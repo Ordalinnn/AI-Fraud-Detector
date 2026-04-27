@@ -137,6 +137,48 @@ TEXT = {
         "how": "How does it work?",
         "footer": "Applied Mathematics + Machine Learning Prototype",
     },
+    # =========================
+# FLOATING LANGUAGE SWITCHER
+# =========================
+st.markdown("""
+<style>
+.lang-box {
+    position: fixed;
+    top: 70px;
+    right: 25px;
+    z-index: 9999;
+    background: rgba(255,255,255,0.85);
+    padding: 10px;
+    border-radius: 18px;
+    box-shadow: 0 10px 30px rgba(15,23,42,0.18);
+    border: 1px solid #e5e7eb;
+}
+</style>
+""", unsafe_allow_html=True)
+
+if "lang" not in st.session_state:
+    st.session_state.lang = "🇰🇿 Қазақша"
+
+st.markdown('<div class="lang-box">', unsafe_allow_html=True)
+
+c1, c2, c3 = st.columns(3)
+
+with c1:
+    if st.button("🇰🇿"):
+        st.session_state.lang = "🇰🇿 Қазақша"
+
+with c2:
+    if st.button("🇷🇺"):
+        st.session_state.lang = "🇷🇺 Русский"
+
+with c3:
+    if st.button("🇬🇧"):
+        st.session_state.lang = "🇬🇧 English"
+
+st.markdown('</div>', unsafe_allow_html=True)
+
+lang = st.session_state.lang
+T = TEXT[lang]
 }
 # =========================
 # LANGUAGE SWITCHER
