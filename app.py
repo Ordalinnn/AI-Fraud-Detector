@@ -8,6 +8,145 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
 # =========================
+# PAGE CONFIG
+# =========================
+st.set_page_config(
+    page_title="AI Fraud Detector",
+    page_icon="🔐",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# =========================
+# LANGUAGE
+# =========================
+lang = st.radio(
+    "Language",
+    ["🇰🇿 Қазақша", "🇷🇺 Русский", "🇬🇧 English"],
+    horizontal=True,
+    label_visibility="collapsed"
+)
+
+TEXT = {
+    "🇰🇿 Қазақша": {
+        "title": "AI Fraud Detector",
+        "subtitle": "SMS, интернет-хабарлама және қоңырау транскриптіндегі алаяқтықты анықтайтын AI-прототип.",
+        "mode": "Тексеру режимі",
+        "sms": "SMS / хабарлама",
+        "bank": "Банк режимі",
+        "call": "Қоңырау транскрипті",
+        "file": "Файл анализі",
+        "demo": "Демо мысалдар",
+        "input_title": "Мәтінді енгізіңіз",
+        "input_label": "SMS, хабарлама немесе қоңырау транскрипті:",
+        "upload": "TXT файл жүктеу",
+        "analyze": "🚀 Анализ жасау",
+        "features": "Жүйе мүмкіндіктері",
+        "result": "📊 Анализ нәтижесі",
+        "risk": "Алаяқтық ықтималдығы",
+        "detected": "Табылған белгілер",
+        "threshold": "Шешім шегі",
+        "model": "Модель",
+        "low": "Қауіп төмен",
+        "mid": "Күмәнді",
+        "high": "Жоғары қауіп",
+        "critical": "Өте жоғары қауіп",
+        "why": "Неге жүйе осындай шешім шығарды?",
+        "domain": "Домен анализі",
+        "vector": "Сандық белгілер",
+        "report": "Есепті жүктеу",
+        "history": "Тексеру тарихы",
+        "advice": "Қауіпсіздік кеңесі",
+        "bad_advice": "Код, пароль, CVV немесе карта нөмірін бермеңіз. Сілтемеге өтпеңіз. Банкке тек ресми нөмір арқылы хабарласыңыз.",
+        "good_advice": "Хабарлама қауіпсіз көрінеді. Бірақ күмән болса, ресми дереккөз арқылы тексеріңіз.",
+        "no_text": "Алдымен мәтін енгізіңіз.",
+        "no_features": "Күшті алаяқтық белгілері табылмады.",
+        "no_domain": "Мәтінде URL немесе домен табылмады.",
+        "download": "📥 TXT есепті жүктеу",
+        "how": "Бұл қалай жұмыс істейді?",
+        "footer": "Қолданбалы математика + машиналық оқыту прототипі",
+    },
+    "🇷🇺 Русский": {
+        "title": "AI Fraud Detector",
+        "subtitle": "AI-прототип для обнаружения мошенничества в SMS, сообщениях и транскриптах звонков.",
+        "mode": "Режим проверки",
+        "sms": "SMS / сообщение",
+        "bank": "Банковский режим",
+        "call": "Транскрипт звонка",
+        "file": "Анализ файла",
+        "demo": "Демо-примеры",
+        "input_title": "Введите текст",
+        "input_label": "SMS, сообщение или транскрипт звонка:",
+        "upload": "Загрузить TXT файл",
+        "analyze": "🚀 Сделать анализ",
+        "features": "Возможности системы",
+        "result": "📊 Результат анализа",
+        "risk": "Вероятность мошенничества",
+        "detected": "Найденные признаки",
+        "threshold": "Порог решения",
+        "model": "Модель",
+        "low": "Низкий риск",
+        "mid": "Подозрительно",
+        "high": "Высокий риск",
+        "critical": "Очень высокий риск",
+        "why": "Почему система приняла такое решение?",
+        "domain": "Анализ домена",
+        "vector": "Числовые признаки",
+        "report": "Скачать отчет",
+        "history": "История проверок",
+        "advice": "Совет по безопасности",
+        "bad_advice": "Не сообщайте код, пароль, CVV или номер карты. Не переходите по ссылке. Свяжитесь с банком только по официальному номеру.",
+        "good_advice": "Сообщение выглядит безопасным. Но если есть сомнения, проверьте через официальный источник.",
+        "no_text": "Сначала введите текст.",
+        "no_features": "Сильные признаки мошенничества не найдены.",
+        "no_domain": "URL или домен в тексте не найден.",
+        "download": "📥 Скачать TXT отчет",
+        "how": "Как это работает?",
+        "footer": "Прототип на основе прикладной математики и машинного обучения",
+    },
+    "🇬🇧 English": {
+        "title": "AI Fraud Detector",
+        "subtitle": "An AI prototype for detecting fraud in SMS, messages, and call transcripts.",
+        "mode": "Check mode",
+        "sms": "SMS / message",
+        "bank": "Banking mode",
+        "call": "Call transcript",
+        "file": "File analysis",
+        "demo": "Demo examples",
+        "input_title": "Enter text",
+        "input_label": "SMS, message, or call transcript:",
+        "upload": "Upload TXT file",
+        "analyze": "🚀 Analyze",
+        "features": "System features",
+        "result": "📊 Analysis result",
+        "risk": "Fraud probability",
+        "detected": "Detected features",
+        "threshold": "Decision threshold",
+        "model": "Model",
+        "low": "Low risk",
+        "mid": "Suspicious",
+        "high": "High risk",
+        "critical": "Critical risk",
+        "why": "Why did the system make this decision?",
+        "domain": "Domain analysis",
+        "vector": "Numeric features",
+        "report": "Download report",
+        "history": "Check history",
+        "advice": "Security advice",
+        "bad_advice": "Do not share codes, passwords, CVV, or card numbers. Do not open suspicious links. Contact the bank only through the official number.",
+        "good_advice": "The message looks safe. If unsure, verify it through official sources.",
+        "no_text": "Please enter text first.",
+        "no_features": "No strong fraud indicators were found.",
+        "no_domain": "No URL or domain was found in the text.",
+        "download": "📥 Download TXT report",
+        "how": "How does it work?",
+        "footer": "Applied Mathematics + Machine Learning Prototype",
+    },
+}
+
+T = TEXT[lang]
+
+# =========================
 # DATA
 # =========================
 data = [
@@ -93,29 +232,59 @@ def extract_features(text):
     }, domains
 
 def explain(features):
-    labels = {
-        "has_link": "Сілтеме анықталды",
-        "urgent_count": "Шұғыл әрекетке шақыру бар",
-        "secret_count": "Код / пароль / CVV сұрауы мүмкін",
-        "money_count": "Банк, ақша немесе картаға қатысты сөздер бар",
-        "threat_count": "Қорқыту немесе қысым жасау белгісі бар",
-        "suspicious_domain": "Доменде күмәнді сөздер бар",
-        "long_domain": "Домен ұзындығы күмәнді",
-        "suspicious_zone": "Күмәнді домен зонасы анықталды",
-        "digit_domain": "Доменде цифрлар бар",
-        "digit_count": "Мәтінде көп сан немесе код кездеседі",
-        "exclamation_count": "Көп леп белгісі қолданылған",
-    }
+    if lang == "🇰🇿 Қазақша":
+        labels = {
+            "has_link": "Сілтеме анықталды",
+            "urgent_count": "Шұғыл әрекетке шақыру бар",
+            "secret_count": "Код / пароль / CVV сұрауы мүмкін",
+            "money_count": "Банк, ақша немесе картаға қатысты сөздер бар",
+            "threat_count": "Қорқыту немесе қысым жасау белгісі бар",
+            "suspicious_domain": "Доменде күмәнді сөздер бар",
+            "long_domain": "Домен ұзындығы күмәнді",
+            "suspicious_zone": "Күмәнді домен зонасы анықталды",
+            "digit_domain": "Доменде цифрлар бар",
+            "digit_count": "Мәтінде көп сан немесе код кездеседі",
+            "exclamation_count": "Көп леп белгісі қолданылған",
+        }
+    elif lang == "🇷🇺 Русский":
+        labels = {
+            "has_link": "Обнаружена ссылка",
+            "urgent_count": "Есть срочный призыв к действию",
+            "secret_count": "Возможен запрос кода / пароля / CVV",
+            "money_count": "Есть слова о банке, деньгах или карте",
+            "threat_count": "Есть признаки давления или угрозы",
+            "suspicious_domain": "В домене есть подозрительные слова",
+            "long_domain": "Домен подозрительно длинный",
+            "suspicious_zone": "Обнаружена подозрительная доменная зона",
+            "digit_domain": "В домене есть цифры",
+            "digit_count": "В тексте много чисел или кодов",
+            "exclamation_count": "Используется много восклицательных знаков",
+        }
+    else:
+        labels = {
+            "has_link": "A link was detected",
+            "urgent_count": "Urgent action words were found",
+            "secret_count": "Possible request for code / password / CVV",
+            "money_count": "Bank, money, or card-related words were found",
+            "threat_count": "Pressure or threat indicators were found",
+            "suspicious_domain": "Suspicious words were found in the domain",
+            "long_domain": "The domain is suspiciously long",
+            "suspicious_zone": "Suspicious domain zone detected",
+            "digit_domain": "The domain contains numbers",
+            "digit_count": "The text contains many numbers or codes",
+            "exclamation_count": "Many exclamation marks were used",
+        }
+
     return [labels[k] for k, v in features.items() if v > 0]
 
 def risk_style(prob):
     if prob < 0.3:
-        return "LOW RISK", "Қауіп төмен", "risk-low", "🟢"
+        return T["low"], "risk-low", "🟢"
     if prob < 0.6:
-        return "SUSPICIOUS", "Күмәнді", "risk-mid", "🟡"
+        return T["mid"], "risk-mid", "🟡"
     if prob < 0.8:
-        return "HIGH RISK", "Жоғары қауіп", "risk-high", "🟠"
-    return "CRITICAL", "Өте жоғары қауіп", "risk-critical", "🔴"
+        return T["high"], "risk-high", "🟠"
+    return T["critical"], "risk-critical", "🔴"
 
 # =========================
 # TRAIN MODEL
@@ -136,155 +305,46 @@ model = Pipeline([
 model.fit(X_train, y_train)
 
 # =========================
-# PAGE CONFIG + STYLE
+# STYLE
 # =========================
-st.set_page_config(
-    page_title="AI Fraud Detector",
-    page_icon="🔐",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-# =========================
-# LANGUAGE SWITCHER
-# =========================
-
-lang = st.radio(
-    "🌐 Language / Тіл / Язык",
-    ["🇰🇿 Қазақша", "🇷🇺 Русский", "🇬🇧 English"],
-    horizontal=True,
-    label_visibility="collapsed"
-)
-
-TEXT = {
-    "🇰🇿 Қазақша": {
-        "title": "AI Fraud Detector",
-        "subtitle": "SMS, интернет-хабарлама және қоңырау транскриптіндегі алаяқтықты анықтайтын AI-прототип.",
-        "input": "Мәтінді енгізіңіз",
-        "textarea": "SMS, хабарлама немесе қоңырау транскрипті:",
-        "analyze": "🚀 Анализ жасау",
-        "result": "📊 Анализ нәтижесі",
-        "risk": "Алаяқтық ықтималдығы",
-        "features": "Табылған белгілер",
-        "threshold": "Шешім шегі",
-        "low": "Қауіп төмен",
-        "mid": "Күмәнді",
-        "high": "Жоғары қауіп",
-        "critical": "Өте жоғары қауіп",
-        "why": "Неге жүйе осындай шешім шығарды?",
-        "domain": "Домен анализі",
-        "vector": "Сандық белгілер",
-        "report": "Есепті жүктеу",
-        "history": "Тексеру тарихы",
-        "advice_bad": "Код, пароль, CVV немесе карта нөмірін бермеңіз. Сілтемеге өтпеңіз.",
-        "advice_good": "Хабарлама қауіпсіз көрінеді, бірақ күмән болса ресми дереккөз арқылы тексеріңіз.",
-    },
-    "🇷🇺 Русский": {
-        "title": "AI Fraud Detector",
-        "subtitle": "AI-прототип для обнаружения мошенничества в SMS, сообщениях и транскриптах звонков.",
-        "input": "Введите текст",
-        "textarea": "SMS, сообщение или транскрипт звонка:",
-        "analyze": "🚀 Сделать анализ",
-        "result": "📊 Результат анализа",
-        "risk": "Вероятность мошенничества",
-        "features": "Найденные признаки",
-        "threshold": "Порог решения",
-        "low": "Низкий риск",
-        "mid": "Подозрительно",
-        "high": "Высокий риск",
-        "critical": "Очень высокий риск",
-        "why": "Почему система приняла такое решение?",
-        "domain": "Анализ домена",
-        "vector": "Числовые признаки",
-        "report": "Скачать отчет",
-        "history": "История проверок",
-        "advice_bad": "Не сообщайте код, пароль, CVV или номер карты. Не переходите по ссылке.",
-        "advice_good": "Сообщение выглядит безопасным, но при сомнении проверьте через официальный источник.",
-    },
-    "🇬🇧 English": {
-        "title": "AI Fraud Detector",
-        "subtitle": "An AI prototype for detecting fraud in SMS, messages, and call transcripts.",
-        "input": "Enter text",
-        "textarea": "SMS, message, or call transcript:",
-        "analyze": "🚀 Analyze",
-        "result": "📊 Analysis result",
-        "risk": "Fraud probability",
-        "features": "Detected features",
-        "threshold": "Decision threshold",
-        "low": "Low risk",
-        "mid": "Suspicious",
-        "high": "High risk",
-        "critical": "Critical risk",
-        "why": "Why did the system make this decision?",
-        "domain": "Domain analysis",
-        "vector": "Numeric features",
-        "report": "Download report",
-        "history": "Check history",
-        "advice_bad": "Do not share codes, passwords, CVV, or card numbers. Do not open suspicious links.",
-        "advice_good": "The message looks safe, but verify through official sources if unsure.",
-    }
-}
-
-T = TEXT[lang]
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
-html, body, [class*="css"] {
-    font-family: 'Inter', sans-serif;
-}
-
 .stApp {
-    background: linear-gradient(135deg, #eef2ff 0%, #f8fafc 45%, #ecfeff 100%);
+    background: linear-gradient(135deg, #eef2ff 0%, #f8fafc 50%, #ecfeff 100%);
 }
-
-.block-container {
-    padding-top: 1.5rem;
-    padding-bottom: 2rem;
-}
-
 .hero {
-    padding: 34px;
-    border-radius: 28px;
+    padding: 32px;
+    border-radius: 26px;
     background: linear-gradient(135deg, #111827 0%, #1e3a8a 55%, #0f766e 100%);
     color: white;
     box-shadow: 0 22px 55px rgba(15, 23, 42, 0.22);
     margin-bottom: 24px;
 }
-
 .hero-title {
-    font-size: 48px;
+    font-size: 46px;
     font-weight: 800;
-    margin-bottom: 8px;
-    letter-spacing: -1px;
 }
-
 .hero-subtitle {
     font-size: 18px;
-    opacity: 0.88;
-    max-width: 900px;
+    opacity: 0.9;
 }
-
 .badge {
     display: inline-block;
     padding: 8px 14px;
     border-radius: 999px;
     background: rgba(255,255,255,0.14);
-    border: 1px solid rgba(255,255,255,0.24);
+    border: 1px solid rgba(255,255,255,0.25);
     margin-right: 8px;
     margin-top: 16px;
-    font-size: 14px;
 }
-
 .glass-card {
-    background: rgba(255,255,255,0.78);
+    background: rgba(255,255,255,0.82);
     border: 1px solid rgba(226,232,240,0.9);
     border-radius: 24px;
     padding: 24px;
     box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
-    backdrop-filter: blur(12px);
     margin-bottom: 18px;
 }
-
 .metric-card {
     background: white;
     border-radius: 22px;
@@ -293,53 +353,27 @@ html, body, [class*="css"] {
     border: 1px solid #e5e7eb;
     text-align: center;
 }
-
 .metric-label {
     color: #64748b;
     font-size: 14px;
     font-weight: 600;
 }
-
 .metric-value {
     color: #0f172a;
-    font-size: 34px;
+    font-size: 32px;
     font-weight: 800;
-    margin-top: 6px;
 }
-
 .risk-low, .risk-mid, .risk-high, .risk-critical {
     border-radius: 24px;
-    padding: 26px;
-    font-size: 28px;
+    padding: 24px;
+    font-size: 26px;
     font-weight: 800;
     margin: 18px 0;
-    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.10);
 }
-
-.risk-low {
-    background: linear-gradient(135deg, #dcfce7, #bbf7d0);
-    color: #166534;
-    border: 1px solid #86efac;
-}
-
-.risk-mid {
-    background: linear-gradient(135deg, #fef9c3, #fde68a);
-    color: #854d0e;
-    border: 1px solid #facc15;
-}
-
-.risk-high {
-    background: linear-gradient(135deg, #ffedd5, #fed7aa);
-    color: #9a3412;
-    border: 1px solid #fb923c;
-}
-
-.risk-critical {
-    background: linear-gradient(135deg, #fee2e2, #fecaca);
-    color: #991b1b;
-    border: 1px solid #f87171;
-}
-
+.risk-low {background:#dcfce7;color:#166534;}
+.risk-mid {background:#fef9c3;color:#854d0e;}
+.risk-high {background:#ffedd5;color:#9a3412;}
+.risk-critical {background:#fee2e2;color:#991b1b;}
 .feature-chip {
     display: inline-block;
     padding: 10px 14px;
@@ -350,7 +384,6 @@ html, body, [class*="css"] {
     margin: 5px;
     border: 1px solid #c7d2fe;
 }
-
 .domain-box {
     padding: 14px;
     border-radius: 16px;
@@ -359,20 +392,6 @@ html, body, [class*="css"] {
     font-family: monospace;
     margin-bottom: 8px;
 }
-
-.advice-box {
-    padding: 22px;
-    border-radius: 22px;
-    background: white;
-    border-left: 7px solid #ef4444;
-    box-shadow: 0 14px 35px rgba(15, 23, 42, 0.08);
-}
-
-.small-muted {
-    color: #64748b;
-    font-size: 14px;
-}
-
 .footer {
     text-align: center;
     color: #64748b;
@@ -386,51 +405,36 @@ html, body, [class*="css"] {
 # SIDEBAR
 # =========================
 with st.sidebar:
-    st.markdown("## 🔐 AI Fraud Detector")
-    st.write("Жоба режимдері")
+    st.markdown(f"## 🔐 {T['title']}")
 
     mode = st.selectbox(
-        "Тексеру режимі",
-        ["SMS / хабарлама", "Банковский режим", "Қоңырау транскрипті", "Файл анализі"]
+        T["mode"],
+        [T["sms"], T["bank"], T["call"], T["file"]]
     )
 
-    threshold = st.slider("Decision threshold", 0.1, 0.9, 0.5, 0.05)
+    threshold = st.slider(T["threshold"], 0.1, 0.9, 0.5, 0.05)
 
     st.divider()
-    st.markdown("### 🧪 Демо мысалдар")
+    st.markdown(f"### 🧪 {T['demo']}")
     demo = st.selectbox(
-        "Мысал таңдаңыз",
-        [
-            "Fraud SMS",
-            "Fraud Call",
-            "Safe Message",
-            "Kazakh Fraud",
-        ]
+        T["demo"],
+        ["Fraud SMS", "Fraud Call", "Safe Message", "Kazakh Fraud"]
     )
 
-    demo_texts = {
-        "Fraud SMS": "Срочно! Ваша карта заблокирована. Отправьте код из SMS и перейдите по ссылке http://secure-login.xyz",
-        "Fraud Call": "Здравствуйте, я сотрудник банка. Назовите код из SMS, чтобы мы защитили ваш счет.",
-        "Safe Message": "Привет, завтра урок математики в 9:00. Не забудь тетрадь.",
-        "Kazakh Fraud": "Сіздің картаңыз бұғатталды. Шұғыл түрде SMS кодты жіберіңіз және http://kaspi-login.xyz сайтына кіріңіз."
-    }
-
-    st.divider()
-    st.markdown("### 📌 Модель")
-    st.write("Algorithm: Logistic Regression")
-    st.write("Input: text features")
-    st.write("Output: fraud probability")
+demo_texts = {
+    "Fraud SMS": "Срочно! Ваша карта заблокирована. Отправьте код из SMS и перейдите по ссылке http://secure-login.xyz",
+    "Fraud Call": "Здравствуйте, я сотрудник банка. Назовите код из SMS, чтобы мы защитили ваш счет.",
+    "Safe Message": "Привет, завтра урок математики в 9:00. Не забудь тетрадь.",
+    "Kazakh Fraud": "Сіздің картаңыз бұғатталды. Шұғыл түрде SMS кодты жіберіңіз және http://kaspi-login.xyz сайтына кіріңіз."
+}
 
 # =========================
 # HERO
 # =========================
-st.markdown("""
+st.markdown(f"""
 <div class="hero">
-    <div class="hero-title">AI Fraud Detector</div>
-    <div class="hero-subtitle">
-        SMS, интернет-хабарлама және қоңырау транскриптіндегі алаяқтық белгілерін анықтайтын
-        логистикалық регрессияға негізделген AI-прототип.
-    </div>
+    <div class="hero-title">🔐 {T['title']}</div>
+    <div class="hero-subtitle">{T['subtitle']}</div>
     <span class="badge">Logistic Regression</span>
     <span class="badge">Domain Analysis</span>
     <span class="badge">Explainable AI</span>
@@ -439,119 +443,91 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =========================
-# INPUT SECTION
+# INPUT
 # =========================
-left, right = st.columns([2.1, 1])
+left, right = st.columns([2, 1])
 
 with left:
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-    st.subheader("✍️ Мәтінді енгізіңіз")
-
-    default_text = demo_texts[demo]
+    st.subheader(f"✍️ {T['input_title']}")
 
     uploaded = None
-    if mode == "Файл анализі":
-        uploaded = st.file_uploader("TXT файл жүктеу", type=["txt"])
+    if mode == T["file"]:
+        uploaded = st.file_uploader(T["upload"], type=["txt"])
 
     if uploaded:
         input_text = uploaded.read().decode("utf-8", errors="ignore")
-        st.success("Файл сәтті жүктелді.")
+        st.success("File uploaded")
     else:
         input_text = st.text_area(
-            "SMS, хабарлама немесе қоңырау транскрипті:",
-            value=default_text,
+            T["input_label"],
+            value=demo_texts[demo],
             height=190
         )
 
-    analyze = st.button("🚀 Анализ жасау", use_container_width=True)
+    analyze = st.button(T["analyze"], use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 with right:
-    st.markdown("""
+    st.markdown(f"""
     <div class="glass-card">
-        <h3>⚙️ Жүйе мүмкіндіктері</h3>
-        <p>✅ мәтіннен белгілерді шығарады</p>
-        <p>✅ доменді тексереді</p>
-        <p>✅ fraud risk пайызын есептейді</p>
-        <p>✅ шешімді түсіндіреді</p>
-        <p>✅ есепті жүктеуге мүмкіндік береді</p>
+        <h3>⚙️ {T['features']}</h3>
+        <p>✅ Text analysis</p>
+        <p>✅ Domain analysis</p>
+        <p>✅ Logistic regression</p>
+        <p>✅ Explain AI</p>
+        <p>✅ Risk report</p>
     </div>
     """, unsafe_allow_html=True)
 
 # =========================
-# ANALYSIS
+# HISTORY
 # =========================
 if "history" not in st.session_state:
     st.session_state.history = []
 
+# =========================
+# ANALYSIS
+# =========================
 if analyze:
     if not input_text.strip():
-        st.warning("Алдымен мәтін енгізіңіз.")
+        st.warning(T["no_text"])
     else:
         features, domains = extract_features(input_text)
         X_input = pd.DataFrame([features])
         prob = model.predict_proba(X_input)[0][1]
         pred = int(prob >= threshold)
-        risk_en, risk_kz, risk_class, emoji = risk_style(prob)
+        risk_label, risk_class, emoji = risk_style(prob)
         explanations = explain(features)
 
-        st.markdown("## 📊 Анализ нәтижесі")
+        st.markdown(f"## {T['result']}")
 
-        m1, m2, m3, m4 = st.columns(4)
-        m1.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">Fraud Risk</div>
-            <div class="metric-value">{prob*100:.1f}%</div>
-        </div>
-        """, unsafe_allow_html=True)
+        c1, c2, c3, c4 = st.columns(4)
+        c1.markdown(f'<div class="metric-card"><div class="metric-label">{T["risk"]}</div><div class="metric-value">{prob*100:.1f}%</div></div>', unsafe_allow_html=True)
+        c2.markdown(f'<div class="metric-card"><div class="metric-label">{T["detected"]}</div><div class="metric-value">{len(explanations)}</div></div>', unsafe_allow_html=True)
+        c3.markdown(f'<div class="metric-card"><div class="metric-label">{T["threshold"]}</div><div class="metric-value">{threshold:.2f}</div></div>', unsafe_allow_html=True)
+        c4.markdown(f'<div class="metric-card"><div class="metric-label">{T["model"]}</div><div class="metric-value">LR</div></div>', unsafe_allow_html=True)
 
-        m2.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">Detected Features</div>
-            <div class="metric-value">{len(explanations)}</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        m3.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">Threshold</div>
-            <div class="metric-value">{threshold:.2f}</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        m4.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">Model</div>
-            <div class="metric-value">LR</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        st.markdown(f"""
-        <div class="{risk_class}">
-            {emoji} {risk_en} — {risk_kz}
-        </div>
-        """, unsafe_allow_html=True)
-
+        st.markdown(f'<div class="{risk_class}">{emoji} {risk_label}</div>', unsafe_allow_html=True)
         st.progress(float(prob))
 
         tab1, tab2, tab3, tab4, tab5 = st.tabs([
             "🔍 Explain AI",
-            "🌐 Domain",
-            "🧠 Feature Vector",
-            "📥 Report",
-            "📜 History"
+            f"🌐 {T['domain']}",
+            f"🧠 {T['vector']}",
+            f"📥 {T['report']}",
+            f"📜 {T['history']}"
         ])
 
         with tab1:
-            st.subheader("Неге жүйе осындай шешім шығарды?")
+            st.subheader(T["why"])
             if explanations:
                 chips = "".join([f'<span class="feature-chip">{e}</span>' for e in explanations])
                 st.markdown(chips, unsafe_allow_html=True)
             else:
-                st.success("Күшті алаяқтық белгілері табылмады.")
+                st.success(T["no_features"])
 
-            st.divider()
-            st.subheader("Белгілердің модельге әсері")
+            st.subheader("Feature contribution")
             coef = model.named_steps["clf"].coef_[0]
             contrib = []
             for name, value, w in zip(X_train.columns, X_input.iloc[0], coef):
@@ -560,48 +536,23 @@ if analyze:
             contrib_df = pd.DataFrame(contrib, columns=["Feature", "Value", "Weight", "Contribution"])
             st.dataframe(contrib_df.sort_values("Contribution", ascending=False), use_container_width=True)
 
-            st.subheader("Қауіпсіздік кеңесі")
+            st.subheader(T["advice"])
             if pred == 1:
-                st.markdown("""
-                <div class="advice-box">
-                    <b>Қауіп жоғары.</b><br>
-                    Код, пароль, CVV немесе карта нөмірін бермеңіз.
-                    Сілтемеге өтпеңіз. Банкке тек ресми нөмір арқылы хабарласыңыз.
-                </div>
-                """, unsafe_allow_html=True)
+                st.error(T["bad_advice"])
             else:
-                st.success("Хабарлама қауіпсіз көрінеді. Бірақ күмән болса, ресми дереккөз арқылы тексеріңіз.")
+                st.success(T["good_advice"])
 
         with tab2:
-            st.subheader("Домен анализі")
+            st.subheader(T["domain"])
             if domains:
                 for d in domains:
                     st.markdown(f'<div class="domain-box">{d}</div>', unsafe_allow_html=True)
-
-                    domain_warnings = []
-                    if len(d) > 20:
-                        domain_warnings.append("Домен ұзын")
-                    if any(w in d for w in suspicious_domain_words):
-                        domain_warnings.append("Күмәнді сөздер бар")
-                    if any(d.endswith(z) for z in suspicious_zones):
-                        domain_warnings.append("Күмәнді зона")
-                    if any(ch.isdigit() for ch in d):
-                        domain_warnings.append("Цифрлар бар")
-
-                    if domain_warnings:
-                        for w in domain_warnings:
-                            st.warning(w)
-                    else:
-                        st.success("Доменде айқын қауіп белгісі табылмады.")
             else:
-                st.info("Мәтінде URL немесе домен табылмады.")
+                st.info(T["no_domain"])
 
         with tab3:
-            st.subheader("Модельге берілген сандық белгілер")
+            st.subheader(T["vector"])
             st.dataframe(X_input, use_container_width=True)
-
-            st.subheader("Оқыту деректерінің қысқаша көрінісі")
-            st.dataframe(pd.DataFrame(data, columns=["Text", "Label"]).head(10), use_container_width=True)
 
         with tab4:
             report = f"""
@@ -612,7 +563,7 @@ Input:
 {input_text}
 
 Fraud risk: {prob*100:.1f}%
-Risk level: {risk_kz}
+Risk level: {risk_label}
 Threshold: {threshold}
 
 Detected features:
@@ -622,10 +573,10 @@ Domains:
 {chr(10).join(domains) if domains else "No domains"}
 
 Advice:
-{"Do not share SMS codes, passwords, CVV or card data. Do not open suspicious links." if pred == 1 else "Looks relatively safe, but verify through official sources if unsure."}
+{T["bad_advice"] if pred == 1 else T["good_advice"]}
 """
             st.download_button(
-                "📥 TXT есепті жүктеу",
+                T["download"],
                 report,
                 file_name="fraud_analysis_report.txt",
                 use_container_width=True
@@ -634,7 +585,7 @@ Advice:
         st.session_state.history.append({
             "Time": datetime.now().strftime("%H:%M:%S"),
             "Risk %": round(prob * 100, 1),
-            "Level": risk_kz,
+            "Level": risk_label,
             "Text": input_text[:70]
         })
 
@@ -642,10 +593,14 @@ Advice:
             if st.session_state.history:
                 st.dataframe(pd.DataFrame(st.session_state.history), use_container_width=True)
             else:
-                st.write("Әзірге тарих жоқ.")
+                st.write("No history")
 
-st.markdown("""
-<div class="footer">
-    AI Fraud Detector • Applied Mathematics + Machine Learning Prototype
-</div>
-""", unsafe_allow_html=True)
+with st.expander(f"📘 {T['how']}"):
+    if lang == "🇰🇿 Қазақша":
+        st.write("1. Мәтіннен белгілер алынады. 2. Олар сандық векторға айналады. 3. Логистикалық регрессия ықтималдық есептейді. 4. Сайт нәтиже мен кеңес береді.")
+    elif lang == "🇷🇺 Русский":
+        st.write("1. Из текста извлекаются признаки. 2. Они превращаются в числовой вектор. 3. Логистическая регрессия считает вероятность. 4. Сайт показывает результат и совет.")
+    else:
+        st.write("1. Features are extracted from the text. 2. They are converted into a numeric vector. 3. Logistic regression calculates probability. 4. The site shows the result and advice.")
+
+st.markdown(f'<div class="footer">{T["footer"]}</div>', unsafe_allow_html=True)
