@@ -162,13 +162,12 @@ T = TEXT[lang]
 # DATA
 # =========================
 data = [
-    # FRAUD EXAMPLES (expanded real-life)
+    # FRAUD: bank / card / account
     ["срочно отправьте код из SMS", 1],
     ["ваша карта заблокирована перейдите по ссылке http://secure-login.xyz", 1],
     ["перейдите по ссылке http://kaspi-login.xyz", 1],
     ["назовите пароль чтобы защитить счет", 1],
     ["введите CVV и номер карты", 1],
-    ["вы выиграли приз оплатите доставку", 1],
     ["ваш аккаунт будет удален срочно подтвердите вход", 1],
     ["не говорите никому и отправьте код", 1],
     ["сотрудник банка просит код из SMS", 1],
@@ -178,38 +177,40 @@ data = [
     ["переведите деньги на безопасный счет", 1],
     ["это служба безопасности банка срочно назовите код", 1],
     ["вам одобрен кредит отправьте код подтверждения", 1],
+    ["ваша карта временно ограничена подтвердите данные", 1],
+    ["банк предупреждает о списании подтвердите операцию", 1],
+    ["ваш личный кабинет заблокирован войдите по ссылке", 1],
+
+    # FRAUD: delivery / prize / fake government / relatives
+    ["вы выиграли приз оплатите доставку", 1],
     ["вы получили бонус перейдите по ссылке и введите данные", 1],
     ["ваша посылка задержана оплатите пошлину по ссылке", 1],
     ["подтвердите оплату иначе штраф", 1],
     ["ваш номер выиграл в акции отправьте данные карты", 1],
     ["мы из полиции ваш счет используется мошенниками срочно действуйте", 1],
     ["ваш родственник попал в аварию срочно переведите деньги", 1],
+    ["на ваше имя оформлен кредит срочно свяжитесь с оператором", 1],
+    ["это госуслуги подтвердите учетную запись иначе доступ будет закрыт", 1],
+    ["вам начислена компенсация введите номер карты для получения", 1],
 
-    # SAFE EXAMPLES
-    ["привет как дела", 0],
-    ["завтра урок математики в 9", 0],
-    ["встреча в 15:00", 0],
-    ["ваш заказ доставлен", 0],
-    ["спасибо за покупку", 0],
-    ["добрый день документы готовы", 0],
-    ["сегодня тренировка в 18:00", 0],
-    ["сәлем қалайсың", 0],
-    ["ертең математика сабағы болады", 0],
-    ["үй тапсырмасын жібердім", 0],
-],
-    ["ваша карта заблокирована перейдите по ссылке http://secure-login.xyz", 1],
-    ["перейдите по ссылке http://kaspi-login.xyz", 1],
-    ["назовите пароль чтобы защитить счет", 1],
-    ["введите CVV и номер карты", 1],
-    ["вы выиграли приз оплатите доставку", 1],
-    ["ваш аккаунт будет удален срочно подтвердите вход", 1],
-    ["не говорите никому и отправьте код", 1],
-    ["сотрудник банка просит код из SMS", 1],
-    ["ваш счет под угрозой продиктуйте пароль", 1],
+    # FRAUD: English examples
+    ["urgent your card is blocked verify your account now", 1],
+    ["your account will be suspended enter your password", 1],
+    ["security department needs your verification code", 1],
+    ["you won a prize pay delivery fee by link", 1],
+    ["transfer money to a safe account immediately", 1],
+    ["your parcel is on hold pay customs fee", 1],
+    ["confirm your identity using this secure login link", 1],
+
+    # FRAUD: Kazakh examples
     ["құттықтаймыз сіз ұтыс ұттыңыз карта деректерін енгізіңіз", 1],
     ["сіздің картаңыз бұғатталды SMS кодты жіберіңіз", 1],
     ["шұғыл түрде сілтемеге өтіп аккаунтты растаңыз", 1],
     ["банк қызметкерімін кодты айтыңыз", 1],
+    ["қауіпсіз шотқа ақша аударыңыз", 1],
+    ["жеке кабинетіңіз жабылады құпия кодты енгізіңіз", 1],
+
+    # SAFE examples
     ["привет как дела", 0],
     ["завтра урок математики в 9", 0],
     ["встреча в 15:00", 0],
@@ -217,9 +218,16 @@ data = [
     ["спасибо за покупку", 0],
     ["добрый день документы готовы", 0],
     ["сегодня тренировка в 18:00", 0],
+    ["ваш чек доступен в приложении", 0],
+    ["напоминаем о записи к врачу завтра", 0],
+    ["ваш заказ готов к выдаче", 0],
+    ["посылка доставлена в пункт выдачи", 0],
+    ["оплата прошла успешно спасибо", 0],
     ["сәлем қалайсың", 0],
     ["ертең математика сабағы болады", 0],
     ["үй тапсырмасын жібердім", 0],
+    ["hello see you tomorrow at school", 0],
+    ["your appointment is confirmed", 0],
 ]
 
 urgent_words = [
@@ -242,8 +250,26 @@ threat_words = [
     "blocked", "suspended", "terminated", "penalty", "freeze",
     "ограничен", "будет закрыт"
 ]
-suspicious_domain_words = ["login", "verify", "secure", "bonus", "gift", "bank", "kaspi"]
-suspicious_zones = [".xyz", ".top", ".click", ".site", ".online"]
+suspicious_domain_words = [
+    "login", "verify", "secure", "bonus", "gift", "bank", "kaspi",
+    "account", "support", "confirm", "prize", "payment", "wallet",
+    "security", "update", "auth", "free"
+]
+suspicious_zones = [".xyz", ".top", ".click", ".site", ".online", ".live", ".info", ".icu"]
+
+identity_words = [
+    "паспорт", "иин", "удостоверение", "личность", "identity",
+    "document", "id card", "жсн", "құжат"
+]
+reward_words = [
+    "выиграли", "приз", "бонус", "подарок", "акция", "компенсация",
+    "won", "prize", "gift", "bonus", "reward", "ұтыс", "сыйлық"
+]
+pressure_phrases = [
+    "не говорите никому", "никому не сообщайте", "это секретно",
+    "только сейчас", "последний шанс", "иначе", "do not tell anyone",
+    "last chance", "only now", "қазір ғана"
+]
 
 # =========================
 # FUNCTIONS
@@ -285,12 +311,16 @@ def extract_features(text):
         "secret_count": count_matches(text, secret_words),
         "money_count": count_matches(text, money_words),
         "threat_count": count_matches(text, threat_words),
+        "identity_count": count_matches(text, identity_words),
+        "reward_count": count_matches(text, reward_words),
+        "pressure_count": count_matches(text, pressure_phrases),
         "suspicious_domain": suspicious_domain,
         "long_domain": long_domain,
         "suspicious_zone": suspicious_zone,
         "digit_domain": digit_domain,
         "digit_count": sum(ch.isdigit() for ch in text),
         "exclamation_count": text.count("!"),
+        "uppercase_count": sum(1 for ch in text if ch.isupper()),
     }, domains
 
 def explain(features):
@@ -301,12 +331,16 @@ def explain(features):
             "secret_count": "Код / пароль / CVV сұрауы мүмкін",
             "money_count": "Банк, ақша немесе картаға қатысты сөздер бар",
             "threat_count": "Қорқыту немесе қысым жасау белгісі бар",
+            "identity_count": "Жеке құжат немесе жеке ақпарат сұралуы мүмкін",
+            "reward_count": "Ұтыс, бонус немесе сыйлық уәдесі бар",
+            "pressure_count": "Қысым жасау немесе құпия ұстау белгісі бар",
             "suspicious_domain": "Доменде күмәнді сөздер бар",
             "long_domain": "Домен ұзындығы күмәнді",
             "suspicious_zone": "Күмәнді домен зонасы анықталды",
             "digit_domain": "Доменде цифрлар бар",
             "digit_count": "Мәтінде көп сан немесе код кездеседі",
             "exclamation_count": "Көп леп белгісі қолданылған",
+            "uppercase_count": "Үлкен әріптер көп қолданылған",
         }
     elif lang == "🇷🇺 RU":
         labels = {
@@ -315,12 +349,16 @@ def explain(features):
             "secret_count": "Возможен запрос кода / пароля / CVV",
             "money_count": "Есть слова о банке, деньгах или карте",
             "threat_count": "Есть признаки давления или угрозы",
+            "identity_count": "Возможен запрос личных документов или данных",
+            "reward_count": "Есть обещание выигрыша, бонуса или подарка",
+            "pressure_count": "Есть давление или просьба держать всё в секрете",
             "suspicious_domain": "В домене есть подозрительные слова",
             "long_domain": "Домен подозрительно длинный",
             "suspicious_zone": "Обнаружена подозрительная доменная зона",
             "digit_domain": "В домене есть цифры",
             "digit_count": "В тексте много чисел или кодов",
             "exclamation_count": "Используется много восклицательных знаков",
+            "uppercase_count": "Используется много заглавных букв",
         }
     else:
         labels = {
@@ -329,12 +367,16 @@ def explain(features):
             "secret_count": "Possible request for code / password / CVV",
             "money_count": "Bank, money, or card-related words were found",
             "threat_count": "Pressure or threat indicators were found",
+            "identity_count": "Possible request for personal identity data",
+            "reward_count": "Prize, bonus, or gift promise was found",
+            "pressure_count": "Pressure or secrecy phrase was found",
             "suspicious_domain": "Suspicious words were found in the domain",
             "long_domain": "The domain is suspiciously long",
             "suspicious_zone": "Suspicious domain zone detected",
             "digit_domain": "The domain contains numbers",
             "digit_count": "The text contains many numbers or codes",
             "exclamation_count": "Many exclamation marks were used",
+            "uppercase_count": "Many uppercase letters were used",
         }
     return [labels[k] for k, v in features.items() if v > 0]
 
@@ -346,6 +388,27 @@ def risk_style(prob):
     if prob < 0.8:
         return T["high"], "risk-high", "🟠"
     return T["critical"], "risk-critical", "🔴"
+
+def rule_boost(features):
+    """Extra rule-based boost for realistic scam patterns.
+    It helps the prototype catch dangerous combinations even with small training data.
+    """
+    boost = 0.0
+    if features["has_link"] and features["secret_count"]:
+        boost += 0.15
+    if features["urgent_count"] and features["money_count"]:
+        boost += 0.12
+    if features["secret_count"] and features["money_count"]:
+        boost += 0.15
+    if features["threat_count"] and features["has_link"]:
+        boost += 0.10
+    if features["reward_count"] and features["money_count"]:
+        boost += 0.12
+    if features["pressure_count"]:
+        boost += 0.10
+    if features["suspicious_zone"] or features["suspicious_domain"]:
+        boost += 0.10
+    return boost
 
 # =========================
 # TRAIN MODEL
@@ -730,7 +793,7 @@ with st.sidebar:
     st.markdown(f"### 🧪 {T['demo']}")
     demo = st.selectbox(
         T["demo"],
-        ["Fraud SMS", "Fraud Call", "Safe Message"]
+        ["Fraud SMS", "Fraud Call", "Fake Delivery", "Fake Prize", "Relative Scam", "Safe Message"]
     )
 
     st.divider()
@@ -739,12 +802,16 @@ with st.sidebar:
     st.markdown("• Feature Engineering")
     st.markdown("• Domain Analysis")
     st.markdown("• Explainable AI")
+    st.markdown("• Rule-based Risk Boost")
+    st.markdown("• Real-life Scam Scenarios")
 
 demo_texts = {
     "Fraud SMS": "Срочно! Ваша карта заблокирована. Отправьте код из SMS и перейдите по ссылке http://secure-login.xyz",
-    "Fraud Call": "Здравствуйте, я сотрудник банка. Назовите код из SMS, чтобы мы защитили ваш счет.",
+    "Fraud Call": "Здравствуйте, я сотрудник службы безопасности банка. По вашему счету подозрительная операция. Назовите код из SMS, чтобы мы отменили перевод.",
     "Safe Message": "Привет, завтра урок математики в 9:00. Не забудь тетрадь.",
-    "Kazakh Fraud": "Сіздің картаңыз бұғатталды. Шұғыл түрде SMS кодты жіберіңіз және http://kaspi-login.xyz сайтына кіріңіз."
+    "Fake Delivery": "Ваша посылка задержана. Срочно оплатите таможенную пошлину по ссылке http://delivery-pay-online.xyz",
+    "Fake Prize": "Поздравляем! Вы выиграли приз. Для получения подарка введите номер карты и CVV.",
+    "Relative Scam": "Ваш родственник попал в аварию. Срочно переведите деньги, никому не говорите."
 }
 
 # =========================
@@ -807,6 +874,8 @@ with right:
         <p>🧠 Logistic regression</p>
         <p>🔍 Explainable result</p>
         <p>📥 Downloadable report</p>
+        <p>🚨 Real scam scenarios</p>
+        <p>⚡ Rule-based risk boost</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -825,7 +894,8 @@ if analyze:
     else:
         features, domains = extract_features(input_text)
         X_input = pd.DataFrame([features])
-        prob = model.predict_proba(X_input)[0][1]
+        raw_prob = model.predict_proba(X_input)[0][1]
+        prob = min(0.99, raw_prob + rule_boost(features))
         pred = int(prob >= threshold)
         risk_label, risk_class, emoji = risk_style(prob)
         explanations = explain(features)
@@ -892,7 +962,8 @@ Date: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 Input:
 {input_text}
 
-Fraud risk: {prob*100:.1f}%
+Raw ML probability: {raw_prob*100:.1f}%
+Final fraud risk after rule boost: {prob*100:.1f}%
 Risk level: {risk_label}
 Threshold: {threshold}
 
