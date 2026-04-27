@@ -41,7 +41,7 @@ lang = st.session_state.lang
 
 TEXT = {
     "🇰🇿 KZ": {
-        "title": "AI Fraud Detector",
+        "title": "AI Fraud Detector Бека Лох",
         "subtitle": "SMS, интернет-хабарлама және қоңырау транскриптіндегі алаяқтықты анықтайтын AI-прототип.",
         "mode": "Тексеру режимі",
         "sms": "SMS / хабарлама",
