@@ -143,8 +143,41 @@ TEXT = {
         "footer": "Applied Mathematics + Machine Learning Prototype",
     },
 }
+# =========================
+# LANGUAGE SWITCHER
+# =========================
+if "lang" not in st.session_state:
+    st.session_state.lang = "🇰🇿 KZ"
 
-T = TEXT[lang]
+c1, c2, c3 = st.columns([1, 1, 1])
+
+with c1:
+    if st.button("🇰🇿 KZ", use_container_width=True):
+        st.session_state.lang = "🇰🇿 KZ"
+
+with c2:
+    if st.button("🇷🇺 RU", use_container_width=True):
+        st.session_state.lang = "🇷🇺 RU"
+
+with c3:
+    if st.button("🇬🇧 EN", use_container_width=True):
+        st.session_state.lang = "🇬🇧 EN"
+
+lang = st.session_state.lang
+
+T = TEXT = {
+    "🇰🇿 KZ": {
+        # казахский текст
+    },
+    "🇷🇺 RU": {
+        # русский текст
+    },
+    "🇬🇧 EN": {
+        # английский текст
+    }
+}
+
+T = TEXT[lang]]
 
 # =========================
 # DATA
