@@ -144,7 +144,87 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+# =========================
+# LANGUAGE SWITCHER
+# =========================
 
+lang = st.radio(
+    "🌐 Language / Тіл / Язык",
+    ["🇰🇿 Қазақша", "🇷🇺 Русский", "🇬🇧 English"],
+    horizontal=True,
+    label_visibility="collapsed"
+)
+
+TEXT = {
+    "🇰🇿 Қазақша": {
+        "title": "AI Fraud Detector",
+        "subtitle": "SMS, интернет-хабарлама және қоңырау транскриптіндегі алаяқтықты анықтайтын AI-прототип.",
+        "input": "Мәтінді енгізіңіз",
+        "textarea": "SMS, хабарлама немесе қоңырау транскрипті:",
+        "analyze": "🚀 Анализ жасау",
+        "result": "📊 Анализ нәтижесі",
+        "risk": "Алаяқтық ықтималдығы",
+        "features": "Табылған белгілер",
+        "threshold": "Шешім шегі",
+        "low": "Қауіп төмен",
+        "mid": "Күмәнді",
+        "high": "Жоғары қауіп",
+        "critical": "Өте жоғары қауіп",
+        "why": "Неге жүйе осындай шешім шығарды?",
+        "domain": "Домен анализі",
+        "vector": "Сандық белгілер",
+        "report": "Есепті жүктеу",
+        "history": "Тексеру тарихы",
+        "advice_bad": "Код, пароль, CVV немесе карта нөмірін бермеңіз. Сілтемеге өтпеңіз.",
+        "advice_good": "Хабарлама қауіпсіз көрінеді, бірақ күмән болса ресми дереккөз арқылы тексеріңіз.",
+    },
+    "🇷🇺 Русский": {
+        "title": "AI Fraud Detector",
+        "subtitle": "AI-прототип для обнаружения мошенничества в SMS, сообщениях и транскриптах звонков.",
+        "input": "Введите текст",
+        "textarea": "SMS, сообщение или транскрипт звонка:",
+        "analyze": "🚀 Сделать анализ",
+        "result": "📊 Результат анализа",
+        "risk": "Вероятность мошенничества",
+        "features": "Найденные признаки",
+        "threshold": "Порог решения",
+        "low": "Низкий риск",
+        "mid": "Подозрительно",
+        "high": "Высокий риск",
+        "critical": "Очень высокий риск",
+        "why": "Почему система приняла такое решение?",
+        "domain": "Анализ домена",
+        "vector": "Числовые признаки",
+        "report": "Скачать отчет",
+        "history": "История проверок",
+        "advice_bad": "Не сообщайте код, пароль, CVV или номер карты. Не переходите по ссылке.",
+        "advice_good": "Сообщение выглядит безопасным, но при сомнении проверьте через официальный источник.",
+    },
+    "🇬🇧 English": {
+        "title": "AI Fraud Detector",
+        "subtitle": "An AI prototype for detecting fraud in SMS, messages, and call transcripts.",
+        "input": "Enter text",
+        "textarea": "SMS, message, or call transcript:",
+        "analyze": "🚀 Analyze",
+        "result": "📊 Analysis result",
+        "risk": "Fraud probability",
+        "features": "Detected features",
+        "threshold": "Decision threshold",
+        "low": "Low risk",
+        "mid": "Suspicious",
+        "high": "High risk",
+        "critical": "Critical risk",
+        "why": "Why did the system make this decision?",
+        "domain": "Domain analysis",
+        "vector": "Numeric features",
+        "report": "Download report",
+        "history": "Check history",
+        "advice_bad": "Do not share codes, passwords, CVV, or card numbers. Do not open suspicious links.",
+        "advice_good": "The message looks safe, but verify through official sources if unsure.",
+    }
+}
+
+T = TEXT[lang]
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
