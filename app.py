@@ -147,37 +147,25 @@ TEXT = {
 # LANGUAGE SWITCHER
 # =========================
 if "lang" not in st.session_state:
-    st.session_state.lang = "🇰🇿 KZ"
+    st.session_state.lang = "🇰🇿 Қазақша"
 
-c1, c2, c3 = st.columns([1, 1, 1])
+c1, c2, c3 = st.columns(3)
 
 with c1:
     if st.button("🇰🇿 KZ", use_container_width=True):
-        st.session_state.lang = "🇰🇿 KZ"
+        st.session_state.lang = "🇰🇿 Қазақша"
 
 with c2:
     if st.button("🇷🇺 RU", use_container_width=True):
-        st.session_state.lang = "🇷🇺 RU"
+        st.session_state.lang = "🇷🇺 Русский"
 
 with c3:
     if st.button("🇬🇧 EN", use_container_width=True):
-        st.session_state.lang = "🇬🇧 EN"
+        st.session_state.lang = "🇬🇧 English"
 
 lang = st.session_state.lang
+T = TEXT[lang]
 
-T = TEXT = {
-    "🇰🇿 KZ": {
-        # казахский текст
-    },
-    "🇷🇺 RU": {
-        # русский текст
-    },
-    "🇬🇧 EN": {
-        # английский текст
-    }
-}
-
-T = TEXT[lang]]
 
 # =========================
 # DATA
