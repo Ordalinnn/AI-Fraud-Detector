@@ -3,6 +3,8 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 from datetime import datetime
+from pathlib import Path
+import base64
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
@@ -16,6 +18,19 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+
+# =========================
+# LOGO HELPER
+# =========================
+def image_to_base64(path: str) -> str:
+    file_path = Path(path)
+    if not file_path.exists():
+        return ""
+    return base64.b64encode(file_path.read_bytes()).decode()
+
+LOGO_B64 = image_to_base64("logo.png")
+LOGO_HTML = f"data:image/png;base64,{LOGO_B64}" if LOGO_B64 else ""
 
 # =========================
 # LANGUAGE
@@ -747,6 +762,39 @@ textarea {
     border-radius: 16px 16px 0 0;
 }
 
+.site-logo {
+    width: 86px;
+    height: 86px;
+    object-fit: contain;
+    filter: drop-shadow(0 0 18px rgba(34,211,238,0.45));
+}
+
+.sidebar-logo {
+    width: 72px;
+    height: 72px;
+    object-fit: contain;
+    filter: drop-shadow(0 0 12px rgba(34,211,238,0.45));
+    margin-bottom: 8px;
+}
+
+.logo-row {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    margin-bottom: 10px;
+}
+
+.logo-title {
+    font-size: 42px;
+    line-height: 1.05;
+    font-weight: 900;
+    letter-spacing: -1.2px;
+}
+
+.logo-title span {
+    color: #22d3ee;
+}
+
 .footer {
     text-align: center;
     color: #64748b;
@@ -766,7 +814,9 @@ textarea {
 # SIDEBAR
 # =========================
 with st.sidebar:
-    st.markdown(f"## 🔐 {T['title']}")
+    if LOGO_HTML:
+        st.markdown(f'<img src="{LOGO_HTML}" class="sidebar-logo">', unsafe_allow_html=True)
+    st.markdown(f"## {T['title']}")
     st.caption("Smart fraud detection prototype")
 
     selected_lang = st.radio(
@@ -817,12 +867,19 @@ demo_texts = {
 # =========================
 # HERO
 # =========================
+logo_block = f'<img src="{LOGO_HTML}" class="site-logo">' if LOGO_HTML else '<div style="font-size:58px">🔐</div>'
+
 st.markdown(f"""
 <div class="hero">
     <div class="hero-grid">
         <div>
-            <div class="hero-kicker">⚡ AI-powered safety scanner</div>
-            <div class="hero-title">🔐 {T['title']}</div>
+            <div class="logo-row">
+                {logo_block}
+                <div>
+                    <div class="hero-kicker">⚡ AI-powered safety scanner</div>
+                    <div class="logo-title"><span>AI</span> FRAUD<br>DETECTOR</div>
+                </div>
+            </div>
             <div class="hero-subtitle">{T['subtitle']}</div>
             <span class="badge">Logistic Regression</span>
             <span class="badge">Domain Analysis</span>
