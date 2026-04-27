@@ -1,355 +1,165 @@
-import re
+import streamlit as st
 import numpy as np
 import pandas as pd
-import streamlit as st
+import re
 from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import Pipeline
 
-# -----------------------------
-# 1. Training data
-# -----------------------------
-train_data = [
-    ["Срочно отправьте код из SMS", 1],
-    ["Ваша карта заблокирована перейдите по ссылке http://secure-login.xyz", 1],
-    ["Назовите пароль чтобы защитить счет", 1],
-    ["Вы выиграли приз перейдите по ссылке", 1],
-    ["Введите CVV и номер карты", 1],
-    ["Не говорите никому и отправьте код", 1],
-    ["Ваш аккаунт будет удален срочно подтвердите вход", 1],
-    ["Перейдите на http://kaspi-login.xyz", 1],
-    ["Здравствуйте, завтра будет урок математики", 0],
-    ["Мама, я пришел домой", 0],
-    ["Ваш заказ доставлен", 0],
-    ["Напоминаем о встрече в 15:00", 0],
-    ["Спасибо за покупку в официальном магазине", 0],
-    ["Добрый день, документы готовы", 0],
-    ["Сегодня тренировка в 18:00", 0],
-    ["Ваш баланс пополнен", 0],
+# --- СЕССИЯ (история) ---
+if "history" not in st.session_state:
+    st.session_state.history = []
+
+# --- ДАННЫЕ ---
+data = [
+    # FRAUD = 1
+    ["срочно отправьте код из SMS", 1],
+    ["ваша карта заблокирована перейдите по ссылке http://secure-login.xyz", 1],
+    ["перейдите по ссылке http://kaspi-login.xyz", 1],
+    ["назовите пароль чтобы защитить счет", 1],
+    ["введите CVV и номер карты", 1],
+    ["вы выиграли приз оплатите доставку", 1],
+    ["ваш аккаунт будет удален срочно подтвердите вход", 1],
+    ["не говорите никому и отправьте код", 1],
+    ["сотрудник банка просит код из SMS", 1],
+    ["ваш счет под угрозой продиктуйте пароль", 1],
+    ["переведите деньги сейчас иначе карта заблокируется", 1],
+    ["подтвердите личность через ссылку http://verify-bank.top", 1],
+    ["вам начислен бонус перейдите по ссылке", 1],
+    ["для получения выплаты введите данные карты", 1],
+    ["ваш Kaspi аккаунт заблокирован срочно войдите", 1],
+    ["служба безопасности банка просит назвать SMS код", 1],
+    ["оплатите комиссию чтобы получить выигрыш", 1],
+    ["ваш номер выбран победителем отправьте данные", 1],
+    ["перейдите на сайт и подтвердите пароль", 1],
+    ["срочно оплатите штраф по ссылке", 1],
+    ["құттықтаймыз сіз ұтыс ұттыңыз карта деректерін енгізіңіз", 1],
+    ["сіздің картаңыз бұғатталды SMS кодты жіберіңіз", 1],
+    ["шұғыл түрде сілтемеге өтіп аккаунтты растаңыз", 1],
+    ["банк қызметкерімін кодты айтыңыз", 1],
+    ["құпиясөзді жіберіңіз әйтпесе аккаунт жабылады", 1],
+
+    # SAFE = 0
+    ["привет как дела", 0],
+    ["завтра урок математики в 9", 0],
+    ["встреча в 15:00", 0],
+    ["ваш заказ доставлен", 0],
+    ["спасибо за покупку", 0],
+    ["добрый день документы готовы", 0],
+    ["сегодня тренировка в 18:00", 0],
+    ["мама я пришел домой", 0],
+    ["напоминаем о родительском собрании", 0],
+    ["домашнее задание отправлено", 0],
+    ["завтра контрольная по физике", 0],
+    ["ваш баланс пополнен", 0],
+    ["спасибо за регистрацию на мероприятие", 0],
+    ["ссылка на урок будет отправлена позже", 0],
+    ["жду тебя возле школы", 0],
+    ["сәлем қалайсың", 0],
+    ["ертең математика сабағы болады", 0],
+    ["үй тапсырмасын жібердім", 0],
+    ["кездесу сағат 15:00-де", 0],
+    ["құжаттар дайын болды", 0],
 ]
 
-# -----------------------------
-# 2. Dictionaries
-# -----------------------------
-urgent_words = [
-    "срочно", "шұғыл", "быстро", "немедленно", "қазір",
-    "тез", "urgent", "now", "сразу"
-]
-
-money_words = [
-    "карта", "счет", "ақша", "банк", "cvv", "пароль",
-    "код", "sms", "перевод", "оплата", "төле"
-]
-
-threat_words = [
-    "заблокирована", "удален", "штраф", "проблема",
-    "бұғатталды", "жабылады", "тоқтатылады"
-]
-
-secret_words = [
-    "код", "пароль", "cvv", "номер карты", "жеке мәлімет",
-    "құпия", "sms код"
-]
-
-suspicious_domain_words = [
-    "login", "verify", "secure", "bonus", "gift", "bank", "kaspi"
-]
-
-suspicious_zones = [".xyz", ".top", ".click", ".site", ".online"]
-
-
-# -----------------------------
-# 3. Feature extraction
-# -----------------------------
-def extract_urls(text):
-    return re.findall(r"https?://[^\s]+|www\.[^\s]+", text.lower())
-
-
-def get_domain(url):
-    url = url.replace("https://", "").replace("http://", "").replace("www.", "")
-    return url.split("/")[0]
-
-
-def count_matches(text, words):
+# --- ПРИЗНАКИ ---
+def extract(text):
     text = text.lower()
-    return sum(1 for w in words if w in text)
 
+    link = int("http" in text)
+    urgent = int("срочно" in text or "шұғыл" in text)
+    code = int("код" in text)
+    card = int("карта" in text or "cvv" in text)
+    domain = int(".xyz" in text or "login" in text)
 
-def extract_features(text):
-    text_lower = text.lower()
-    urls = extract_urls(text_lower)
-    domains = [get_domain(u) for u in urls]
+    return [link, urgent, code, card, domain]
 
-    has_link = int(len(urls) > 0)
-    urgent_count = count_matches(text_lower, urgent_words)
-    money_count = count_matches(text_lower, money_words)
-    threat_count = count_matches(text_lower, threat_words)
-    secret_count = count_matches(text_lower, secret_words)
+X = np.array([extract(x[0]) for x in data])
+y = np.array([x[1] for x in data])
 
-    suspicious_domain = 0
-    long_domain = 0
-    suspicious_zone = 0
+model = LogisticRegression()
+model.fit(X, y)
 
-    for d in domains:
-        if any(w in d for w in suspicious_domain_words):
-            suspicious_domain = 1
-        if len(d) > 20:
-            long_domain = 1
-        if any(d.endswith(z) for z in suspicious_zones):
-            suspicious_zone = 1
-
-    digit_count = sum(ch.isdigit() for ch in text_lower)
-    exclamation_count = text_lower.count("!")
-
-    features = {
-        "has_link": has_link,
-        "urgent_count": urgent_count,
-        "money_count": money_count,
-        "threat_count": threat_count,
-        "secret_count": secret_count,
-        "suspicious_domain": suspicious_domain,
-        "long_domain": long_domain,
-        "suspicious_zone": suspicious_zone,
-        "digit_count": digit_count,
-        "exclamation_count": exclamation_count,
-    }
+# --- АНАЛИЗ ---
+def analyze(text):
+    x = np.array([extract(text)])
+    prob = model.predict_proba(x)[0][1]
 
     explanations = []
 
-    if has_link:
-        explanations.append("Хабарламада сілтеме бар")
-    if urgent_count > 0:
-        explanations.append("Шұғыл әрекетке итермелейтін сөздер бар")
-    if money_count > 0:
-        explanations.append("Банк/ақша/картаға қатысты сөздер бар")
-    if secret_count > 0:
-        explanations.append("Құпия код немесе жеке мәлімет сұрауы мүмкін")
-    if threat_count > 0:
-        explanations.append("Қорқыту немесе қысым жасау белгілері бар")
-    if suspicious_domain:
-        explanations.append("Доменде күмәнді сөздер бар")
-    if long_domain:
-        explanations.append("Домен тым ұзын")
-    if suspicious_zone:
-        explanations.append("Күмәнді домен зонасы анықталды")
-    if digit_count >= 4:
-        explanations.append("Көп сан/код кездеседі")
-    if exclamation_count >= 2:
-        explanations.append("Көп леп белгісі қолданылған")
+    if "http" in text:
+        explanations.append("Сілтеме табылды")
+    if "срочно" in text:
+        explanations.append("Шұғыл сөз бар")
+    if "код" in text:
+        explanations.append("SMS код сұралады")
+    if "карта" in text:
+        explanations.append("Карта мәліметі сұралады")
+    if ".xyz" in text:
+        explanations.append("Күмәнді домен")
 
-    return features, explanations, domains
+    return prob, explanations
 
+# --- UI ---
+st.title("🔐 AI Fraud Detector")
 
-# -----------------------------
-# 4. Prepare model
-# -----------------------------
-rows = []
-labels = []
+st.markdown("### Мәтінді енгізіңіз немесе файл жүктеңіз")
 
-for text, label in train_data:
-    features, _, _ = extract_features(text)
-    rows.append(features)
-    labels.append(label)
+text = st.text_area("Хабарлама немесе транскрипт:")
 
-X_train = pd.DataFrame(rows)
-y_train = np.array(labels)
+file = st.file_uploader("TXT файл жүктеу", type=["txt"])
 
-model = Pipeline([
-    ("scaler", StandardScaler()),
-    ("clf", LogisticRegression())
-])
+if file is not None:
+    text = file.read().decode("utf-8")
 
-model.fit(X_train, y_train)
-
-
-# -----------------------------
-# 5. Streamlit interface
-# -----------------------------
-# -----------------------------
-# 5. Improved Streamlit interface
-# -----------------------------
-st.set_page_config(
-    page_title="AI Fraud Detector",
-    page_icon="🔐",
-    layout="wide"
-)
-
-st.markdown("""
-<style>
-.main-title {
-    font-size: 42px;
-    font-weight: 800;
-    color: #1f2937;
-}
-.subtitle {
-    font-size: 18px;
-    color: #6b7280;
-}
-.card {
-    padding: 22px;
-    border-radius: 18px;
-    background-color: #f9fafb;
-    border: 1px solid #e5e7eb;
-}
-.safe {
-    padding: 20px;
-    border-radius: 16px;
-    background-color: #dcfce7;
-    color: #166534;
-    font-size: 24px;
-    font-weight: 700;
-}
-.warning {
-    padding: 20px;
-    border-radius: 16px;
-    background-color: #fef9c3;
-    color: #854d0e;
-    font-size: 24px;
-    font-weight: 700;
-}
-.danger {
-    padding: 20px;
-    border-radius: 16px;
-    background-color: #fee2e2;
-    color: #991b1b;
-    font-size: 24px;
-    font-weight: 700;
-}
-.feature-box {
-    padding: 12px;
-    margin: 6px 0;
-    border-radius: 12px;
-    background-color: white;
-    border-left: 5px solid #6366f1;
-}
-</style>
-""", unsafe_allow_html=True)
-
-st.markdown('<div class="main-title">🔐 AI Fraud Detector</div>', unsafe_allow_html=True)
-st.markdown(
-    '<div class="subtitle">SMS, интернет-хабарлама және қоңырау транскриптіндегі алаяқтық белгілерін анықтайтын AI-прототип</div>',
-    unsafe_allow_html=True
-)
-
-st.divider()
-
-left, right = st.columns([2, 1])
-
-with left:
-    st.markdown("### ✍️ Мәтінді енгізіңіз")
-    input_type = st.radio(
-        "Тексеру түрі:",
-        ["SMS / хабарлама", "Қоңырау транскрипті"],
-        horizontal=True
-    )
-
-    sample_sms = "Срочно! Ваша карта заблокирована. Отправьте код из SMS и перейдите по ссылке http://secure-login.xyz"
-    sample_call = "Здравствуйте, я сотрудник банка. Назовите код из SMS, чтобы мы защитили ваш счет."
-
-    if input_type == "SMS / хабарлама":
-        default_text = sample_sms
-    else:
-        default_text = sample_call
-
-    text = st.text_area(
-        "Мәтін:",
-        value=default_text,
-        height=180
-    )
-
-    threshold = st.slider(
-        "Шешім шегі / Threshold",
-        min_value=0.1,
-        max_value=0.9,
-        value=0.5,
-        step=0.05
-    )
-
-    analyze_button = st.button("🚀 Анализ жасау", use_container_width=True)
-
-with right:
-    st.markdown("### ℹ️ Жүйе не істейді?")
-    st.markdown("""
-    <div class="card">
-    ✅ мәтінді талдайды<br>
-    ✅ күмәнді белгілерді табады<br>
-    ✅ доменді тексереді<br>
-    ✅ логистикалық регрессия арқылы ықтималдық есептейді<br>
-    ✅ қорытынды кеңес береді
-    </div>
-    """, unsafe_allow_html=True)
-
-if analyze_button:
+if st.button("🚀 Анализ"):
     if not text.strip():
-        st.warning("Алдымен мәтін енгізіңіз.")
+        st.warning("Мәтін енгізіңіз")
     else:
-        features, explanations, domains = extract_features(text)
-        X_input = pd.DataFrame([features])
+        prob, explanations = analyze(text)
 
-        probability = model.predict_proba(X_input)[0][1]
-        prediction = int(probability >= threshold)
-
-        st.divider()
-        st.markdown("## 📊 Анализ нәтижесі")
-
-        col1, col2, col3 = st.columns(3)
-
-        with col1:
-            st.metric("Алаяқтық ықтималдығы", f"{probability * 100:.1f}%")
-
-        with col2:
-            st.metric("Табылған белгілер саны", len(explanations))
-
-        with col3:
-            st.metric("Threshold", threshold)
-
-        if probability >= 0.8:
-            st.markdown(
-                f'<div class="danger">⚠️ Жоғары қауіп: {probability * 100:.1f}%</div>',
-                unsafe_allow_html=True
-            )
-        elif probability >= threshold:
-            st.markdown(
-                f'<div class="warning">⚠️ Күмәнді: {probability * 100:.1f}%</div>',
-                unsafe_allow_html=True
-            )
+        # --- УРОВНИ ---
+        if prob < 0.3:
+            level = "Қауіп төмен"
+            st.success(f"{level} ({prob:.2f})")
+        elif prob < 0.6:
+            level = "Күмәнді"
+            st.warning(f"{level} ({prob:.2f})")
+        elif prob < 0.8:
+            level = "Жоғары қауіп"
+            st.warning(f"{level} ({prob:.2f})")
         else:
-            st.markdown(
-                f'<div class="safe">✅ Қауіп төмен: {probability * 100:.1f}%</div>',
-                unsafe_allow_html=True
-            )
+            level = "Алаяқтық ықтималдығы өте жоғары"
+            st.error(f"{level} ({prob:.2f})")
 
-        st.progress(float(probability))
+        # --- ПРОГРЕСС ---
+        st.progress(prob)
 
-        st.markdown("## 🔍 Табылған белгілер")
-
+        # --- ОБЪЯСНЕНИЕ ---
+        st.markdown("### 🧠 Неге бұл нәтиже?")
         if explanations:
-            for item in explanations:
-                st.markdown(
-                    f'<div class="feature-box">• {item}</div>',
-                    unsafe_allow_html=True
-                )
+            for e in explanations:
+                st.write(f"- {e}")
         else:
-            st.success("Күшті алаяқтық белгілері табылмады.")
+            st.write("Айқын алаяқтық белгілері табылмады")
 
-        if domains:
-            st.markdown("## 🌐 Анықталған домендер")
-            for d in domains:
-                st.code(d)
-
-        st.markdown("## 🧠 Модельге берілген сандық белгілер")
-        st.dataframe(X_input, use_container_width=True)
-
-        st.markdown("## 💡 Кеңес")
-        if prediction == 1:
-            st.error("Жеке мәлімет, SMS код, карта нөмірі немесе пароль бермеңіз. Сілтемеге өтпеңіз.")
+        # --- СОВЕТ ---
+        st.markdown("### 💡 Кеңес")
+        if prob > 0.5:
+            st.error("Код, пароль, карта мәліметін бермеңіз!")
         else:
-            st.success("Хабарлама қауіпсіз көрінеді, бірақ күмән болса ресми дереккөз арқылы тексеріңіз.")
+            st.success("Хабарлама қауіпсіз сияқты")
 
-        with st.expander("📌 Логистикалық регрессия коэффициенттері"):
-            coef = model.named_steps["clf"].coef_[0]
-            coef_df = pd.DataFrame({
-                "Feature": X_train.columns,
-                "Coefficient": coef
-            }).sort_values(by="Coefficient", ascending=False)
-            st.dataframe(coef_df, use_container_width=True)
+        # --- СОХРАНЕНИЕ В ИСТОРИЮ ---
+        st.session_state.history.append({
+            "text": text[:50],
+            "risk": prob,
+            "level": level
+        })
+
+# --- ИСТОРИЯ ---
+st.markdown("## 📜 Тексеру тарихы")
+
+if st.session_state.history:
+    df = pd.DataFrame(st.session_state.history)
+    st.dataframe(df)
+else:
+    st.write("Тарих жоқ")
