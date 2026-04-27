@@ -14,7 +14,7 @@ from sklearn.preprocessing import StandardScaler
 # =========================
 st.set_page_config(
     page_title="AI Fraud Detector",
-    page_icon="🔐",
+    page_icon="icon.ico",
     layout="wide",
     initial_sidebar_state="expanded"
 )
