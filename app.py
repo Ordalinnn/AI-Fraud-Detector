@@ -22,13 +22,13 @@ st.set_page_config(
 # =========================
 lang = st.radio(
     "Language",
-    ["🇰🇿 Қазақша", "🇷🇺 Русский", "🇬🇧 English"],
+    ["🇰🇿 KZ", "🇷🇺 RU", "🇬🇧 EN"],
     horizontal=True,
     label_visibility="collapsed"
 )
 
 TEXT = {
-    "🇰🇿 Қазақша": {
+    "🇰🇿 KZ": {
         "title": "AI Fraud Detector",
         "subtitle": "SMS, интернет-хабарлама және қоңырау транскриптіндегі алаяқтықты анықтайтын AI-прототип.",
         "mode": "Тексеру режимі",
@@ -42,7 +42,7 @@ TEXT = {
         "upload": "TXT файл жүктеу",
         "analyze": "🚀 Анализ жасау",
         "features": "Жүйе мүмкіндіктері",
-        "result": "📊 Анализ нәтижесі",
+        "result": "Анализ нәтижесі",
         "risk": "Алаяқтық ықтималдығы",
         "detected": "Табылған белгілер",
         "threshold": "Шешім шегі",
@@ -66,7 +66,7 @@ TEXT = {
         "how": "Бұл қалай жұмыс істейді?",
         "footer": "Қолданбалы математика + машиналық оқыту прототипі",
     },
-    "🇷🇺 Русский": {
+    "🇷🇺 RU": {
         "title": "AI Fraud Detector",
         "subtitle": "AI-прототип для обнаружения мошенничества в SMS, сообщениях и транскриптах звонков.",
         "mode": "Режим проверки",
@@ -80,7 +80,7 @@ TEXT = {
         "upload": "Загрузить TXT файл",
         "analyze": "🚀 Сделать анализ",
         "features": "Возможности системы",
-        "result": "📊 Результат анализа",
+        "result": "Результат анализа",
         "risk": "Вероятность мошенничества",
         "detected": "Найденные признаки",
         "threshold": "Порог решения",
@@ -104,7 +104,7 @@ TEXT = {
         "how": "Как это работает?",
         "footer": "Прототип на основе прикладной математики и машинного обучения",
     },
-    "🇬🇧 English": {
+    "🇬🇧 EN": {
         "title": "AI Fraud Detector",
         "subtitle": "An AI prototype for detecting fraud in SMS, messages, and call transcripts.",
         "mode": "Check mode",
@@ -118,7 +118,7 @@ TEXT = {
         "upload": "Upload TXT file",
         "analyze": "🚀 Analyze",
         "features": "System features",
-        "result": "📊 Analysis result",
+        "result": "Analysis result",
         "risk": "Fraud probability",
         "detected": "Detected features",
         "threshold": "Decision threshold",
@@ -232,7 +232,7 @@ def extract_features(text):
     }, domains
 
 def explain(features):
-    if lang == "🇰🇿 Қазақша":
+    if lang == "🇰🇿 KZ":
         labels = {
             "has_link": "Сілтеме анықталды",
             "urgent_count": "Шұғыл әрекетке шақыру бар",
@@ -246,7 +246,7 @@ def explain(features):
             "digit_count": "Мәтінде көп сан немесе код кездеседі",
             "exclamation_count": "Көп леп белгісі қолданылған",
         }
-    elif lang == "🇷🇺 Русский":
+    elif lang == "🇷🇺 RU":
         labels = {
             "has_link": "Обнаружена ссылка",
             "urgent_count": "Есть срочный призыв к действию",
@@ -274,7 +274,6 @@ def explain(features):
             "digit_count": "The text contains many numbers or codes",
             "exclamation_count": "Many exclamation marks were used",
         }
-
     return [labels[k] for k, v in features.items() if v > 0]
 
 def risk_style(prob):
@@ -305,98 +304,306 @@ model = Pipeline([
 model.fit(X_train, y_train)
 
 # =========================
-# STYLE
+# PREMIUM UI STYLE
 # =========================
 st.markdown("""
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+html, body, [class*="css"] {
+    font-family: 'Inter', sans-serif;
+}
+
 .stApp {
-    background: linear-gradient(135deg, #eef2ff 0%, #f8fafc 50%, #ecfeff 100%);
+    background:
+        radial-gradient(circle at 15% 15%, rgba(37,99,235,0.17), transparent 28%),
+        radial-gradient(circle at 80% 0%, rgba(20,184,166,0.18), transparent 32%),
+        linear-gradient(135deg, #f8fafc 0%, #eef2ff 45%, #ecfeff 100%);
 }
+
+.block-container {
+    padding-top: 1.4rem;
+    padding-bottom: 3rem;
+    max-width: 1280px;
+}
+
+[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #0f172a 0%, #111827 60%, #020617 100%);
+    border-right: 1px solid rgba(255,255,255,0.08);
+}
+
+[data-testid="stSidebar"] * {
+    color: #e5e7eb !important;
+}
+
+[data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] > div,
+[data-testid="stSidebar"] .stSlider,
+[data-testid="stSidebar"] .stTextInput,
+[data-testid="stSidebar"] .stNumberInput {
+    color: #0f172a !important;
+}
+
+[data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] span {
+    color: #0f172a !important;
+}
+
 .hero {
-    padding: 32px;
-    border-radius: 26px;
-    background: linear-gradient(135deg, #111827 0%, #1e3a8a 55%, #0f766e 100%);
+    position: relative;
+    overflow: hidden;
+    padding: 38px;
+    border-radius: 34px;
+    background:
+        linear-gradient(135deg, rgba(15,23,42,0.98), rgba(30,64,175,0.95) 52%, rgba(13,148,136,0.94)),
+        url('https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=1600&q=80');
+    background-blend-mode: multiply;
+    background-size: cover;
     color: white;
-    box-shadow: 0 22px 55px rgba(15, 23, 42, 0.22);
-    margin-bottom: 24px;
+    box-shadow: 0 30px 80px rgba(15, 23, 42, 0.28);
+    margin-bottom: 26px;
+    border: 1px solid rgba(255,255,255,0.18);
 }
+
+.hero:before {
+    content: "";
+    position: absolute;
+    width: 260px;
+    height: 260px;
+    right: -70px;
+    top: -80px;
+    background: rgba(255,255,255,0.13);
+    filter: blur(3px);
+    border-radius: 50%;
+}
+
+.hero-grid {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1.6fr 0.9fr;
+    gap: 24px;
+    align-items: center;
+}
+
+.hero-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 13px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.13);
+    border: 1px solid rgba(255,255,255,0.23);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    margin-bottom: 16px;
+}
+
 .hero-title {
-    font-size: 46px;
-    font-weight: 800;
+    font-size: 54px;
+    line-height: 1.02;
+    font-weight: 900;
+    letter-spacing: -1.7px;
+    margin-bottom: 14px;
 }
+
 .hero-subtitle {
     font-size: 18px;
-    opacity: 0.9;
+    line-height: 1.6;
+    opacity: 0.91;
+    max-width: 760px;
 }
+
 .badge {
     display: inline-block;
-    padding: 8px 14px;
+    padding: 9px 14px;
     border-radius: 999px;
-    background: rgba(255,255,255,0.14);
-    border: 1px solid rgba(255,255,255,0.25);
+    background: rgba(255,255,255,0.13);
+    border: 1px solid rgba(255,255,255,0.22);
     margin-right: 8px;
-    margin-top: 16px;
+    margin-top: 17px;
+    font-size: 13px;
+    font-weight: 700;
+    backdrop-filter: blur(8px);
 }
-.glass-card {
-    background: rgba(255,255,255,0.82);
-    border: 1px solid rgba(226,232,240,0.9);
-    border-radius: 24px;
-    padding: 24px;
-    box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
-    margin-bottom: 18px;
-}
-.metric-card {
-    background: white;
-    border-radius: 22px;
+
+.hero-panel {
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 28px;
     padding: 22px;
-    box-shadow: 0 14px 35px rgba(15, 23, 42, 0.08);
-    border: 1px solid #e5e7eb;
-    text-align: center;
+    backdrop-filter: blur(16px);
 }
-.metric-label {
+
+.hero-panel-title {
+    font-size: 14px;
+    opacity: 0.82;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.hero-panel-value {
+    font-size: 38px;
+    font-weight: 900;
+    letter-spacing: -1px;
+}
+
+.hero-panel-small {
+    font-size: 13px;
+    opacity: 0.82;
+    line-height: 1.5;
+    margin-top: 8px;
+}
+
+.glass-card {
+    background: rgba(255,255,255,0.84);
+    border: 1px solid rgba(226,232,240,0.92);
+    border-radius: 30px;
+    padding: 25px;
+    box-shadow: 0 20px 55px rgba(15, 23, 42, 0.09);
+    margin-bottom: 19px;
+    backdrop-filter: blur(18px);
+}
+
+.section-title {
+    font-size: 24px;
+    font-weight: 900;
+    color: #0f172a;
+    letter-spacing: -0.6px;
+    margin-bottom: 8px;
+}
+
+.section-subtitle {
     color: #64748b;
     font-size: 14px;
-    font-weight: 600;
+    margin-bottom: 15px;
 }
+
+.feature-list p {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 12px 14px;
+    border-radius: 16px;
+    margin: 8px 0;
+    color: #334155;
+    font-weight: 650;
+}
+
+.metric-card {
+    background: rgba(255,255,255,0.92);
+    border-radius: 26px;
+    padding: 23px 18px;
+    box-shadow: 0 16px 42px rgba(15, 23, 42, 0.08);
+    border: 1px solid #e5e7eb;
+    text-align: center;
+    transition: all .2s ease;
+}
+
+.metric-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 22px 50px rgba(15, 23, 42, 0.12);
+}
+
+.metric-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 15px;
+    background: linear-gradient(135deg, #2563eb, #14b8a6);
+    color: white;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 10px;
+    font-size: 20px;
+}
+
+.metric-label {
+    color: #64748b;
+    font-size: 13px;
+    font-weight: 750;
+    text-transform: uppercase;
+    letter-spacing: 0.45px;
+}
+
 .metric-value {
     color: #0f172a;
-    font-size: 32px;
-    font-weight: 800;
+    font-size: 34px;
+    font-weight: 900;
+    margin-top: 5px;
 }
+
 .risk-low, .risk-mid, .risk-high, .risk-critical {
-    border-radius: 24px;
-    padding: 24px;
-    font-size: 26px;
-    font-weight: 800;
-    margin: 18px 0;
+    border-radius: 30px;
+    padding: 24px 26px;
+    font-size: 28px;
+    font-weight: 900;
+    margin: 20px 0;
+    border: 1px solid rgba(255,255,255,0.8);
+    box-shadow: 0 18px 45px rgba(15,23,42,0.08);
 }
-.risk-low {background:#dcfce7;color:#166534;}
-.risk-mid {background:#fef9c3;color:#854d0e;}
-.risk-high {background:#ffedd5;color:#9a3412;}
-.risk-critical {background:#fee2e2;color:#991b1b;}
+.risk-low {background:linear-gradient(135deg,#dcfce7,#f0fdf4);color:#166534;}
+.risk-mid {background:linear-gradient(135deg,#fef9c3,#fffbeb);color:#854d0e;}
+.risk-high {background:linear-gradient(135deg,#ffedd5,#fff7ed);color:#9a3412;}
+.risk-critical {background:linear-gradient(135deg,#fee2e2,#fff1f2);color:#991b1b;}
+
 .feature-chip {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
     padding: 10px 14px;
-    border-radius: 14px;
+    border-radius: 999px;
     background: #eef2ff;
     color: #3730a3;
-    font-weight: 600;
-    margin: 5px;
+    font-weight: 750;
+    margin: 6px;
     border: 1px solid #c7d2fe;
+    box-shadow: 0 8px 18px rgba(55,48,163,0.08);
 }
+
 .domain-box {
-    padding: 14px;
-    border-radius: 16px;
+    padding: 15px 16px;
+    border-radius: 18px;
     background: #0f172a;
     color: #e2e8f0;
     font-family: monospace;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
+    border: 1px solid #334155;
 }
+
+.stButton > button {
+    border-radius: 18px !important;
+    padding: 0.8rem 1rem !important;
+    font-weight: 850 !important;
+    border: 0 !important;
+    background: linear-gradient(135deg, #2563eb, #0f766e) !important;
+    color: white !important;
+    box-shadow: 0 14px 30px rgba(37,99,235,0.23) !important;
+}
+
+.stButton > button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 20px 42px rgba(37,99,235,0.30) !important;
+}
+
+textarea {
+    border-radius: 22px !important;
+    border: 1px solid #cbd5e1 !important;
+    box-shadow: inset 0 1px 4px rgba(15,23,42,0.05) !important;
+}
+
+[data-testid="stTabs"] button {
+    font-weight: 800;
+    border-radius: 16px 16px 0 0;
+}
+
 .footer {
     text-align: center;
     color: #64748b;
     font-size: 13px;
-    margin-top: 30px;
+    margin-top: 34px;
+    padding: 18px;
+}
+
+@media (max-width: 900px) {
+    .hero-grid { grid-template-columns: 1fr; }
+    .hero-title { font-size: 38px; }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -406,6 +613,7 @@ st.markdown("""
 # =========================
 with st.sidebar:
     st.markdown(f"## 🔐 {T['title']}")
+    st.caption("Smart fraud detection prototype")
 
     mode = st.selectbox(
         T["mode"],
@@ -421,6 +629,13 @@ with st.sidebar:
         ["Fraud SMS", "Fraud Call", "Safe Message", "Kazakh Fraud"]
     )
 
+    st.divider()
+    st.markdown("### 🛡️ Project stack")
+    st.markdown("• Logistic Regression")
+    st.markdown("• Feature Engineering")
+    st.markdown("• Domain Analysis")
+    st.markdown("• Explainable AI")
+
 demo_texts = {
     "Fraud SMS": "Срочно! Ваша карта заблокирована. Отправьте код из SMS и перейдите по ссылке http://secure-login.xyz",
     "Fraud Call": "Здравствуйте, я сотрудник банка. Назовите код из SMS, чтобы мы защитили ваш счет.",
@@ -433,23 +648,34 @@ demo_texts = {
 # =========================
 st.markdown(f"""
 <div class="hero">
-    <div class="hero-title">🔐 {T['title']}</div>
-    <div class="hero-subtitle">{T['subtitle']}</div>
-    <span class="badge">Logistic Regression</span>
-    <span class="badge">Domain Analysis</span>
-    <span class="badge">Explainable AI</span>
-    <span class="badge">Risk Report</span>
+    <div class="hero-grid">
+        <div>
+            <div class="hero-kicker">⚡ AI-powered safety scanner</div>
+            <div class="hero-title">🔐 {T['title']}</div>
+            <div class="hero-subtitle">{T['subtitle']}</div>
+            <span class="badge">Logistic Regression</span>
+            <span class="badge">Domain Analysis</span>
+            <span class="badge">Explainable AI</span>
+            <span class="badge">Risk Report</span>
+        </div>
+        <div class="hero-panel">
+            <div class="hero-panel-title">Prototype readiness</div>
+            <div class="hero-panel-value">Demo-ready</div>
+            <div class="hero-panel-small">Analyzes text, links, pressure words, secret-code requests and suspicious domains.</div>
+        </div>
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
 # =========================
 # INPUT
 # =========================
-left, right = st.columns([2, 1])
+left, right = st.columns([2.1, 0.9], gap="large")
 
 with left:
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-    st.subheader(f"✍️ {T['input_title']}")
+    st.markdown(f'<div class="section-title">✍️ {T["input_title"]}</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-subtitle">Paste a suspicious message or call transcript and check the risk level.</div>', unsafe_allow_html=True)
 
     uploaded = None
     if mode == T["file"]:
@@ -457,12 +683,12 @@ with left:
 
     if uploaded:
         input_text = uploaded.read().decode("utf-8", errors="ignore")
-        st.success("File uploaded")
+        st.success("File uploaded successfully")
     else:
         input_text = st.text_area(
             T["input_label"],
             value=demo_texts[demo],
-            height=190
+            height=210
         )
 
     analyze = st.button(T["analyze"], use_container_width=True)
@@ -470,13 +696,13 @@ with left:
 
 with right:
     st.markdown(f"""
-    <div class="glass-card">
-        <h3>⚙️ {T['features']}</h3>
-        <p>✅ Text analysis</p>
-        <p>✅ Domain analysis</p>
-        <p>✅ Logistic regression</p>
-        <p>✅ Explain AI</p>
-        <p>✅ Risk report</p>
+    <div class="glass-card feature-list">
+        <div class="section-title">⚙️ {T['features']}</div>
+        <p>🧾 Text analysis</p>
+        <p>🌐 Domain analysis</p>
+        <p>🧠 Logistic regression</p>
+        <p>🔍 Explainable result</p>
+        <p>📥 Downloadable report</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -500,13 +726,13 @@ if analyze:
         risk_label, risk_class, emoji = risk_style(prob)
         explanations = explain(features)
 
-        st.markdown(f"## {T['result']}")
+        st.markdown(f'<div class="section-title">📊 {T["result"]}</div>', unsafe_allow_html=True)
 
         c1, c2, c3, c4 = st.columns(4)
-        c1.markdown(f'<div class="metric-card"><div class="metric-label">{T["risk"]}</div><div class="metric-value">{prob*100:.1f}%</div></div>', unsafe_allow_html=True)
-        c2.markdown(f'<div class="metric-card"><div class="metric-label">{T["detected"]}</div><div class="metric-value">{len(explanations)}</div></div>', unsafe_allow_html=True)
-        c3.markdown(f'<div class="metric-card"><div class="metric-label">{T["threshold"]}</div><div class="metric-value">{threshold:.2f}</div></div>', unsafe_allow_html=True)
-        c4.markdown(f'<div class="metric-card"><div class="metric-label">{T["model"]}</div><div class="metric-value">LR</div></div>', unsafe_allow_html=True)
+        c1.markdown(f'<div class="metric-card"><div class="metric-icon">%</div><div class="metric-label">{T["risk"]}</div><div class="metric-value">{prob*100:.1f}%</div></div>', unsafe_allow_html=True)
+        c2.markdown(f'<div class="metric-card"><div class="metric-icon">⚠️</div><div class="metric-label">{T["detected"]}</div><div class="metric-value">{len(explanations)}</div></div>', unsafe_allow_html=True)
+        c3.markdown(f'<div class="metric-card"><div class="metric-icon">🎚️</div><div class="metric-label">{T["threshold"]}</div><div class="metric-value">{threshold:.2f}</div></div>', unsafe_allow_html=True)
+        c4.markdown(f'<div class="metric-card"><div class="metric-icon">🧠</div><div class="metric-label">{T["model"]}</div><div class="metric-value">LR</div></div>', unsafe_allow_html=True)
 
         st.markdown(f'<div class="{risk_class}">{emoji} {risk_label}</div>', unsafe_allow_html=True)
         st.progress(float(prob))
@@ -546,7 +772,7 @@ if analyze:
             st.subheader(T["domain"])
             if domains:
                 for d in domains:
-                    st.markdown(f'<div class="domain-box">{d}</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="domain-box">🌐 {d}</div>', unsafe_allow_html=True)
             else:
                 st.info(T["no_domain"])
 
@@ -596,9 +822,9 @@ Advice:
                 st.write("No history")
 
 with st.expander(f"📘 {T['how']}"):
-    if lang == "🇰🇿 Қазақша":
+    if lang == "🇰🇿 KZ":
         st.write("1. Мәтіннен белгілер алынады. 2. Олар сандық векторға айналады. 3. Логистикалық регрессия ықтималдық есептейді. 4. Сайт нәтиже мен кеңес береді.")
-    elif lang == "🇷🇺 Русский":
+    elif lang == "🇷🇺 RU":
         st.write("1. Из текста извлекаются признаки. 2. Они превращаются в числовой вектор. 3. Логистическая регрессия считает вероятность. 4. Сайт показывает результат и совет.")
     else:
         st.write("1. Features are extracted from the text. 2. They are converted into a numeric vector. 3. Logistic regression calculates probability. 4. The site shows the result and advice.")
