@@ -20,9 +20,21 @@ st.set_page_config(
 # =========================
 # LANGUAGE
 # =========================
-# Language selector is now placed inside the sidebar
+# Language selector is now placed inside the sidebar.
+# This block also fixes old saved values like "🇷🇺 Русский".
 LANG_OPTIONS = ["🇰🇿 KZ", "🇷🇺 RU", "🇬🇧 EN"]
+OLD_LANG_MAP = {
+    "🇰🇿 Қазақша": "🇰🇿 KZ",
+    "🇷🇺 Русский": "🇷🇺 RU",
+    "🇬🇧 English": "🇬🇧 EN",
+}
+
 if "lang" not in st.session_state:
+    st.session_state.lang = "🇷🇺 RU"
+
+st.session_state.lang = OLD_LANG_MAP.get(st.session_state.lang, st.session_state.lang)
+
+if st.session_state.lang not in LANG_OPTIONS:
     st.session_state.lang = "🇷🇺 RU"
 
 lang = st.session_state.lang
@@ -647,6 +659,7 @@ with st.sidebar:
     selected_lang = st.radio(
         "🌍 Language / Тіл / Язык",
         LANG_OPTIONS,
+        index=LANG_OPTIONS.index(st.session_state.lang),
         horizontal=True,
         key="lang_selector"
     )
