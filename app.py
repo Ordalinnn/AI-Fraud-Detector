@@ -20,12 +20,7 @@ st.set_page_config(
 # =========================
 # LANGUAGE
 # =========================
-lang = st.radio(
-    "Language",
-    ["🇰🇿 Қазақша", "🇷🇺 Русский", "🇬🇧 English"],
-    horizontal=True,
-    label_visibility="collapsed"
-)
+
 
 TEXT = {
     "🇰🇿 Қазақша": {
