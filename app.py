@@ -671,7 +671,7 @@ with st.sidebar:
 
     mode = st.selectbox(
         T["mode"],
-        [T["sms"], T["bank"], T["call"], T["file"]]
+        [T["sms"], T["call"], T["file"]]
     )
 
     threshold = st.slider(T["threshold"], 0.1, 0.9, 0.5, 0.05)
@@ -680,7 +680,7 @@ with st.sidebar:
     st.markdown(f"### 🧪 {T['demo']}")
     demo = st.selectbox(
         T["demo"],
-        ["Fraud SMS", "Fraud Call", "Safe Message", "Kazakh Fraud"]
+        ["Fraud SMS", "Fraud Call", "Safe Message"]
     )
 
     st.divider()
