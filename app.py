@@ -12,7 +12,7 @@ from sklearn.preprocessing import StandardScaler
 # =========================
 st.set_page_config(
     page_title="AI Fraud Detector",
-    page_icon="logo.png",
+    page_icon="🔐",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -820,34 +820,20 @@ demo_texts = {
 st.markdown(f"""
 <div class="hero">
     <div class="hero-grid">
-
-        <!-- LEFT PART -->
-        <div style="display:flex; align-items:center; gap:16px;">
-
-            <img src="logo.png" width="70">
-
-            <div>
-                <div class="hero-kicker">⚡ AI-powered safety scanner</div>
-                <div class="hero-title">🔐 {T['title']}</div>
-                <div class="hero-subtitle">{T['subtitle']}</div>
-
-                <span class="badge">Logistic Regression</span>
-                <span class="badge">Domain Analysis</span>
-                <span class="badge">Explainable AI</span>
-                <span class="badge">Risk Report</span>
-            </div>
-
+        <div>
+            <div class="hero-kicker">⚡ AI-powered safety scanner</div>
+            <div class="hero-title">🔐 {T['title']}</div>
+            <div class="hero-subtitle">{T['subtitle']}</div>
+            <span class="badge">Logistic Regression</span>
+            <span class="badge">Domain Analysis</span>
+            <span class="badge">Explainable AI</span>
+            <span class="badge">Risk Report</span>
         </div>
-
-        <!-- RIGHT PANEL -->
         <div class="hero-panel">
             <div class="hero-panel-title">Prototype readiness</div>
             <div class="hero-panel-value">Demo-ready</div>
-            <div class="hero-panel-small">
-                Analyzes text, links, pressure words, secret-code requests and suspicious domains.
-            </div>
+            <div class="hero-panel-small">Analyzes text, links, pressure words, secret-code requests and suspicious domains.</div>
         </div>
-
     </div>
 </div>
 """, unsafe_allow_html=True)
