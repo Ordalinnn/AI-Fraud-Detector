@@ -20,12 +20,12 @@ st.set_page_config(
 # =========================
 # LANGUAGE
 # =========================
-lang = st.radio(
-    "Language",
-    ["🇰🇿 KZ", "🇷🇺 RU", "🇬🇧 EN"],
-    horizontal=True,
-    label_visibility="collapsed"
-)
+# Language selector is now placed inside the sidebar
+LANG_OPTIONS = ["🇰🇿 KZ", "🇷🇺 RU", "🇬🇧 EN"]
+if "lang" not in st.session_state:
+    st.session_state.lang = "🇷🇺 RU"
+
+lang = st.session_state.lang
 
 TEXT = {
     "🇰🇿 KZ": {
@@ -332,19 +332,48 @@ html, body, [class*="css"] {
     border-right: 1px solid rgba(255,255,255,0.08);
 }
 
-[data-testid="stSidebar"] * {
+[data-testid="stSidebar"] h1,
+[data-testid="stSidebar"] h2,
+[data-testid="stSidebar"] h3,
+[data-testid="stSidebar"] p,
+[data-testid="stSidebar"] label,
+[data-testid="stSidebar"] .stMarkdown,
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"] {
     color: #e5e7eb !important;
 }
 
-[data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] > div,
-[data-testid="stSidebar"] .stSlider,
-[data-testid="stSidebar"] .stTextInput,
-[data-testid="stSidebar"] .stNumberInput {
-    color: #0f172a !important;
+/* Fix white text inside select boxes */
+[data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] > div {
+    background: #ffffff !important;
+    border-radius: 14px !important;
+    border: 1px solid rgba(255,255,255,0.22) !important;
 }
 
-[data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] span {
+[data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] span,
+[data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] input,
+[data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] svg {
     color: #0f172a !important;
+    fill: #0f172a !important;
+}
+
+/* Fix radio language buttons in sidebar */
+[data-testid="stSidebar"] .stRadio label {
+    color: #e5e7eb !important;
+    font-weight: 700 !important;
+}
+
+[data-testid="stSidebar"] .stRadio div[role="radiogroup"] label {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    padding: 8px 10px;
+    border-radius: 14px;
+    margin-right: 6px;
+}
+
+[data-testid="stSidebar"] .stSlider label,
+[data-testid="stSidebar"] .stSlider [data-testid="stTickBar"],
+[data-testid="stSidebar"] .stSlider div {
+    color: #e5e7eb !important;
 }
 
 .hero {
@@ -614,6 +643,18 @@ textarea {
 with st.sidebar:
     st.markdown(f"## 🔐 {T['title']}")
     st.caption("Smart fraud detection prototype")
+
+    selected_lang = st.radio(
+        "🌍 Language / Тіл / Язык",
+        LANG_OPTIONS,
+        horizontal=True,
+        key="lang_selector"
+    )
+    if selected_lang != st.session_state.lang:
+        st.session_state.lang = selected_lang
+        st.rerun()
+
+    st.divider()
 
     mode = st.selectbox(
         T["mode"],
