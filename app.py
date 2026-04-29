@@ -1009,7 +1009,7 @@ if analyze:
             st.subheader("Feature contribution")
             coef = model.named_steps["clf"].coef_[0]
             contrib = []
-            for name, value, w in zip(X_train.columns, X_input.iloc[0], coef):
+            for name, value, w in zip(X_input.columns, X_input.iloc[0], coef):
                 contrib.append([name, value, round(w, 3), round(value * w, 3)])
 
             contrib_df = pd.DataFrame(contrib, columns=["Feature", "Value", "Weight", "Contribution"])
