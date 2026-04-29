@@ -843,7 +843,18 @@ with st.sidebar:
     st.markdown(f"### 🧪 {T['demo']}")
     demo = st.selectbox(
         T["demo"],
-        ["Fraud SMS", "Fraud Call", "Fake Delivery", "Fake Prize", "Relative Scam", "Safe Message"]
+        [
+            "Fraud SMS",
+            "Fraud Call",
+            "Fake Delivery",
+            "Fake Prize",
+            "Relative Scam",
+            "Fake Job Offer",
+            "Marketplace Prepayment Scam",
+            "Fake Utility Debt",
+            "Investment Scam",
+            "Safe Message",
+        ]
     )
 
     st.divider()
