@@ -926,21 +926,22 @@ with left:
     st.markdown(f'<div class="section-title">✍️ {T["input_title"]}</div>', unsafe_allow_html=True)
     st.markdown('<div class="section-subtitle">Paste a suspicious message or call transcript and check the risk level.</div>', unsafe_allow_html=True)
 
-    uploaded = None
-    if mode == T["file"]:
-        uploaded = st.file_uploader(T["upload"], type=["txt"])
+    with st.form("analysis_form", clear_on_submit=False):
+        uploaded = None
+        if mode == T["file"]:
+            uploaded = st.file_uploader(T["upload"], type=["txt"])
 
-    if uploaded:
-        input_text = uploaded.read().decode("utf-8", errors="ignore")
-        st.success("File uploaded successfully")
-    else:
-        input_text = st.text_area(
-            T["input_label"],
-            value=demo_texts[demo],
-            height=210
-        )
+        if uploaded:
+            input_text = uploaded.read().decode("utf-8", errors="ignore")
+            st.success("File uploaded successfully")
+        else:
+            input_text = st.text_area(
+                T["input_label"],
+                value=demo_texts[demo],
+                height=210
+            )
 
-    analyze = st.button(T["analyze"], use_container_width=True)
+        analyze = st.form_submit_button(T["analyze"], use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 with right:
