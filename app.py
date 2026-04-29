@@ -428,20 +428,26 @@ def rule_boost(features):
 # =========================
 # TRAIN MODEL
 # =========================
-rows, labels = [], []
-for text, label in data:
-    f, _ = extract_features(text)
-    rows.append(f)
-    labels.append(label)
+@st.cache_resource(show_spinner=False)
+def train_model():
+    rows, labels = [], []
+    for text, label in data:
+        f, _ = extract_features(text)
+        rows.append(f)
+        labels.append(label)
 
-X_train = pd.DataFrame(rows)
-y_train = np.array(labels)
+    X_train = pd.DataFrame(rows)
+    y_train = np.array(labels)
 
-model = Pipeline([
-    ("scaler", StandardScaler()),
-    ("clf", LogisticRegression())
-])
-model.fit(X_train, y_train)
+    cached_model = Pipeline([
+        ("scaler", StandardScaler()),
+        ("clf", LogisticRegression())
+    ])
+    cached_model.fit(X_train, y_train)
+    return cached_model
+
+
+model = train_model()
 
 # =========================
 # PREMIUM UI STYLE
