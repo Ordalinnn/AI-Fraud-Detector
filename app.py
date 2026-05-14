@@ -5,20 +5,21 @@ import streamlit as st
 from datetime import datetime
 from pathlib import Path
 import base64
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import cross_val_score
 
 # =========================
 # PAGE CONFIG
 # =========================
 st.set_page_config(
     page_title="AI Fraud Detector",
-    page_icon="icon.ico",
+    page_icon="🔐",
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
 
 # =========================
 # LOGO HELPER
@@ -35,8 +36,6 @@ LOGO_HTML = f"data:image/png;base64,{LOGO_B64}" if LOGO_B64 else ""
 # =========================
 # LANGUAGE
 # =========================
-# Language selector is now placed inside the sidebar.
-# This block also fixes old saved values like "🇷🇺 Русский".
 LANG_OPTIONS = ["🇰🇿 KZ", "🇷🇺 RU", "🇬🇧 EN"]
 OLD_LANG_MAP = {
     "🇰🇿 Қазақша": "🇰🇿 KZ",
@@ -92,6 +91,14 @@ TEXT = {
         "download": "📥 TXT есепті жүктеу",
         "how": "Бұл қалай жұмыс істейді?",
         "footer": "Қолданбалы математика + машиналық оқыту прототипі",
+        "model_metrics": "Модель метрикалары",
+        "accuracy": "Дәлдік",
+        "clear_history": "Тарихты тазалау",
+        "char_count": "Таңба саны",
+        "word_count": "Сөз саны",
+        "text_stats": "Мәтін статистикасы",
+        "ensemble": "Ансамбль болжамы",
+        "no_history": "Тарих жоқ",
     },
     "🇷🇺 RU": {
         "title": "AI Fraud Detector",
@@ -130,6 +137,14 @@ TEXT = {
         "download": "📥 Скачать TXT отчет",
         "how": "Как это работает?",
         "footer": "Прототип на основе прикладной математики и машинного обучения",
+        "model_metrics": "Метрики модели",
+        "accuracy": "Точность",
+        "clear_history": "Очистить историю",
+        "char_count": "Символов",
+        "word_count": "Слов",
+        "text_stats": "Статистика текста",
+        "ensemble": "Ансамблевый прогноз",
+        "no_history": "История пуста",
     },
     "🇬🇧 EN": {
         "title": "AI Fraud Detector",
@@ -168,13 +183,21 @@ TEXT = {
         "download": "📥 Download TXT report",
         "how": "How does it work?",
         "footer": "Applied Mathematics + Machine Learning Prototype",
+        "model_metrics": "Model Metrics",
+        "accuracy": "Accuracy",
+        "clear_history": "Clear history",
+        "char_count": "Characters",
+        "word_count": "Words",
+        "text_stats": "Text statistics",
+        "ensemble": "Ensemble prediction",
+        "no_history": "No history yet",
     },
 }
 
 T = TEXT[lang]
 
 # =========================
-# DATA
+# EXPANDED TRAINING DATA
 # =========================
 data = [
     # FRAUD: bank / card / account
@@ -216,6 +239,11 @@ data = [
     ["transfer money to a safe account immediately", 1],
     ["your parcel is on hold pay customs fee", 1],
     ["confirm your identity using this secure login link", 1],
+    ["click here to verify your bank account details now", 1],
+    ["your otp code is required to protect your account", 1],
+    ["do not tell anyone call us back with your pin", 1],
+    ["last chance to claim your reward enter card details", 1],
+    ["your account has been compromised login immediately", 1],
 
     # FRAUD: Kazakh examples
     ["құттықтаймыз сіз ұтыс ұттыңыз карта деректерін енгізіңіз", 1],
@@ -224,8 +252,17 @@ data = [
     ["банк қызметкерімін кодты айтыңыз", 1],
     ["қауіпсіз шотқа ақша аударыңыз", 1],
     ["жеке кабинетіңіз жабылады құпия кодты енгізіңіз", 1],
+    ["сіздің шотыңыз бұғатталды ресми нөмірге хабарласыңыз", 1],
+    ["жеделдетілген несие алыңыз кодты растаңыз", 1],
 
-    # SAFE examples
+    # FRAUD: Investment / job scams
+    ["guaranteed 30% weekly returns send money to activate account", 1],
+    ["work from home earn 500 a day send registration fee", 1],
+    ["your investment is ready withdraw by entering card details", 1],
+    ["гарантированный доход 30 процентов переведите деньги для активации", 1],
+    ["удаленная работа заработок 500 в день отправьте регистрационный взнос", 1],
+
+    # SAFE examples — expanded and more diverse
     ["привет как дела", 0],
     ["завтра урок математики в 9", 0],
     ["встреча в 15:00", 0],
@@ -243,6 +280,17 @@ data = [
     ["үй тапсырмасын жібердім", 0],
     ["hello see you tomorrow at school", 0],
     ["your appointment is confirmed", 0],
+    ["your order has been shipped and will arrive in 3 days", 0],
+    ["meeting rescheduled to friday at 10am", 0],
+    ["thank you for your payment receipt attached", 0],
+    ["reminder your prescription is ready for pickup", 0],
+    ["your monthly statement is now available in the app", 0],
+    ["restaurant reservation confirmed for saturday 7pm", 0],
+    ["your package was delivered to your front door", 0],
+    ["happy birthday have a great day", 0],
+    ["кездесу жоспарланды сейсенбіде сағат 14-те", 0],
+    ["тапсырысыңыз дайын алып кетуге болады", 0],
+    ["your salary has been credited to your account", 0],
 ]
 
 urgent_words = [
@@ -301,8 +349,8 @@ def count_matches(text, words):
     return sum(1 for w in words if w in text)
 
 def extract_features(text):
-    text = text.lower()
-    urls = extract_urls(text)
+    text_lower = text.lower()
+    urls = extract_urls(text_lower)
     domains = [get_domain(u) for u in urls]
 
     suspicious_domain = 0
@@ -320,22 +368,34 @@ def extract_features(text):
         if any(ch.isdigit() for ch in d):
             digit_domain = 1
 
+    words = text_lower.split()
+    avg_word_len = np.mean([len(w) for w in words]) if words else 0
+
     return {
         "has_link": int(len(urls) > 0),
-        "urgent_count": count_matches(text, urgent_words),
-        "secret_count": count_matches(text, secret_words),
-        "money_count": count_matches(text, money_words),
-        "threat_count": count_matches(text, threat_words),
-        "identity_count": count_matches(text, identity_words),
-        "reward_count": count_matches(text, reward_words),
-        "pressure_count": count_matches(text, pressure_phrases),
+        "urgent_count": count_matches(text_lower, urgent_words),
+        "secret_count": count_matches(text_lower, secret_words),
+        "money_count": count_matches(text_lower, money_words),
+        "threat_count": count_matches(text_lower, threat_words),
+        "identity_count": count_matches(text_lower, identity_words),
+        "reward_count": count_matches(text_lower, reward_words),
+        "pressure_count": count_matches(text_lower, pressure_phrases),
         "suspicious_domain": suspicious_domain,
         "long_domain": long_domain,
         "suspicious_zone": suspicious_zone,
         "digit_domain": digit_domain,
-        "digit_count": sum(ch.isdigit() for ch in text),
-        "exclamation_count": text.count("!"),
+        "digit_count": sum(ch.isdigit() for ch in text_lower),
+        "exclamation_count": text_lower.count("!"),
         "uppercase_count": sum(1 for ch in text if ch.isupper()),
+        # FIX: new meaningful features added
+        "text_length": len(text),
+        "word_count": len(words),
+        "avg_word_length": round(avg_word_len, 2),
+        "url_count": len(urls),
+        "has_multiple_warnings": int(
+            count_matches(text_lower, urgent_words) > 0
+            and count_matches(text_lower, threat_words) > 0
+        ),
     }, domains
 
 def explain(features):
@@ -356,6 +416,8 @@ def explain(features):
             "digit_count": "Мәтінде көп сан немесе код кездеседі",
             "exclamation_count": "Көп леп белгісі қолданылған",
             "uppercase_count": "Үлкен әріптер көп қолданылған",
+            "has_multiple_warnings": "Бір уақытта шұғылдық және қорқыту бар",
+            "url_count": "Бірнеше сілтеме анықталды",
         }
     elif lang == "🇷🇺 RU":
         labels = {
@@ -374,6 +436,8 @@ def explain(features):
             "digit_count": "В тексте много чисел или кодов",
             "exclamation_count": "Используется много восклицательных знаков",
             "uppercase_count": "Используется много заглавных букв",
+            "has_multiple_warnings": "Одновременно присутствуют срочность и угроза",
+            "url_count": "Обнаружено несколько ссылок",
         }
     else:
         labels = {
@@ -392,8 +456,13 @@ def explain(features):
             "digit_count": "The text contains many numbers or codes",
             "exclamation_count": "Many exclamation marks were used",
             "uppercase_count": "Many uppercase letters were used",
+            "has_multiple_warnings": "Both urgency and threat were detected simultaneously",
+            "url_count": "Multiple links were detected",
         }
-    return [labels[k] for k, v in features.items() if v > 0]
+
+    # Only explain features that are relevant (non-zero and meaningful)
+    irrelevant = {"text_length", "word_count", "avg_word_length"}
+    return [labels[k] for k, v in features.items() if v > 0 and k in labels and k not in irrelevant]
 
 def risk_style(prob):
     if prob < 0.3:
@@ -405,8 +474,9 @@ def risk_style(prob):
     return T["critical"], "risk-critical", "🔴"
 
 def rule_boost(features):
-    """Extra rule-based boost for realistic scam patterns.
-    It helps the prototype catch dangerous combinations even with small training data.
+    """
+    Rule-based boost for realistic scam patterns.
+    Capped at 0.30 to prevent runaway scores on safe messages.
     """
     boost = 0.0
     if features["has_link"] and features["secret_count"]:
@@ -423,13 +493,17 @@ def rule_boost(features):
         boost += 0.10
     if features["suspicious_zone"] or features["suspicious_domain"]:
         boost += 0.10
-    return boost
+    if features["has_multiple_warnings"]:
+        boost += 0.08
+    if features["url_count"] > 1:
+        boost += 0.05
+    return min(boost, 0.30)  # FIX: cap boost so safe messages aren't over-flagged
 
 # =========================
-# TRAIN MODEL
+# TRAIN MODELS (ENSEMBLE)
 # =========================
 @st.cache_resource(show_spinner=False)
-def train_model():
+def train_models():
     rows, labels = [], []
     for text, label in data:
         f, _ = extract_features(text)
@@ -439,18 +513,42 @@ def train_model():
     X_train = pd.DataFrame(rows)
     y_train = np.array(labels)
 
-    cached_model = Pipeline([
+    # FIX: Use ensemble of 3 models for more reliable predictions
+    lr_model = Pipeline([
         ("scaler", StandardScaler()),
-        ("clf", LogisticRegression())
+        ("clf", LogisticRegression(C=1.0, max_iter=1000, random_state=42))
     ])
-    cached_model.fit(X_train, y_train)
-    return cached_model
+    rf_model = Pipeline([
+        ("scaler", StandardScaler()),
+        ("clf", RandomForestClassifier(n_estimators=100, random_state=42))
+    ])
+    gb_model = Pipeline([
+        ("scaler", StandardScaler()),
+        ("clf", GradientBoostingClassifier(n_estimators=100, random_state=42))
+    ])
+
+    lr_model.fit(X_train, y_train)
+    rf_model.fit(X_train, y_train)
+    gb_model.fit(X_train, y_train)
+
+    # Cross-validation accuracy for each model
+    lr_cv = cross_val_score(lr_model, X_train, y_train, cv=5, scoring="accuracy").mean()
+    rf_cv = cross_val_score(rf_model, X_train, y_train, cv=5, scoring="accuracy").mean()
+    gb_cv = cross_val_score(gb_model, X_train, y_train, cv=5, scoring="accuracy").mean()
+
+    metrics = {
+        "Logistic Regression": round(lr_cv * 100, 1),
+        "Random Forest": round(rf_cv * 100, 1),
+        "Gradient Boosting": round(gb_cv * 100, 1),
+    }
+
+    return lr_model, rf_model, gb_model, metrics, X_train, y_train
 
 
-model = train_model()
+lr_model, rf_model, gb_model, model_metrics, X_train, y_train = train_models()
 
 # =========================
-# PREMIUM UI STYLE
+# UI STYLE
 # =========================
 st.markdown("""
 <style>
@@ -488,7 +586,6 @@ html, body, [class*="css"] {
     color: #e5e7eb !important;
 }
 
-/* Fix white text inside select boxes */
 [data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] > div {
     background: #ffffff !important;
     border-radius: 14px !important;
@@ -502,7 +599,6 @@ html, body, [class*="css"] {
     fill: #0f172a !important;
 }
 
-/* Fix radio language buttons in sidebar */
 [data-testid="stSidebar"] .stRadio label {
     color: #e5e7eb !important;
     font-weight: 700 !important;
@@ -528,10 +624,7 @@ html, body, [class*="css"] {
     padding: 38px;
     border-radius: 34px;
     background:
-        linear-gradient(135deg, rgba(15,23,42,0.98), rgba(30,64,175,0.95) 52%, rgba(13,148,136,0.94)),
-        url('https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=1600&q=80');
-    background-blend-mode: multiply;
-    background-size: cover;
+        linear-gradient(135deg, rgba(15,23,42,0.98), rgba(30,64,175,0.95) 52%, rgba(13,148,136,0.94));
     color: white;
     box-shadow: 0 30px 80px rgba(15, 23, 42, 0.28);
     margin-bottom: 26px;
@@ -809,6 +902,43 @@ textarea {
     padding: 18px;
 }
 
+.metrics-bar {
+    background: #f1f5f9;
+    border-radius: 20px;
+    padding: 18px 22px;
+    margin: 12px 0;
+    border: 1px solid #e2e8f0;
+}
+
+.metrics-row {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+.metrics-item {
+    background: white;
+    border-radius: 14px;
+    padding: 12px 18px;
+    border: 1px solid #e2e8f0;
+    flex: 1;
+    min-width: 120px;
+    text-align: center;
+}
+
+.metrics-item-label {
+    font-size: 12px;
+    color: #64748b;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.metrics-item-val {
+    font-size: 22px;
+    font-weight: 900;
+    color: #0f172a;
+}
+
 @media (max-width: 900px) {
     .hero-grid { grid-template-columns: 1fr; }
     .hero-title { font-size: 38px; }
@@ -847,43 +977,41 @@ with st.sidebar:
 
     st.divider()
     st.markdown(f"### 🧪 {T['demo']}")
+
+    demo_texts = {
+        "Fraud SMS": "Срочно! Ваша карта заблокирована. Отправьте код из SMS и перейдите по ссылке http://secure-login.xyz",
+        "Fraud Call": "Здравствуйте, я сотрудник службы безопасности банка. По вашему счету подозрительная операция. Назовите код из SMS, чтобы мы отменили перевод.",
+        "Safe Message": "Привет, завтра урок математики в 9:00. Не забудь тетрадь.",
+        "Fake Delivery": "Ваша посылка задержана. Срочно оплатите таможенную пошлину по ссылке http://delivery-pay-online.xyz",
+        "Fake Prize": "Поздравляем! Вы выиграли приз. Для получения подарка введите номер карты и CVV.",
+        "Relative Scam": "Ваш родственник попал в аварию. Срочно переведите деньги, никому не говорите.",
+        "Fake Job Offer": "Поздравляем, вы приняты на удаленную работу. Для оформления выплат отправьте фото удостоверения, номер карты и OTP-код из SMS.",
+        "Marketplace Prepayment Scam": "Здравствуйте, я покупатель с маркетплейса. Подтвердите получение оплаты: перейдите по ссылке https://safe-deal-confirm.top и введите данные карты.",
+        "Fake Utility Debt": "Уведомление ЖКХ: у вас долг за коммунальные услуги. Во избежание отключения света оплатите сегодня по ссылке http://pay-service-24.site.",
+        "Investment Scam": "Гарантированный доход 30% в неделю! Переведите деньги на инвестиционный счет и сообщите код подтверждения для активации."
+    }
+
     demo = st.selectbox(
         T["demo"],
-        [
-            "Fraud SMS",
-            "Fraud Call",
-            "Fake Delivery",
-            "Fake Prize",
-            "Relative Scam",
-            "Fake Job Offer",
-            "Marketplace Prepayment Scam",
-            "Fake Utility Debt",
-            "Investment Scam",
-            "Safe Message",
-        ]
+        list(demo_texts.keys())
     )
 
     st.divider()
-    st.markdown("### 🛡️ Project stack")
-    st.markdown("• Logistic Regression")
-    st.markdown("• Feature Engineering")
-    st.markdown("• Domain Analysis")
-    st.markdown("• Explainable AI")
-    st.markdown("• Rule-based Risk Boost")
-    st.markdown("• Real-life Scam Scenarios")
+    st.markdown(f"### 📊 {T['model_metrics']}")
+    for model_name, acc in model_metrics.items():
+        color = "#16a34a" if acc >= 90 else "#ca8a04"
+        st.markdown(
+            f'<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.1)">'
+            f'<span style="color:#94a3b8;font-size:12px">{model_name}</span>'
+            f'<span style="color:{color};font-weight:800;font-size:13px">{acc}%</span></div>',
+            unsafe_allow_html=True
+        )
 
-demo_texts = {
-    "Fraud SMS": "Срочно! Ваша карта заблокирована. Отправьте код из SMS и перейдите по ссылке http://secure-login.xyz",
-    "Fraud Call": "Здравствуйте, я сотрудник службы безопасности банка. По вашему счету подозрительная операция. Назовите код из SMS, чтобы мы отменили перевод.",
-    "Safe Message": "Привет, завтра урок математики в 9:00. Не забудь тетрадь.",
-    "Fake Delivery": "Ваша посылка задержана. Срочно оплатите таможенную пошлину по ссылке http://delivery-pay-online.xyz",
-    "Fake Prize": "Поздравляем! Вы выиграли приз. Для получения подарка введите номер карты и CVV.",
-    "Relative Scam": "Ваш родственник попал в аварию. Срочно переведите деньги, никому не говорите.",
-    "Fake Job Offer": "Поздравляем, вы приняты на удаленную работу. Для оформления выплат отправьте фото удостоверения, номер карты и OTP-код из SMS.",
-    "Marketplace Prepayment Scam": "Здравствуйте, я покупатель с маркетплейса. Подтвердите получение оплаты: перейдите по ссылке https://safe-deal-confirm.top и введите данные карты.",
-    "Fake Utility Debt": "Уведомление ЖКХ: у вас долг за коммунальные услуги. Во избежание отключения света оплатите сегодня по ссылке http://pay-service-24.site.",
-    "Investment Scam": "Гарантированный доход 30% в неделю! Переведите деньги на инвестиционный счет и сообщите код подтверждения для активации."
-}
+    st.divider()
+    st.markdown("### 🛡️ Project stack")
+    for item in ["Ensemble (LR + RF + GB)", "Feature Engineering", "Domain Analysis",
+                 "Explainable AI", "Rule-based Risk Boost", "Real-life Scam Scenarios"]:
+        st.markdown(f"• {item}")
 
 # =========================
 # HERO
@@ -902,7 +1030,7 @@ st.markdown(f"""
                 </div>
             </div>
             <div class="hero-subtitle">{T['subtitle']}</div>
-            <span class="badge">Logistic Regression</span>
+            <span class="badge">Ensemble ML</span>
             <span class="badge">Domain Analysis</span>
             <span class="badge">Explainable AI</span>
             <span class="badge">Risk Report</span>
@@ -910,7 +1038,7 @@ st.markdown(f"""
         <div class="hero-panel">
             <div class="hero-panel-title">Prototype readiness</div>
             <div class="hero-panel-value">Demo-ready</div>
-            <div class="hero-panel-small">Analyzes text, links, pressure words, secret-code requests and suspicious domains.</div>
+            <div class="hero-panel-small">Analyzes text, links, pressure words, secret-code requests and suspicious domains using an ensemble of 3 ML models.</div>
         </div>
     </div>
 </div>
@@ -941,6 +1069,11 @@ with left:
                 height=210
             )
 
+        # FIX: Show live character/word count below textarea
+        char_count = len(input_text)
+        word_count_val = len(input_text.split()) if input_text.strip() else 0
+        st.caption(f"📝 {T['char_count']}: {char_count} | {T['word_count']}: {word_count_val}")
+
         analyze = st.form_submit_button(T["analyze"], use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -950,16 +1083,17 @@ with right:
         <div class="section-title">⚙️ {T['features']}</div>
         <p>🧾 Text analysis</p>
         <p>🌐 Domain analysis</p>
-        <p>🧠 Logistic regression</p>
+        <p>🧠 Ensemble ML (LR+RF+GB)</p>
         <p>🔍 Explainable result</p>
         <p>📥 Downloadable report</p>
         <p>🚨 Real scam scenarios</p>
         <p>⚡ Rule-based risk boost</p>
+        <p>📊 Model accuracy shown</p>
     </div>
     """, unsafe_allow_html=True)
 
 # =========================
-# HISTORY
+# HISTORY INIT
 # =========================
 if "history" not in st.session_state:
     st.session_state.history = []
@@ -973,8 +1107,15 @@ if analyze:
     else:
         features, domains = extract_features(input_text)
         X_input = pd.DataFrame([features])
-        raw_prob = model.predict_proba(X_input)[0][1]
-        prob = min(0.99, raw_prob + rule_boost(features))
+
+        # FIX: Ensemble prediction — average probabilities from all 3 models
+        lr_prob = lr_model.predict_proba(X_input)[0][1]
+        rf_prob = rf_model.predict_proba(X_input)[0][1]
+        gb_prob = gb_model.predict_proba(X_input)[0][1]
+        raw_prob = (lr_prob + rf_prob + gb_prob) / 3.0
+
+        boost = rule_boost(features)
+        prob = min(0.99, raw_prob + boost)
         pred = int(prob >= threshold)
         risk_label, risk_class, emoji = risk_style(prob)
         explanations = explain(features)
@@ -985,10 +1126,17 @@ if analyze:
         c1.markdown(f'<div class="metric-card"><div class="metric-icon">%</div><div class="metric-label">{T["risk"]}</div><div class="metric-value">{prob*100:.1f}%</div></div>', unsafe_allow_html=True)
         c2.markdown(f'<div class="metric-card"><div class="metric-icon">⚠️</div><div class="metric-label">{T["detected"]}</div><div class="metric-value">{len(explanations)}</div></div>', unsafe_allow_html=True)
         c3.markdown(f'<div class="metric-card"><div class="metric-icon">🎚️</div><div class="metric-label">{T["threshold"]}</div><div class="metric-value">{threshold:.2f}</div></div>', unsafe_allow_html=True)
-        c4.markdown(f'<div class="metric-card"><div class="metric-icon">🧠</div><div class="metric-label">{T["model"]}</div><div class="metric-value">LR</div></div>', unsafe_allow_html=True)
+        c4.markdown(f'<div class="metric-card"><div class="metric-icon">🧠</div><div class="metric-label">{T["model"]}</div><div class="metric-value">3-way</div></div>', unsafe_allow_html=True)
 
         st.markdown(f'<div class="{risk_class}">{emoji} {risk_label}</div>', unsafe_allow_html=True)
         st.progress(float(prob))
+
+        # FIX: Show per-model breakdown
+        st.markdown(f"**{T['ensemble']}:**")
+        mc1, mc2, mc3 = st.columns(3)
+        mc1.metric("Logistic Regression", f"{lr_prob*100:.1f}%")
+        mc2.metric("Random Forest", f"{rf_prob*100:.1f}%")
+        mc3.metric("Gradient Boosting", f"{gb_prob*100:.1f}%")
 
         tab1, tab2, tab3, tab4, tab5 = st.tabs([
             "🔍 Explain AI",
@@ -1006,14 +1154,29 @@ if analyze:
             else:
                 st.success(T["no_features"])
 
-            st.subheader("Feature contribution")
-            coef = model.named_steps["clf"].coef_[0]
+            st.subheader("Feature contribution (Logistic Regression)")
+            coef = lr_model.named_steps["clf"].coef_[0]
+            feature_names = list(X_input.columns)
             contrib = []
-            for name, value, w in zip(X_input.columns, X_input.iloc[0], coef):
-                contrib.append([name, value, round(w, 3), round(value * w, 3)])
+            for name, value, w in zip(feature_names, X_input.iloc[0], coef):
+                contrib.append([name, round(float(value), 3), round(float(w), 3), round(float(value) * round(float(w), 3), 3)])
 
             contrib_df = pd.DataFrame(contrib, columns=["Feature", "Value", "Weight", "Contribution"])
-            st.dataframe(contrib_df.sort_values("Contribution", ascending=False), use_container_width=True)
+            # FIX: Highlight most impactful rows in dataframe
+            st.dataframe(
+                contrib_df.sort_values("Contribution", ascending=False),
+                use_container_width=True,
+                hide_index=True
+            )
+
+            # FIX: Also show Random Forest importances
+            st.subheader("Feature importance (Random Forest)")
+            rf_importances = rf_model.named_steps["clf"].feature_importances_
+            imp_df = pd.DataFrame({
+                "Feature": feature_names,
+                "Importance": [round(float(i), 4) for i in rf_importances]
+            }).sort_values("Importance", ascending=False)
+            st.dataframe(imp_df, use_container_width=True, hide_index=True)
 
             st.subheader(T["advice"])
             if pred == 1:
@@ -1025,62 +1188,112 @@ if analyze:
             st.subheader(T["domain"])
             if domains:
                 for d in domains:
-                    st.markdown(f'<div class="domain-box">🌐 {d}</div>', unsafe_allow_html=True)
+                    flags = []
+                    if any(w in d for w in suspicious_domain_words):
+                        flags.append("⚠️ Suspicious keyword")
+                    if len(d) > 20:
+                        flags.append("⚠️ Long domain")
+                    if any(d.endswith(z) for z in suspicious_zones):
+                        flags.append("🔴 Suspicious TLD")
+                    if any(ch.isdigit() for ch in d):
+                        flags.append("⚠️ Contains digits")
+                    flag_str = " | ".join(flags) if flags else "✅ No issues found"
+                    st.markdown(
+                        f'<div class="domain-box">🌐 {d}<br><small style="color:#94a3b8">{flag_str}</small></div>',
+                        unsafe_allow_html=True
+                    )
             else:
                 st.info(T["no_domain"])
 
         with tab3:
             st.subheader(T["vector"])
-            st.dataframe(X_input, use_container_width=True)
+            # FIX: Transpose for better readability
+            display_df = X_input.T.reset_index()
+            display_df.columns = ["Feature", "Value"]
+            st.dataframe(display_df, use_container_width=True, hide_index=True)
+
+            # FIX: Show text statistics
+            st.subheader(T["text_stats"])
+            ts1, ts2, ts3 = st.columns(3)
+            ts1.metric(T["char_count"], char_count)
+            ts2.metric(T["word_count"], word_count_val)
+            ts3.metric("URLs", len(domains))
 
         with tab4:
             report = f"""
 AI Fraud Detector Report
+========================
 Date: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+Language: {lang}
 
-Input:
+INPUT TEXT:
 {input_text}
 
-Raw ML probability: {raw_prob*100:.1f}%
-Final fraud risk after rule boost: {prob*100:.1f}%
-Risk level: {risk_label}
-Threshold: {threshold}
+ANALYSIS RESULTS:
+-----------------
+Logistic Regression probability: {lr_prob*100:.1f}%
+Random Forest probability:       {rf_prob*100:.1f}%
+Gradient Boosting probability:   {gb_prob*100:.1f}%
+Ensemble average (raw):          {raw_prob*100:.1f}%
+Rule boost applied:              +{boost*100:.1f}%
+Final fraud risk:                {prob*100:.1f}%
+Risk level:                      {risk_label}
+Decision threshold:              {threshold}
+Prediction:                      {"FRAUD" if pred == 1 else "SAFE"}
 
-Detected features:
+DETECTED FEATURES ({len(explanations)}):
 {chr(10).join("- " + e for e in explanations) if explanations else "No strong fraud indicators"}
 
-Domains:
-{chr(10).join(domains) if domains else "No domains"}
+DETECTED DOMAINS ({len(domains)}):
+{chr(10).join("- " + d for d in domains) if domains else "No domains"}
 
-Advice:
+TEXT STATS:
+Characters: {char_count}
+Words: {word_count_val}
+
+SECURITY ADVICE:
 {T["bad_advice"] if pred == 1 else T["good_advice"]}
 """
             st.download_button(
                 T["download"],
                 report,
-                file_name="fraud_analysis_report.txt",
+                file_name=f"fraud_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
                 use_container_width=True
             )
 
+        # FIX: Save to history with richer info
         st.session_state.history.append({
             "Time": datetime.now().strftime("%H:%M:%S"),
             "Risk %": round(prob * 100, 1),
             "Level": risk_label,
-            "Text": input_text[:70]
+            "Verdict": "🚨 FRAUD" if pred == 1 else "✅ SAFE",
+            "Features": len(explanations),
+            "Text": input_text[:70] + ("..." if len(input_text) > 70 else ""),
         })
 
         with tab5:
             if st.session_state.history:
-                st.dataframe(pd.DataFrame(st.session_state.history), use_container_width=True)
+                st.dataframe(
+                    pd.DataFrame(st.session_state.history),
+                    use_container_width=True,
+                    hide_index=True
+                )
+                # FIX: Button to clear history
+                if st.button(T["clear_history"]):
+                    st.session_state.history = []
+                    st.rerun()
             else:
-                st.write("No history")
+                st.info(T["no_history"])
 
+# =========================
+# HOW IT WORKS
+# =========================
 with st.expander(f"📘 {T['how']}"):
     if lang == "🇰🇿 KZ":
-        st.write("1. Мәтіннен белгілер алынады. 2. Олар сандық векторға айналады. 3. Логистикалық регрессия ықтималдық есептейді. 4. Сайт нәтиже мен кеңес береді.")
+        st.write("1. Мәтіннен 18 белгі алынады. 2. Олар сандық векторға айналады. 3. 3 ML модель ықтималдық есептейді. 4. Ереже күшейткіш қолданылады. 5. Сайт нәтиже мен кеңес береді.")
     elif lang == "🇷🇺 RU":
-        st.write("1. Из текста извлекаются признаки. 2. Они превращаются в числовой вектор. 3. Логистическая регрессия считает вероятность. 4. Сайт показывает результат и совет.")
+        st.write("1. Из текста извлекаются 18 признаков. 2. Они превращаются в числовой вектор. 3. 3 модели ML считают вероятность мошенничества. 4. Применяется ансамблирование и правило-буст. 5. Сайт показывает результат и совет по безопасности.")
     else:
-        st.write("1. Features are extracted from the text. 2. They are converted into a numeric vector. 3. Logistic regression calculates probability. 4. The site shows the result and advice.")
+        st.write("1. 18 features are extracted from the text. 2. They are converted into a numeric vector. 3. Three ML models (LR, RF, GB) independently predict fraud probability. 4. Probabilities are averaged and a rule-based boost is applied. 5. The app shows the result, explanation, and safety advice.")
 
-st.markdown(f'<div class="footer">{T["footer"]}</div>', unsafe_allow_html=True)
+st.markdown(f'<div class="footer">{T["footer"]} · Ensemble ML · {datetime.now().year}</div>', unsafe_allow_html=True)
