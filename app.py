@@ -1342,13 +1342,20 @@ with st.sidebar:
 
     st.divider()
 
+    MODE_KEYS = ["sms", "call", "file", "batch"]
     mode = st.selectbox(
         T["mode"],
-        [T["sms"], T["call"], T["file"], T["batch"]],
+        MODE_KEYS,
+        format_func=lambda k: T[k],
+        key="mode_select",
         help=T["mode_help"]
     )
 
-    threshold = st.slider(T["threshold"], 0.1, 0.9, 0.5, 0.05, help=T["threshold_help"])
+    threshold = st.slider(
+        T["threshold"], 0.1, 0.9, 0.5, 0.05,
+        key="threshold_slider",
+        help=T["threshold_help"]
+    )
 
     st.divider()
     st.markdown(f"### 🧪 {T['demo']}")
@@ -1366,9 +1373,17 @@ with st.sidebar:
         "Investment Scam": "Гарантированный доход 30% в неделю! Переведите деньги на инвестиционный счет и сообщите код подтверждения для активации."
     }
 
+    if "main_input_text" not in st.session_state:
+        st.session_state["main_input_text"] = next(iter(demo_texts.values()))
+
+    def apply_demo_change():
+        st.session_state["main_input_text"] = demo_texts[st.session_state["demo_select"]]
+
     demo = st.selectbox(
         T["demo"],
-        list(demo_texts.keys())
+        list(demo_texts.keys()),
+        key="demo_select",
+        on_change=apply_demo_change,
     )
 
     st.divider()
@@ -1448,13 +1463,13 @@ left, right = st.columns([2.1, 0.9], gap="large")
 with left:
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)
 
-    if mode == T["batch"]:
+    if mode == "batch":
         st.markdown(f'<div class="section-title">📊 {T["batch"]}</div>', unsafe_allow_html=True)
         st.markdown('<div class="section-subtitle">Upload a CSV file with many messages and analyze all of them at once.</div>', unsafe_allow_html=True)
 
         with st.form("batch_form", clear_on_submit=False):
-            batch_file = st.file_uploader(T["batch_upload"], type=["csv"])
-            batch_column = st.text_input(T["batch_column"], value="text")
+            batch_file = st.file_uploader(T["batch_upload"], type=["csv"], key="batch_file_uploader")
+            batch_column = st.text_input(T["batch_column"], value="text", key="batch_column_input")
             batch_go = st.form_submit_button(T["batch_run"], use_container_width=True)
 
         analyze = False
@@ -1465,8 +1480,8 @@ with left:
 
         with st.form("analysis_form", clear_on_submit=False):
             uploaded = None
-            if mode == T["file"]:
-                uploaded = st.file_uploader(T["upload"], type=["txt"])
+            if mode == "file":
+                uploaded = st.file_uploader(T["upload"], type=["txt"], key="txt_file_uploader")
 
             if uploaded:
                 input_text = uploaded.read().decode("utf-8", errors="ignore")
@@ -1474,7 +1489,7 @@ with left:
             else:
                 input_text = st.text_area(
                     T["input_label"],
-                    value=demo_texts[demo],
+                    key="main_input_text",
                     height=210
                 )
 
@@ -1516,7 +1531,7 @@ if "history" not in st.session_state:
 # =========================
 # BATCH ANALYSIS
 # =========================
-if mode == T["batch"] and batch_go:
+if mode == "batch" and batch_go:
     if not batch_file:
         st.warning(T["batch_no_file"])
     else:
@@ -1586,7 +1601,7 @@ if mode == T["batch"] and batch_go:
 # =========================
 # ANALYSIS
 # =========================
-if mode != T["batch"] and analyze:
+if mode != "batch" and analyze:
     if not input_text.strip():
         st.warning(T["no_text"])
     else:
