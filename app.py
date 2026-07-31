@@ -74,6 +74,12 @@ st.session_state.lang = OLD_LANG_MAP.get(st.session_state.lang, st.session_state
 if st.session_state.lang not in LANG_OPTIONS:
     st.session_state.lang = "🇷🇺 RU"
 
+def apply_lang_change():
+    """Runs before the rerun triggered by the radio click, so the new
+    language is already in session_state when the script body executes
+    (avoids needing a second, explicit st.rerun())."""
+    st.session_state.lang = st.session_state.lang_selector
+
 lang = st.session_state.lang
 
 TEXT = {
@@ -1232,16 +1238,14 @@ with st.sidebar:
     st.markdown(f"## {T['title']}")
     st.caption("Smart fraud detection prototype")
 
-    selected_lang = st.radio(
+    st.radio(
         "🌍 Language / Тіл / Язык",
         LANG_OPTIONS,
         index=LANG_OPTIONS.index(st.session_state.lang),
         horizontal=True,
-        key="lang_selector"
+        key="lang_selector",
+        on_change=apply_lang_change,
     )
-    if selected_lang != st.session_state.lang:
-        st.session_state.lang = selected_lang
-        st.rerun()
 
     st.divider()
 
