@@ -1,7 +1,10 @@
 import re
+import json
+import html
 import numpy as np
 import pandas as pd
 import streamlit as st
+import plotly.graph_objects as go
 from datetime import datetime
 from pathlib import Path
 import base64
@@ -32,6 +35,25 @@ def image_to_base64(path: str) -> str:
 
 LOGO_B64 = image_to_base64("logo.png")
 LOGO_HTML = f"data:image/png;base64,{LOGO_B64}" if LOGO_B64 else ""
+
+# =========================
+# HISTORY PERSISTENCE
+# =========================
+HISTORY_FILE = Path("history.json")
+
+def load_history():
+    if HISTORY_FILE.exists():
+        try:
+            return json.loads(HISTORY_FILE.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return []
+    return []
+
+def save_history(history):
+    try:
+        HISTORY_FILE.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
+    except OSError:
+        pass
 
 # =========================
 # LANGUAGE
@@ -99,6 +121,21 @@ TEXT = {
         "text_stats": "Мәтін статистикасы",
         "ensemble": "Ансамбль болжамы",
         "no_history": "Тарих жоқ",
+        "batch": "Топтық анализ",
+        "batch_upload": "Мәтіндері бар CSV файлды жүктеу",
+        "batch_column": "Мәтін бағаны",
+        "batch_run": "📊 Барлығын талдау",
+        "batch_results": "Топтық анализ нәтижесі",
+        "batch_summary": "Қорытынды",
+        "batch_no_file": "Алдымен CSV файл жүктеңіз.",
+        "batch_no_column": "Таңдалған бағанда мәтін табылмады.",
+        "download_csv_results": "📥 Нәтижелерді CSV түрінде жүктеу",
+        "download_history": "📥 Тарихты CSV түрінде жүктеу",
+        "highlighted": "Белгіленген мәтін",
+        "gauge_title": "Қауіп өлшегіші",
+        "model_compare": "Модельдер бойынша салыстыру",
+        "fraud_count": "Алаяқтық",
+        "safe_count": "Қауіпсіз",
     },
     "🇷🇺 RU": {
         "title": "AI Fraud Detector",
@@ -145,6 +182,21 @@ TEXT = {
         "text_stats": "Статистика текста",
         "ensemble": "Ансамблевый прогноз",
         "no_history": "История пуста",
+        "batch": "Пакетный анализ",
+        "batch_upload": "Загрузить CSV файл с текстами",
+        "batch_column": "Колонка с текстом",
+        "batch_run": "📊 Проанализировать всё",
+        "batch_results": "Результаты пакетного анализа",
+        "batch_summary": "Сводка",
+        "batch_no_file": "Сначала загрузите CSV файл.",
+        "batch_no_column": "В выбранной колонке не найден текст.",
+        "download_csv_results": "📥 Скачать результаты в CSV",
+        "download_history": "📥 Скачать историю в CSV",
+        "highlighted": "Выделенный текст",
+        "gauge_title": "Индикатор риска",
+        "model_compare": "Сравнение моделей",
+        "fraud_count": "Мошенничество",
+        "safe_count": "Безопасно",
     },
     "🇬🇧 EN": {
         "title": "AI Fraud Detector",
@@ -191,6 +243,21 @@ TEXT = {
         "text_stats": "Text statistics",
         "ensemble": "Ensemble prediction",
         "no_history": "No history yet",
+        "batch": "Batch analysis",
+        "batch_upload": "Upload a CSV file with texts",
+        "batch_column": "Text column",
+        "batch_run": "📊 Analyze all",
+        "batch_results": "Batch analysis results",
+        "batch_summary": "Summary",
+        "batch_no_file": "Please upload a CSV file first.",
+        "batch_no_column": "No text was found in the selected column.",
+        "download_csv_results": "📥 Download results as CSV",
+        "download_history": "📥 Download history as CSV",
+        "highlighted": "Highlighted text",
+        "gauge_title": "Risk meter",
+        "model_compare": "Model comparison",
+        "fraud_count": "Fraud",
+        "safe_count": "Safe",
     },
 }
 
@@ -464,6 +531,52 @@ def explain(features):
     irrelevant = {"text_length", "word_count", "avg_word_length"}
     return [labels[k] for k, v in features.items() if v > 0 and k in labels and k not in irrelevant]
 
+HIGHLIGHT_CATEGORIES = [
+    (pressure_phrases, "hl-pressure"),
+    (threat_words, "hl-threat"),
+    (secret_words, "hl-secret"),
+    (reward_words, "hl-reward"),
+    (identity_words, "hl-identity"),
+    (urgent_words, "hl-urgent"),
+    (money_words, "hl-money"),
+]
+
+def highlight_text(text):
+    """Wrap detected trigger words/links in colored <span> tags for display."""
+    matches = []
+    for words, css_class in HIGHLIGHT_CATEGORIES:
+        for w in words:
+            if not w:
+                continue
+            for m in re.finditer(re.escape(w), text, flags=re.IGNORECASE):
+                matches.append((m.start(), m.end(), css_class))
+    for m in re.finditer(r"https?://[^\s]+|www\.[^\s]+", text, flags=re.IGNORECASE):
+        matches.append((m.start(), m.end(), "hl-link"))
+
+    if not matches:
+        return html.escape(text).replace("\n", "<br>")
+
+    matches.sort(key=lambda x: (x[0], -(x[1] - x[0])))
+
+    filtered = []
+    last_end = -1
+    for start, end, css_class in matches:
+        if start >= last_end:
+            filtered.append((start, end, css_class))
+            last_end = end
+
+    pieces = []
+    cursor = 0
+    for start, end, css_class in filtered:
+        if start > cursor:
+            pieces.append(html.escape(text[cursor:start]))
+        pieces.append(f'<span class="{css_class}">{html.escape(text[start:end])}</span>')
+        cursor = end
+    if cursor < len(text):
+        pieces.append(html.escape(text[cursor:]))
+
+    return "".join(pieces).replace("\n", "<br>")
+
 def risk_style(prob):
     if prob < 0.3:
         return T["low"], "risk-low", "🟢"
@@ -498,6 +611,60 @@ def rule_boost(features):
     if features["url_count"] > 1:
         boost += 0.05
     return min(boost, 0.30)  # FIX: cap boost so safe messages aren't over-flagged
+
+def make_gauge_chart(prob, threshold, title):
+    fig = go.Figure(go.Indicator(
+        mode="gauge+number",
+        value=prob * 100,
+        number={"suffix": "%", "font": {"size": 36}},
+        title={"text": title, "font": {"size": 15}},
+        gauge={
+            "axis": {"range": [0, 100], "tickwidth": 1},
+            "bar": {"color": "#0f172a"},
+            "steps": [
+                {"range": [0, 30], "color": "#dcfce7"},
+                {"range": [30, 60], "color": "#fef9c3"},
+                {"range": [60, 80], "color": "#ffedd5"},
+                {"range": [80, 100], "color": "#fee2e2"},
+            ],
+            "threshold": {
+                "line": {"color": "#dc2626", "width": 4},
+                "thickness": 0.85,
+                "value": threshold * 100,
+            },
+        },
+    ))
+    fig.update_layout(height=250, margin=dict(l=20, r=20, t=50, b=10), paper_bgcolor="rgba(0,0,0,0)")
+    return fig
+
+def make_model_bar_chart(lr_prob, rf_prob, gb_prob, title):
+    values = [lr_prob * 100, rf_prob * 100, gb_prob * 100]
+    fig = go.Figure(go.Bar(
+        x=["Logistic Regression", "Random Forest", "Gradient Boosting"],
+        y=values,
+        marker_color=["#2563eb", "#14b8a6", "#7c3aed"],
+        text=[f"{v:.1f}%" for v in values],
+        textposition="outside",
+    ))
+    fig.update_layout(
+        title=title,
+        yaxis=dict(range=[0, 100], title="Probability (%)"),
+        height=280,
+        margin=dict(l=20, r=20, t=50, b=10),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+    )
+    return fig
+
+def make_batch_summary_chart(fraud_count, safe_count, title):
+    fig = go.Figure(go.Pie(
+        labels=[title[0], title[1]],
+        values=[fraud_count, safe_count],
+        marker_colors=["#dc2626", "#16a34a"],
+        hole=0.55,
+    ))
+    fig.update_layout(height=280, margin=dict(l=20, r=20, t=30, b=10), paper_bgcolor="rgba(0,0,0,0)")
+    return fig
 
 # =========================
 # TRAIN MODELS (ENSEMBLE)
@@ -569,6 +736,51 @@ html, body, [class*="css"] {
     padding-top: 1.4rem;
     padding-bottom: 3rem;
     max-width: 1280px;
+}
+
+/* Force readable text for native Streamlit widgets in the main area,
+   regardless of the visitor's OS/browser light-dark preference. */
+.main h1, .main h2, .main h3, .main h4, .main h5, .main h6,
+[data-testid="stMain"] h1, [data-testid="stMain"] h2, [data-testid="stMain"] h3,
+[data-testid="stMain"] h4, [data-testid="stMain"] h5, [data-testid="stMain"] h6 {
+    color: #0f172a !important;
+}
+
+[data-testid="stMetricValue"],
+[data-testid="stMetricLabel"],
+[data-testid="stMetricDelta"] {
+    color: #0f172a !important;
+}
+
+.main [data-testid="stCaptionContainer"],
+[data-testid="stMain"] [data-testid="stCaptionContainer"] {
+    color: #64748b !important;
+}
+
+[data-testid="stExpander"] summary,
+[data-testid="stExpander"] summary p,
+[data-testid="stExpander"] svg {
+    color: #0f172a !important;
+    fill: #0f172a !important;
+}
+
+[data-testid="stExpander"] [data-testid="stMarkdownContainer"] p {
+    color: #1e293b !important;
+}
+
+[data-testid="stTabs"] [data-baseweb="tab"] p {
+    color: #334155 !important;
+}
+
+[data-testid="stDataFrame"] {
+    color: #0f172a;
+}
+
+.main [data-testid="stWidgetLabel"] p,
+[data-testid="stMain"] [data-testid="stWidgetLabel"] p,
+.main [data-testid="stFileUploaderDropzoneInstructions"] div,
+[data-testid="stMain"] [data-testid="stFileUploaderDropzoneInstructions"] div {
+    color: #0f172a !important;
 }
 
 [data-testid="stSidebar"] {
@@ -835,7 +1047,9 @@ html, body, [class*="css"] {
     border: 1px solid #334155;
 }
 
-.stButton > button {
+.stButton > button,
+[data-testid="stDownloadButton"] button,
+[data-testid="stFormSubmitButton"] button {
     border-radius: 18px !important;
     padding: 0.8rem 1rem !important;
     font-weight: 850 !important;
@@ -845,7 +1059,9 @@ html, body, [class*="css"] {
     box-shadow: 0 14px 30px rgba(37,99,235,0.23) !important;
 }
 
-.stButton > button:hover {
+.stButton > button:hover,
+[data-testid="stDownloadButton"] button:hover,
+[data-testid="stFormSubmitButton"] button:hover {
     transform: translateY(-2px);
     box-shadow: 0 20px 42px rgba(37,99,235,0.30) !important;
 }
@@ -939,9 +1155,64 @@ textarea {
     color: #0f172a;
 }
 
+.highlight-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 18px;
+    padding: 16px 18px;
+    line-height: 1.85;
+    color: #1e293b;
+    font-size: 15px;
+    word-wrap: break-word;
+}
+
+.hl-urgent, .hl-secret, .hl-money, .hl-threat,
+.hl-reward, .hl-pressure, .hl-identity, .hl-link {
+    padding: 1px 5px;
+    border-radius: 6px;
+    font-weight: 750;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+}
+.hl-urgent   {background:#fef9c3; color:#854d0e;}
+.hl-secret   {background:#fee2e2; color:#991b1b;}
+.hl-money    {background:#dbeafe; color:#1e40af;}
+.hl-threat   {background:#ffedd5; color:#9a3412;}
+.hl-reward   {background:#f3e8ff; color:#6b21a8;}
+.hl-pressure {background:#fce7f3; color:#9d174d;}
+.hl-identity {background:#ccfbf1; color:#0f766e;}
+.hl-link     {background:#e0e7ff; color:#3730a3; text-decoration: underline;}
+
+.glass-card, .metric-card,
+.stButton > button, [data-testid="stDownloadButton"] button, [data-testid="stFormSubmitButton"] button {
+    transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.glass-card:hover {
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+}
+
+.risk-low, .risk-mid, .risk-high, .risk-critical {
+    animation: risk-fade-in .35s ease;
+}
+
+@keyframes risk-fade-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
 @media (max-width: 900px) {
     .hero-grid { grid-template-columns: 1fr; }
     .hero-title { font-size: 38px; }
+    .hero { padding: 26px; }
+    .block-container { padding-left: 1rem; padding-right: 1rem; }
+    .metric-value { font-size: 26px; }
+    .logo-title { font-size: 32px; }
+}
+
+@media (max-width: 640px) {
+    .hero-panel-value { font-size: 28px; }
+    .risk-low, .risk-mid, .risk-high, .risk-critical { font-size: 20px; padding: 18px 20px; }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -970,7 +1241,7 @@ with st.sidebar:
 
     mode = st.selectbox(
         T["mode"],
-        [T["sms"], T["call"], T["file"]]
+        [T["sms"], T["call"], T["file"], T["batch"]]
     )
 
     threshold = st.slider(T["threshold"], 0.1, 0.9, 0.5, 0.05)
@@ -1051,30 +1322,47 @@ left, right = st.columns([2.1, 0.9], gap="large")
 
 with left:
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-    st.markdown(f'<div class="section-title">✍️ {T["input_title"]}</div>', unsafe_allow_html=True)
-    st.markdown('<div class="section-subtitle">Paste a suspicious message or call transcript and check the risk level.</div>', unsafe_allow_html=True)
 
-    with st.form("analysis_form", clear_on_submit=False):
-        uploaded = None
-        if mode == T["file"]:
-            uploaded = st.file_uploader(T["upload"], type=["txt"])
+    if mode == T["batch"]:
+        st.markdown(f'<div class="section-title">📊 {T["batch"]}</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-subtitle">Upload a CSV file with many messages and analyze all of them at once.</div>', unsafe_allow_html=True)
 
-        if uploaded:
-            input_text = uploaded.read().decode("utf-8", errors="ignore")
-            st.success("File uploaded successfully")
-        else:
-            input_text = st.text_area(
-                T["input_label"],
-                value=demo_texts[demo],
-                height=210
-            )
+        with st.form("batch_form", clear_on_submit=False):
+            batch_file = st.file_uploader(T["batch_upload"], type=["csv"])
+            batch_column = st.text_input(T["batch_column"], value="text")
+            batch_go = st.form_submit_button(T["batch_run"], use_container_width=True)
 
-        # FIX: Show live character/word count below textarea
-        char_count = len(input_text)
-        word_count_val = len(input_text.split()) if input_text.strip() else 0
-        st.caption(f"📝 {T['char_count']}: {char_count} | {T['word_count']}: {word_count_val}")
+        analyze = False
+        input_text = ""
+    else:
+        st.markdown(f'<div class="section-title">✍️ {T["input_title"]}</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-subtitle">Paste a suspicious message or call transcript and check the risk level.</div>', unsafe_allow_html=True)
 
-        analyze = st.form_submit_button(T["analyze"], use_container_width=True)
+        with st.form("analysis_form", clear_on_submit=False):
+            uploaded = None
+            if mode == T["file"]:
+                uploaded = st.file_uploader(T["upload"], type=["txt"])
+
+            if uploaded:
+                input_text = uploaded.read().decode("utf-8", errors="ignore")
+                st.success("File uploaded successfully")
+            else:
+                input_text = st.text_area(
+                    T["input_label"],
+                    value=demo_texts[demo],
+                    height=210
+                )
+
+            # FIX: Show live character/word count below textarea
+            char_count = len(input_text)
+            word_count_val = len(input_text.split()) if input_text.strip() else 0
+            st.caption(f"📝 {T['char_count']}: {char_count} | {T['word_count']}: {word_count_val}")
+
+            analyze = st.form_submit_button(T["analyze"], use_container_width=True)
+
+        batch_go = False
+        batch_file = None
+        batch_column = "text"
     st.markdown('</div>', unsafe_allow_html=True)
 
 with right:
@@ -1085,10 +1373,12 @@ with right:
         <p>🌐 Domain analysis</p>
         <p>🧠 Ensemble ML (LR+RF+GB)</p>
         <p>🔍 Explainable result</p>
-        <p>📥 Downloadable report</p>
+        <p>🖍️ Highlighted trigger words</p>
+        <p>📈 Risk gauge & model charts</p>
+        <p>📊 Batch CSV analysis</p>
+        <p>📥 Downloadable report & history</p>
         <p>🚨 Real scam scenarios</p>
         <p>⚡ Rule-based risk boost</p>
-        <p>📊 Model accuracy shown</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -1096,12 +1386,79 @@ with right:
 # HISTORY INIT
 # =========================
 if "history" not in st.session_state:
-    st.session_state.history = []
+    st.session_state.history = load_history()
+
+# =========================
+# BATCH ANALYSIS
+# =========================
+if mode == T["batch"] and batch_go:
+    if not batch_file:
+        st.warning(T["batch_no_file"])
+    else:
+        try:
+            batch_df = pd.read_csv(batch_file)
+        except Exception:
+            batch_file.seek(0)
+            batch_df = pd.read_csv(batch_file, sep=";")
+
+        col = batch_column.strip()
+        if col not in batch_df.columns:
+            st.warning(T["batch_no_column"])
+        else:
+            texts = batch_df[col].astype(str).fillna("")
+            results = []
+            for t in texts:
+                if not t.strip():
+                    continue
+                feats, _ = extract_features(t)
+                X_row = pd.DataFrame([feats])
+                lr_p = lr_model.predict_proba(X_row)[0][1]
+                rf_p = rf_model.predict_proba(X_row)[0][1]
+                gb_p = gb_model.predict_proba(X_row)[0][1]
+                raw_p = (lr_p + rf_p + gb_p) / 3.0
+                p = min(0.99, raw_p + rule_boost(feats))
+                risk_lbl, _, em = risk_style(p)
+                verdict = "FRAUD" if p >= threshold else "SAFE"
+                results.append({
+                    "Text": t[:100] + ("..." if len(t) > 100 else ""),
+                    "Risk %": round(p * 100, 1),
+                    "Level": risk_lbl,
+                    "Verdict": f"{em} {verdict}",
+                })
+
+            if not results:
+                st.warning(T["batch_no_column"])
+            else:
+                st.markdown(f'<div class="section-title">📊 {T["batch_results"]}</div>', unsafe_allow_html=True)
+                results_df = pd.DataFrame(results)
+                st.dataframe(results_df, use_container_width=True, hide_index=True)
+
+                fraud_n = sum(1 for r in results if "FRAUD" in r["Verdict"])
+                safe_n = len(results) - fraud_n
+
+                bc1, bc2 = st.columns([1, 1])
+                with bc1:
+                    st.markdown(f"**{T['batch_summary']}**")
+                    sm1, sm2 = st.columns(2)
+                    sm1.metric(T["fraud_count"], fraud_n)
+                    sm2.metric(T["safe_count"], safe_n)
+                    st.download_button(
+                        T["download_csv_results"],
+                        results_df.to_csv(index=False).encode("utf-8"),
+                        file_name=f"batch_fraud_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                        mime="text/csv",
+                        use_container_width=True,
+                    )
+                with bc2:
+                    st.plotly_chart(
+                        make_batch_summary_chart(fraud_n, safe_n, (T["fraud_count"], T["safe_count"])),
+                        use_container_width=True,
+                    )
 
 # =========================
 # ANALYSIS
 # =========================
-if analyze:
+if mode != T["batch"] and analyze:
     if not input_text.strip():
         st.warning(T["no_text"])
     else:
@@ -1131,6 +1488,12 @@ if analyze:
         st.markdown(f'<div class="{risk_class}">{emoji} {risk_label}</div>', unsafe_allow_html=True)
         st.progress(float(prob))
 
+        chart_col1, chart_col2 = st.columns(2)
+        with chart_col1:
+            st.plotly_chart(make_gauge_chart(prob, threshold, T["gauge_title"]), use_container_width=True)
+        with chart_col2:
+            st.plotly_chart(make_model_bar_chart(lr_prob, rf_prob, gb_prob, T["model_compare"]), use_container_width=True)
+
         # FIX: Show per-model breakdown
         st.markdown(f"**{T['ensemble']}:**")
         mc1, mc2, mc3 = st.columns(3)
@@ -1153,6 +1516,12 @@ if analyze:
                 st.markdown(chips, unsafe_allow_html=True)
             else:
                 st.success(T["no_features"])
+
+            st.subheader(T["highlighted"])
+            st.markdown(
+                f'<div class="highlight-box">{highlight_text(input_text)}</div>',
+                unsafe_allow_html=True
+            )
 
             st.subheader("Feature contribution (Logistic Regression)")
             coef = lr_model.named_steps["clf"].coef_[0]
@@ -1261,26 +1630,36 @@ SECURITY ADVICE:
                 use_container_width=True
             )
 
-        # FIX: Save to history with richer info
+        # Save to history with richer info, persisted to disk
         st.session_state.history.append({
-            "Time": datetime.now().strftime("%H:%M:%S"),
+            "Time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "Risk %": round(prob * 100, 1),
             "Level": risk_label,
             "Verdict": "🚨 FRAUD" if pred == 1 else "✅ SAFE",
             "Features": len(explanations),
             "Text": input_text[:70] + ("..." if len(input_text) > 70 else ""),
         })
+        save_history(st.session_state.history)
 
         with tab5:
             if st.session_state.history:
+                history_df = pd.DataFrame(st.session_state.history)
                 st.dataframe(
-                    pd.DataFrame(st.session_state.history),
+                    history_df,
                     use_container_width=True,
                     hide_index=True
                 )
-                # FIX: Button to clear history
-                if st.button(T["clear_history"]):
+                hc1, hc2 = st.columns(2)
+                hc1.download_button(
+                    T["download_history"],
+                    history_df.to_csv(index=False).encode("utf-8"),
+                    file_name=f"fraud_history_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                    mime="text/csv",
+                    use_container_width=True,
+                )
+                if hc2.button(T["clear_history"], use_container_width=True):
                     st.session_state.history = []
+                    save_history([])
                     st.rerun()
             else:
                 st.info(T["no_history"])
@@ -1290,10 +1669,10 @@ SECURITY ADVICE:
 # =========================
 with st.expander(f"📘 {T['how']}"):
     if lang == "🇰🇿 KZ":
-        st.write("1. Мәтіннен 18 белгі алынады. 2. Олар сандық векторға айналады. 3. 3 ML модель ықтималдық есептейді. 4. Ереже күшейткіш қолданылады. 5. Сайт нәтиже мен кеңес береді.")
+        st.write("1. Мәтіннен 20 белгі алынады. 2. Олар сандық векторға айналады. 3. 3 ML модель ықтималдық есептейді. 4. Ереже күшейткіш қолданылады. 5. Сайт нәтиже мен кеңес береді.")
     elif lang == "🇷🇺 RU":
-        st.write("1. Из текста извлекаются 18 признаков. 2. Они превращаются в числовой вектор. 3. 3 модели ML считают вероятность мошенничества. 4. Применяется ансамблирование и правило-буст. 5. Сайт показывает результат и совет по безопасности.")
+        st.write("1. Из текста извлекаются 20 признаков. 2. Они превращаются в числовой вектор. 3. 3 модели ML считают вероятность мошенничества. 4. Применяется ансамблирование и правило-буст. 5. Сайт показывает результат и совет по безопасности.")
     else:
-        st.write("1. 18 features are extracted from the text. 2. They are converted into a numeric vector. 3. Three ML models (LR, RF, GB) independently predict fraud probability. 4. Probabilities are averaged and a rule-based boost is applied. 5. The app shows the result, explanation, and safety advice.")
+        st.write("1. 20 features are extracted from the text. 2. They are converted into a numeric vector. 3. Three ML models (LR, RF, GB) independently predict fraud probability. 4. Probabilities are averaged and a rule-based boost is applied. 5. The app shows the result, explanation, and safety advice.")
 
 st.markdown(f'<div class="footer">{T["footer"]} · Ensemble ML · {datetime.now().year}</div>', unsafe_allow_html=True)

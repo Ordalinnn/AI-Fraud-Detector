@@ -1,0 +1,11 @@
+# Local analysis history (may contain pasted message content)
+history.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Streamlit
+.streamlit/secrets.toml
