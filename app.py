@@ -27,6 +27,7 @@ st.set_page_config(
 # =========================
 # LOGO HELPER
 # =========================
+@st.cache_data(show_spinner=False)
 def image_to_base64(path: str) -> str:
     file_path = Path(path)
     if not file_path.exists():
@@ -531,26 +532,31 @@ def explain(features):
     irrelevant = {"text_length", "word_count", "avg_word_length"}
     return [labels[k] for k, v in features.items() if v > 0 and k in labels and k not in irrelevant]
 
-HIGHLIGHT_CATEGORIES = [
-    (pressure_phrases, "hl-pressure"),
-    (threat_words, "hl-threat"),
-    (secret_words, "hl-secret"),
-    (reward_words, "hl-reward"),
-    (identity_words, "hl-identity"),
-    (urgent_words, "hl-urgent"),
-    (money_words, "hl-money"),
+def _compile_word_pattern(words):
+    """One alternation regex per category, longest phrases first so they win over substrings."""
+    escaped = sorted((re.escape(w) for w in words if w), key=len, reverse=True)
+    return re.compile("|".join(escaped), flags=re.IGNORECASE) if escaped else None
+
+HIGHLIGHT_PATTERNS = [
+    (_compile_word_pattern(pressure_phrases), "hl-pressure"),
+    (_compile_word_pattern(threat_words), "hl-threat"),
+    (_compile_word_pattern(secret_words), "hl-secret"),
+    (_compile_word_pattern(reward_words), "hl-reward"),
+    (_compile_word_pattern(identity_words), "hl-identity"),
+    (_compile_word_pattern(urgent_words), "hl-urgent"),
+    (_compile_word_pattern(money_words), "hl-money"),
 ]
+LINK_PATTERN = re.compile(r"https?://[^\s]+|www\.[^\s]+", flags=re.IGNORECASE)
 
 def highlight_text(text):
     """Wrap detected trigger words/links in colored <span> tags for display."""
     matches = []
-    for words, css_class in HIGHLIGHT_CATEGORIES:
-        for w in words:
-            if not w:
-                continue
-            for m in re.finditer(re.escape(w), text, flags=re.IGNORECASE):
-                matches.append((m.start(), m.end(), css_class))
-    for m in re.finditer(r"https?://[^\s]+|www\.[^\s]+", text, flags=re.IGNORECASE):
+    for pattern, css_class in HIGHLIGHT_PATTERNS:
+        if pattern is None:
+            continue
+        for m in pattern.finditer(text):
+            matches.append((m.start(), m.end(), css_class))
+    for m in LINK_PATTERN.finditer(text):
         matches.append((m.start(), m.end(), "hl-link"))
 
     if not matches:
@@ -687,21 +693,21 @@ def train_models():
     ])
     rf_model = Pipeline([
         ("scaler", StandardScaler()),
-        ("clf", RandomForestClassifier(n_estimators=100, random_state=42))
+        ("clf", RandomForestClassifier(n_estimators=50, random_state=42))
     ])
     gb_model = Pipeline([
         ("scaler", StandardScaler()),
-        ("clf", GradientBoostingClassifier(n_estimators=100, random_state=42))
+        ("clf", GradientBoostingClassifier(n_estimators=50, random_state=42))
     ])
 
     lr_model.fit(X_train, y_train)
     rf_model.fit(X_train, y_train)
     gb_model.fit(X_train, y_train)
 
-    # Cross-validation accuracy for each model
-    lr_cv = cross_val_score(lr_model, X_train, y_train, cv=5, scoring="accuracy").mean()
-    rf_cv = cross_val_score(rf_model, X_train, y_train, cv=5, scoring="accuracy").mean()
-    gb_cv = cross_val_score(gb_model, X_train, y_train, cv=5, scoring="accuracy").mean()
+    # Cross-validation accuracy for each model (3-fold: dataset is small, keeps startup fast)
+    lr_cv = cross_val_score(lr_model, X_train, y_train, cv=3, scoring="accuracy").mean()
+    rf_cv = cross_val_score(rf_model, X_train, y_train, cv=3, scoring="accuracy").mean()
+    gb_cv = cross_val_score(gb_model, X_train, y_train, cv=3, scoring="accuracy").mean()
 
     metrics = {
         "Logistic Regression": round(lr_cv * 100, 1),
@@ -1405,30 +1411,33 @@ if mode == T["batch"] and batch_go:
         if col not in batch_df.columns:
             st.warning(T["batch_no_column"])
         else:
-            texts = batch_df[col].astype(str).fillna("")
-            results = []
-            for t in texts:
-                if not t.strip():
-                    continue
-                feats, _ = extract_features(t)
-                X_row = pd.DataFrame([feats])
-                lr_p = lr_model.predict_proba(X_row)[0][1]
-                rf_p = rf_model.predict_proba(X_row)[0][1]
-                gb_p = gb_model.predict_proba(X_row)[0][1]
-                raw_p = (lr_p + rf_p + gb_p) / 3.0
-                p = min(0.99, raw_p + rule_boost(feats))
-                risk_lbl, _, em = risk_style(p)
-                verdict = "FRAUD" if p >= threshold else "SAFE"
-                results.append({
-                    "Text": t[:100] + ("..." if len(t) > 100 else ""),
-                    "Risk %": round(p * 100, 1),
-                    "Level": risk_lbl,
-                    "Verdict": f"{em} {verdict}",
-                })
-
-            if not results:
+            texts = [t for t in batch_df[col].astype(str).fillna("") if t.strip()]
+            if not texts:
                 st.warning(T["batch_no_column"])
             else:
+                # Vectorized: extract all feature rows once, then a single
+                # batch predict_proba call per model instead of one call per row.
+                feats_list = [extract_features(t)[0] for t in texts]
+                X_batch = pd.DataFrame(feats_list)
+
+                lr_p = lr_model.predict_proba(X_batch)[:, 1]
+                rf_p = rf_model.predict_proba(X_batch)[:, 1]
+                gb_p = gb_model.predict_proba(X_batch)[:, 1]
+                raw_p = (lr_p + rf_p + gb_p) / 3.0
+                boosts = np.array([rule_boost(f) for f in feats_list])
+                probs = np.minimum(0.99, raw_p + boosts)
+
+                results = []
+                for t, p in zip(texts, probs):
+                    risk_lbl, _, em = risk_style(p)
+                    verdict = "FRAUD" if p >= threshold else "SAFE"
+                    results.append({
+                        "Text": t[:100] + ("..." if len(t) > 100 else ""),
+                        "Risk %": round(p * 100, 1),
+                        "Level": risk_lbl,
+                        "Verdict": f"{em} {verdict}",
+                    })
+
                 st.markdown(f'<div class="section-title">📊 {T["batch_results"]}</div>', unsafe_allow_html=True)
                 results_df = pd.DataFrame(results)
                 st.dataframe(results_df, use_container_width=True, hide_index=True)
