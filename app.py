@@ -143,6 +143,18 @@ TEXT = {
         "model_compare": "Модельдер бойынша салыстыру",
         "fraud_count": "Алаяқтық",
         "safe_count": "Қауіпсіз",
+        "how_to_use": "Қалай пайдалану керек",
+        "step1": "1️⃣ Күмәнді SMS, хабарлама немесе қоңырау мәтінін төменге қойыңыз",
+        "step2": "2️⃣ «Анализ жасау» түймесін басыңыз",
+        "step3": "3️⃣ Түсті нәтижені оқыңыз: жасыл — қауіпсіз, қызыл — қауіпті",
+        "legend_title": "Түстер нені білдіреді?",
+        "model_help": "Хабарламаны 3 түрлі AI әдісі тексереді, содан кейін нәтижелер орташаланады — бір ғана модельге сенбейміз.",
+        "threshold_help": "Төмен мән = жүйе сақ болады және көбірек хабарламаны күдікті деп белгілейді. Жоғары мән = жүйе тек өте айқын жағдайларда ғана ескертеді.",
+        "mode_help": "Не тексеретініңізді таңдаңыз: жай хабарлама, қоңырау мәтіні, файл немесе бірнеше хабарлама бірден (CSV).",
+        "explain_tab": "🔍 Түсініктеме",
+        "feature_contrib": "Әр белгінің әсері (Logistic Regression моделі)",
+        "feature_importance": "Ең маңызды белгілер (Random Forest моделі)",
+        "simple_result": "Қысқаша қорытынды",
     },
     "🇷🇺 RU": {
         "title": "AI Fraud Detector",
@@ -204,6 +216,18 @@ TEXT = {
         "model_compare": "Сравнение моделей",
         "fraud_count": "Мошенничество",
         "safe_count": "Безопасно",
+        "how_to_use": "Как пользоваться",
+        "step1": "1️⃣ Вставьте подозрительное SMS, сообщение или текст звонка ниже",
+        "step2": "2️⃣ Нажмите «Сделать анализ»",
+        "step3": "3️⃣ Прочитайте цветной результат: зелёный — безопасно, красный — опасно",
+        "legend_title": "Что означают цвета?",
+        "model_help": "Сообщение проверяют 3 разных метода ИИ, а затем их ответы усредняются — мы не полагаемся на одну модель.",
+        "threshold_help": "Меньше значение = система осторожнее и чаще предупреждает. Больше значение = предупреждает только в самых явных случаях.",
+        "mode_help": "Выберите, что вы проверяете: обычное сообщение, текст звонка, файл или сразу много сообщений (CSV).",
+        "explain_tab": "🔍 Объяснение",
+        "feature_contrib": "Вклад каждого признака (модель Logistic Regression)",
+        "feature_importance": "Самые важные признаки (модель Random Forest)",
+        "simple_result": "Короткий вывод",
     },
     "🇬🇧 EN": {
         "title": "AI Fraud Detector",
@@ -265,6 +289,18 @@ TEXT = {
         "model_compare": "Model comparison",
         "fraud_count": "Fraud",
         "safe_count": "Safe",
+        "how_to_use": "How to use this",
+        "step1": "1️⃣ Paste a suspicious SMS, message, or call text below",
+        "step2": "2️⃣ Click \"Analyze\"",
+        "step3": "3️⃣ Read the color result: green = safe, red = dangerous",
+        "legend_title": "What do the colors mean?",
+        "model_help": "The message is checked by 3 different AI methods, and their answers are averaged — we don't rely on just one model.",
+        "threshold_help": "Lower = the system is more cautious and flags more messages as suspicious. Higher = it only warns on the clearest cases.",
+        "mode_help": "Choose what you're checking: a plain message, a call transcript, a file, or many messages at once (CSV).",
+        "explain_tab": "🔍 Explain",
+        "feature_contrib": "Feature contribution (Logistic Regression model)",
+        "feature_importance": "Most important features (Random Forest model)",
+        "simple_result": "Simple summary",
     },
 }
 
@@ -979,6 +1015,63 @@ html, body, [class*="css"] {
     font-weight: 650;
 }
 
+.howto-card {
+    padding: 22px 26px;
+}
+
+.howto-steps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.howto-step {
+    flex: 1;
+    min-width: 220px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 14px 16px;
+    font-size: 16px;
+    font-weight: 700;
+    color: #1e293b;
+    line-height: 1.5;
+}
+
+.legend-title {
+    font-size: 14px;
+    font-weight: 800;
+    color: #475569;
+    margin-bottom: 8px;
+}
+
+.legend-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.legend-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 750;
+    border: 1px solid transparent;
+}
+.legend-low      {background:#dcfce7; color:#166534; border-color:#bbf7d0;}
+.legend-mid      {background:#fef9c3; color:#854d0e; border-color:#fef08a;}
+.legend-high     {background:#ffedd5; color:#9a3412; border-color:#fed7aa;}
+.legend-critical {background:#fee2e2; color:#991b1b; border-color:#fecaca;}
+
+@media (max-width: 640px) {
+    .howto-steps { flex-direction: column; }
+    .howto-step { min-width: 0; font-size: 15px; }
+}
+
 .metric-card {
     background: rgba(255,255,255,0.92);
     border-radius: 26px;
@@ -1251,10 +1344,11 @@ with st.sidebar:
 
     mode = st.selectbox(
         T["mode"],
-        [T["sms"], T["call"], T["file"], T["batch"]]
+        [T["sms"], T["call"], T["file"], T["batch"]],
+        help=T["mode_help"]
     )
 
-    threshold = st.slider(T["threshold"], 0.1, 0.9, 0.5, 0.05)
+    threshold = st.slider(T["threshold"], 0.1, 0.9, 0.5, 0.05, help=T["threshold_help"])
 
     st.divider()
     st.markdown(f"### 🧪 {T['demo']}")
@@ -1321,6 +1415,27 @@ st.markdown(f"""
             <div class="hero-panel-value">Demo-ready</div>
             <div class="hero-panel-small">Analyzes text, links, pressure words, secret-code requests and suspicious domains using an ensemble of 3 ML models.</div>
         </div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+# =========================
+# HOW TO USE (plain-language guide, for any age/skill level)
+# =========================
+st.markdown(f"""
+<div class="glass-card howto-card">
+    <div class="section-title">🧭 {T['how_to_use']}</div>
+    <div class="howto-steps">
+        <div class="howto-step">{T['step1']}</div>
+        <div class="howto-step">{T['step2']}</div>
+        <div class="howto-step">{T['step3']}</div>
+    </div>
+    <div class="legend-title">{T['legend_title']}</div>
+    <div class="legend-row">
+        <span class="legend-chip legend-low">🟢 {T['low']}</span>
+        <span class="legend-chip legend-mid">🟡 {T['mid']}</span>
+        <span class="legend-chip legend-high">🟠 {T['high']}</span>
+        <span class="legend-chip legend-critical">🔴 {T['critical']}</span>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -1497,9 +1612,17 @@ if mode != T["batch"] and analyze:
         c2.markdown(f'<div class="metric-card"><div class="metric-icon">⚠️</div><div class="metric-label">{T["detected"]}</div><div class="metric-value">{len(explanations)}</div></div>', unsafe_allow_html=True)
         c3.markdown(f'<div class="metric-card"><div class="metric-icon">🎚️</div><div class="metric-label">{T["threshold"]}</div><div class="metric-value">{threshold:.2f}</div></div>', unsafe_allow_html=True)
         c4.markdown(f'<div class="metric-card"><div class="metric-icon">🧠</div><div class="metric-label">{T["model"]}</div><div class="metric-value">3-way</div></div>', unsafe_allow_html=True)
+        st.caption(f"ℹ️ {T['model_help']}")
 
         st.markdown(f'<div class="{risk_class}">{emoji} {risk_label}</div>', unsafe_allow_html=True)
         st.progress(float(prob))
+
+        # Plain-language verdict shown immediately, not buried in a tab
+        st.markdown(f'<div class="section-title" style="font-size:19px;">💡 {T["simple_result"]}</div>', unsafe_allow_html=True)
+        if pred == 1:
+            st.error(T["bad_advice"])
+        else:
+            st.success(T["good_advice"])
 
         chart_col1, chart_col2 = st.columns(2)
         with chart_col1:
@@ -1515,7 +1638,7 @@ if mode != T["batch"] and analyze:
         mc3.metric("Gradient Boosting", f"{gb_prob*100:.1f}%")
 
         tab1, tab2, tab3, tab4, tab5 = st.tabs([
-            "🔍 Explain AI",
+            T["explain_tab"],
             f"🌐 {T['domain']}",
             f"🧠 {T['vector']}",
             f"📥 {T['report']}",
@@ -1536,7 +1659,7 @@ if mode != T["batch"] and analyze:
                 unsafe_allow_html=True
             )
 
-            st.subheader("Feature contribution (Logistic Regression)")
+            st.subheader(T["feature_contrib"])
             coef = lr_model.named_steps["clf"].coef_[0]
             feature_names = list(X_input.columns)
             contrib = []
@@ -1552,19 +1675,13 @@ if mode != T["batch"] and analyze:
             )
 
             # FIX: Also show Random Forest importances
-            st.subheader("Feature importance (Random Forest)")
+            st.subheader(T["feature_importance"])
             rf_importances = rf_model.named_steps["clf"].feature_importances_
             imp_df = pd.DataFrame({
                 "Feature": feature_names,
                 "Importance": [round(float(i), 4) for i in rf_importances]
             }).sort_values("Importance", ascending=False)
             st.dataframe(imp_df, use_container_width=True, hide_index=True)
-
-            st.subheader(T["advice"])
-            if pred == 1:
-                st.error(T["bad_advice"])
-            else:
-                st.success(T["good_advice"])
 
         with tab2:
             st.subheader(T["domain"])
