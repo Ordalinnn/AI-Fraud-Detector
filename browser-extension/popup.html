@@ -8,10 +8,15 @@
 <body>
   <header>
     <img src="icons/icon48.png" alt="">
-    <div>
-      <div class="title">AI Fraud Detector</div>
-      <div class="subtitle">Runs locally — nothing leaves your device</div>
+    <div class="headerText">
+      <div id="appTitle" class="title">AI Fraud Detector</div>
+      <div id="appSubtitle" class="subtitle">Runs locally — nothing leaves your device</div>
     </div>
+    <select id="langSelect" class="langSelect" aria-label="Language">
+      <option value="kz">🇰🇿 KZ</option>
+      <option value="ru">🇷🇺 RU</option>
+      <option value="en">🇬🇧 EN</option>
+    </select>
   </header>
 
   <textarea id="input" placeholder="Paste a suspicious SMS, message, or call transcript…"></textarea>
@@ -24,8 +29,9 @@
     <div id="domains" class="domains"></div>
   </div>
 
-  <footer>Lightweight rule-based prototype — not a certified security tool.</footer>
+  <footer id="footerText">Lightweight rule-based prototype — not a certified security tool.</footer>
 
+  <script src="i18n.js"></script>
   <script src="detector.js"></script>
   <script src="popup.js"></script>
 </body>

@@ -1,35 +1,48 @@
-importScripts("detector.js");
+importScripts("i18n.js", "detector.js");
+
+function contextMenuTitleFor(lang) {
+  return self.I18N.strings(lang).contextMenuTitle;
+}
 
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.contextMenus.create({
-    id: "check-fraud-selection",
-    title: 'Check "%s" for fraud/scam',
-    contexts: ["selection"]
+  self.I18N.getLang((lang) => {
+    chrome.contextMenus.create({
+      id: "check-fraud-selection",
+      title: contextMenuTitleFor(lang),
+      contexts: ["selection"]
+    });
   });
+});
+
+// Keep the context menu label in sync if the language is changed from the popup.
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && changes.lang) {
+    chrome.contextMenus.update("check-fraud-selection", {
+      title: contextMenuTitleFor(changes.lang.newValue)
+    });
+  }
 });
 
 chrome.contextMenus.onClicked.addListener((info) => {
   if (info.menuItemId !== "check-fraud-selection" || !info.selectionText) return;
 
-  const result = self.FraudDetector.analyzeText(info.selectionText);
+  self.I18N.getLang((lang) => {
+    const s = self.I18N.strings(lang);
+    const result = self.FraudDetector.analyzeText(info.selectionText);
 
-  chrome.storage.local.set({
-    lastResult: result,
-    lastText: info.selectionText
-  });
+    chrome.storage.local.set({
+      lastResult: result,
+      lastText: info.selectionText
+    });
 
-  const bodyLines = [`Risk: ${result.pct}%`];
-  if (result.isFraud) {
-    bodyLines.push("Do not share codes, passwords, CVV, or card numbers. Do not click the link.");
-  } else {
-    bodyLines.push("Looks safe, but verify through an official source if unsure.");
-  }
+    const message = `${result.pct}%\n${result.isFraud ? s.adviceBad : s.adviceGood}`;
 
-  chrome.notifications.create({
-    type: "basic",
-    iconUrl: "icons/icon128.png",
-    title: `${result.emoji} ${result.label}`,
-    message: bodyLines.join("\n"),
-    priority: result.isFraud ? 2 : 0
+    chrome.notifications.create({
+      type: "basic",
+      iconUrl: "icons/icon128.png",
+      title: `${result.emoji} ${s.riskLabels[result.levelKey]}`,
+      message,
+      priority: result.isFraud ? 2 : 0
+    });
   });
 });

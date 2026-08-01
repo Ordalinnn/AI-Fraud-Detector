@@ -18,8 +18,20 @@ header {
 
 header img { width: 34px; height: 34px; border-radius: 8px; }
 
+.headerText { flex: 1; min-width: 0; }
 .title { font-size: 15px; font-weight: 900; }
 .subtitle { font-size: 11px; color: #64748b; }
+
+.langSelect {
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: white;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 6px;
+  cursor: pointer;
+}
 
 textarea {
   width: 100%;

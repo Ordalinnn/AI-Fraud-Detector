@@ -82,17 +82,19 @@ function brandImpersonation(domain) {
 }
 
 function domainFlags(domain) {
+  // Returns language-agnostic flag keys; popup.js resolves labelKey (and
+  // {brand} for "impersonates") to the current UI language's text.
   const flags = [];
   const impersonated = brandImpersonation(domain);
-  if (impersonated) flags.push({ label: `Impersonates ${impersonated}`, severity: "critical" });
+  if (impersonated) flags.push({ labelKey: "impersonates", brand: impersonated, severity: "critical" });
   if (WORD_LISTS.suspiciousDomainWords.some((w) => domain.includes(w))) {
-    flags.push({ label: "Suspicious keyword", severity: "warn" });
+    flags.push({ labelKey: "suspiciousKeyword", severity: "warn" });
   }
-  if (domain.length > 20) flags.push({ label: "Long domain", severity: "warn" });
+  if (domain.length > 20) flags.push({ labelKey: "longDomain", severity: "warn" });
   if (WORD_LISTS.suspiciousZones.some((z) => domain.endsWith(z))) {
-    flags.push({ label: "Suspicious TLD", severity: "critical" });
+    flags.push({ labelKey: "suspiciousTld", severity: "critical" });
   }
-  if (/\d/.test(domain)) flags.push({ label: "Contains digits", severity: "warn" });
+  if (/\d/.test(domain)) flags.push({ labelKey: "containsDigits", severity: "warn" });
   return flags;
 }
 
@@ -166,38 +168,31 @@ function ruleBoost(f) {
   return Math.min(boost, 0.30);
 }
 
-const EXPLAIN_LABELS = {
-  hasLink: "A link was detected",
-  urgentCount: "Urgent action words were found",
-  secretCount: "Possible request for code / password / CVV",
-  moneyCount: "Bank, money, or card-related words were found",
-  threatCount: "Pressure or threat indicators were found",
-  identityCount: "Possible request for personal identity data",
-  rewardCount: "Prize, bonus, or gift promise was found",
-  pressureCount: "Pressure or secrecy phrase was found",
-  suspiciousDomain: "Suspicious words were found in the domain",
-  longDomain: "The domain is suspiciously long",
-  suspiciousZone: "Suspicious domain zone detected",
-  digitDomain: "The domain contains numbers",
-  brandFlag: "Domain mimics a known bank/brand but isn't the real one",
-  hasMultipleWarnings: "Both urgency and threat were detected simultaneously",
-  urlCount: "Multiple links were detected"
-};
+// Reason keys, in display order. popup.js/background.js resolve each to
+// the current UI language's text via I18N.strings(lang).reasonLabels.
+const EXPLAIN_KEYS = [
+  "hasLink", "urgentCount", "secretCount", "moneyCount", "threatCount",
+  "identityCount", "rewardCount", "pressureCount", "suspiciousDomain",
+  "longDomain", "suspiciousZone", "digitDomain", "brandFlag",
+  "hasMultipleWarnings", "urlCount"
+];
 
 function explain(f) {
-  const reasons = [];
-  for (const key of Object.keys(EXPLAIN_LABELS)) {
+  const reasonKeys = [];
+  for (const key of EXPLAIN_KEYS) {
     const value = key === "urlCount" ? (f.urlCount > 1 ? 1 : 0) : f[key];
-    if (value) reasons.push(EXPLAIN_LABELS[key]);
+    if (value) reasonKeys.push(key);
   }
-  return reasons;
+  return reasonKeys;
 }
 
 function riskStyle(prob) {
-  if (prob < 0.3) return { label: "Low risk", cssClass: "risk-low", emoji: "🟢" };
-  if (prob < 0.6) return { label: "Suspicious", cssClass: "risk-mid", emoji: "🟡" };
-  if (prob < 0.8) return { label: "High risk", cssClass: "risk-high", emoji: "🟠" };
-  return { label: "Critical risk", cssClass: "risk-critical", emoji: "🔴" };
+  // levelKey is resolved to translated text by the caller (popup.js /
+  // background.js), same pattern as fraud_logic.risk_level() in the Python app.
+  if (prob < 0.3) return { levelKey: "low", cssClass: "risk-low", emoji: "🟢" };
+  if (prob < 0.6) return { levelKey: "mid", cssClass: "risk-mid", emoji: "🟡" };
+  if (prob < 0.8) return { levelKey: "high", cssClass: "risk-high", emoji: "🟠" };
+  return { levelKey: "critical", cssClass: "risk-critical", emoji: "🔴" };
 }
 
 function analyzeText(text) {

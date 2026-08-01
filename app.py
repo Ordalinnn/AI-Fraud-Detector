@@ -37,8 +37,16 @@ st.set_page_config(
 # =========================
 # Streamlit renders st.markdown into the page body, not the document <head>,
 # so a manifest link / theme-color meta / service worker registration can
-# only be added by reaching into window.parent.document from inside a
+# only be added by reaching into the real top-level document from inside a
 # components.html iframe.
+#
+# IMPORTANT: use window.top, not window.parent. Streamlit Community Cloud
+# wraps the actual app in its OWN nested "streamlitApp" iframe inside the
+# real top-level page, so this component lives two frames deep. window.parent
+# only reaches that middle iframe (confirmed by inspecting a live deployment:
+# our tags landed in the streamlitApp iframe's <head>, while the real outer
+# page still showed Streamlit Cloud's own manifest/icon). window.top always
+# jumps straight to the true outermost document regardless of nesting depth.
 #
 # Hosts like Streamlit Community Cloud inject their OWN <link rel="manifest">
 # / favicon tags for their platform branding, so this must forcibly replace
@@ -48,7 +56,7 @@ st.set_page_config(
 components.html("""
 <script>
 (function () {
-    const doc = window.parent.document;
+    const doc = window.top.document;
 
     function setLink(rel, href, type) {
         doc.querySelectorAll('link[rel="' + rel + '"]').forEach(function (el) {
@@ -64,6 +72,7 @@ components.html("""
     setLink('manifest', '/app/static/manifest.json');
     setLink('icon', '/app/static/icon.png', 'image/png');
     setLink('shortcut icon', '/app/static/icon.png', 'image/png');
+    setLink('alternate icon', '/app/static/icon.png', 'image/png');
     setLink('apple-touch-icon', '/app/static/icon.png');
 
     doc.querySelectorAll('meta[name="theme-color"]').forEach(function (el) {
@@ -569,6 +578,74 @@ data = [
     ["вам полагается наследство от дальнего родственника за границей вышлите данные для перевода", 1],
     ["you have inherited money from a relative abroad send your bank details to claim", 1],
 
+    # FRAUD: More bank/card variants
+    ["ваша карта приостановлена нажмите здесь чтобы восстановить доступ", 1],
+    ["уважаемый клиент ваш счет заморожен до подтверждения личности", 1],
+    ["we detected unusual login activity confirm your identity within 24 hours", 1],
+    ["your debit card has been flagged please verify to avoid permanent block", 1],
+    ["банкіңіз сізден шұғыл құпия кодты растауды сұрайды", 1],
+    ["please update your banking information immediately to avoid service interruption", 1],
+
+    # FRAUD: More delivery / government / relative-in-trouble variants
+    ["курьер не смог доставить посылку оплатите повторную доставку по ссылке", 1],
+    ["налоговая служба уведомляет о задолженности оплатите штраф немедленно", 1],
+    ["your package requires additional customs clearance fee click to pay now", 1],
+    ["this is the tax office you owe a fine pay immediately to avoid arrest", 1],
+    ["сіздің отбасы мүшесі ауруханада жедел ақша керек", 1],
+    ["mom i lost my phone this is my new number please send money urgently", 1],
+
+    # FRAUD: More investment / job variants
+    ["earn passive income 1000 dollars daily just sign up and deposit now", 1],
+    ["exclusive investment opportunity limited slots deposit today to secure your spot", 1],
+    ["стабильный доход без вложений просто зарегистрируйтесь и подтвердите карту", 1],
+    ["job offer confirmed send your bank details to receive your first paycheck advance", 1],
+    ["сізге жоғары жалақылы жұмыс табылды алдын ала төлем жасаңыз", 1],
+
+    # FRAUD: More tech support variants
+    ["apple support your icloud account has been locked verify now to prevent data loss", 1],
+    ["предупреждение системы обнаружены критические ошибки звоните в техподдержку", 1],
+    ["your license key has expired call this number immediately to renew", 1],
+
+    # FRAUD: More romance scam variants
+    ["darling the customs officer needs a fee to release the gift i sent you", 1],
+    ["я нахожусь за границей и мне нужна твоя помощь с деньгами на билет", 1],
+    ["i cannot video call right now but i need money for an emergency surgery", 1],
+
+    # FRAUD: More crypto variants
+    ["binance support team requires your private key to resolve account issue", 1],
+    ["удвоение биткоина гарантировано отправьте на этот кошелек и получите х2", 1],
+    ["your exchange account is suspended verify your recovery phrase to restore access", 1],
+    ["эксклюзивный airdrop подключите кошелек и подпишите транзакцию для получения токенов", 1],
+
+    # FRAUD: More QR code variants
+    ["сканируйте код чтобы получить компенсацию за задержку рейса", 1],
+    ["scan to claim your free gift card before it expires today", 1],
+
+    # FRAUD: More charity variants
+    ["сбор средств для больных детей переведите любую сумму прямо сейчас", 1],
+    ["urgent disaster relief fund click here to donate before it is too late", 1],
+
+    # FRAUD: More subscription variants
+    ["netflix оплата не прошла обновите данные карты чтобы не потерять доступ", 1],
+    ["your streaming subscription payment failed update card details within 24 hours", 1],
+
+    # FRAUD: More SIM swap / social media variants
+    ["код восстановления telegram отправлен никому не сообщайте его кроме нас", 1],
+    ["your facebook account was reported confirm identity or it will be permanently deleted", 1],
+    ["сіздің telegram аккаунтыңызға кіру талабы расталмаса жабылады", 1],
+    ["someone tried to log into your account verify now by sharing the code we sent", 1],
+
+    # FRAUD: More tax / inheritance variants
+    ["irs notice you have unclaimed funds provide account details to receive payment", 1],
+    ["адвокат за границей нашел вам наследство пришлите документы и оплатите сбор", 1],
+    ["government stimulus payment pending verify your bank account to receive it", 1],
+
+    # FRAUD: Global brand impersonation (PayPal / Amazon / Apple / Google)
+    ["your paypal account has been limited click here to restore full access", 1],
+    ["amazon order could not be processed update your payment method immediately", 1],
+    ["apple id disabled tap to verify before your account is permanently closed", 1],
+    ["google security alert someone tried to access your account verify now", 1],
+
     # SAFE examples — expanded and more diverse
     ["привет как дела", 0],
     ["завтра урок математики в 9", 0],
@@ -622,6 +699,44 @@ data = [
     ["ваш кредит одобрен банком менеджер свяжется с вами в течение дня", 0],
     ["зарплата поступила на карту как обычно", 0],
     ["сіздің тапсырысыңыз жолға шықты", 0],
+
+    # SAFE: more everyday counterparts matching the newest scam variants above
+    ["ваша карта успешно перевыпущена заберите в отделении банка", 0],
+    ["уважаемый клиент ваш вклад пополнен спасибо", 0],
+    ["we noticed a new login from your usual device no action needed", 0],
+    ["your debit card renewal is complete no action required", 0],
+    ["банкіңіз сізге жаңа өнім туралы хабарлайды", 0],
+    ["your banking app has a new feature update check it out", 0],
+    ["курьер доставил посылку по адресу спасибо за заказ", 0],
+    ["налоговая декларация принята возврат будет зачислен через 10 дней", 0],
+    ["your package cleared customs and is on its way", 0],
+    ["добрый день напоминаем о плановом визите к стоматологу", 0],
+    ["мама я долетел все хорошо позвоню вечером", 0],
+    ["hi dad landed safely will call you tonight", 0],
+    ["ваш ежемесячный отчет по вкладу доступен в приложении", 0],
+    ["your job application has been received we will contact you soon", 0],
+    ["собеседование назначено на понедельник в 11 утра", 0],
+    ["apple id successfully signed in from your new iphone", 0],
+    ["ваша система обновлена автоматически проблем не обнаружено", 0],
+    ["your license renewal was successful no further action needed", 0],
+    ["привет как прошел день", 0],
+    ["сегодня хорошая погода идем гулять", 0],
+    ["ваш биткоин перевод подтвержден в блокчейне", 0],
+    ["your exchange withdrawal has been completed successfully", 0],
+    ["airdrop distribution complete tokens are now in your connected wallet", 0],
+    ["спасибо за участие в благотворительном забеге", 0],
+    ["your donation receipt is attached for tax purposes", 0],
+    ["ваша подписка на netflix успешно оплачена", 0],
+    ["your streaming subscription payment was successful enjoy", 0],
+    ["сіздің telegram құпия кодыңыз сәтті пайдаланылды", 0],
+    ["your facebook login was successful from a recognized device", 0],
+    ["налоговый возврат зачислен на ваш счет спасибо", 0],
+    ["your inheritance paperwork has been filed with the local notary office", 0],
+    ["стимулирующая выплата уже зачислена на ваш счет банком", 0],
+    ["собрание акционеров состоится в следующую среду", 0],
+    ["ваш заказ на маркетплейсе подтвержден продавцом", 0],
+    ["thanks for shopping with us your receipt is attached", 0],
+    ["сіздің кездесуіңіз сағат 10-да басталады", 0],
 ]
 
 def explain(features):
