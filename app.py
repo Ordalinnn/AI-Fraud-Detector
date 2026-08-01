@@ -53,10 +53,20 @@ st.set_page_config(
 # any existing tags rather than skip-if-present, or our icon never wins.
 # Paths use a leading slash (absolute from site root) since a relative path
 # can resolve incorrectly behind a hosting proxy (e.g. Codespaces).
+#
+# Bump this whenever the icon/manifest content changes. Browsers (especially
+# iOS Safari) cache favicons/manifests very aggressively, sometimes
+# independent of a normal page reload — appending a version query string
+# forces a fresh fetch instead of relying on the user to clear their cache.
+# If you change static/manifest.json or static/icon.png, bump this AND the
+# matching "?v=" inside static/manifest.json's own icon entries.
+PWA_ASSET_VERSION = "2"
+
 components.html("""
 <script>
 (function () {
     const doc = window.top.document;
+    const v = "__PWA_VERSION__";
 
     function setLink(rel, href, type) {
         doc.querySelectorAll('link[rel="' + rel + '"]').forEach(function (el) {
@@ -64,7 +74,7 @@ components.html("""
         });
         const link = doc.createElement('link');
         link.rel = rel;
-        link.href = href;
+        link.href = href + '?v=' + v;
         if (type) link.type = type;
         doc.head.appendChild(link);
     }
@@ -84,11 +94,11 @@ components.html("""
     doc.head.appendChild(meta);
 
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/app/static/sw.js').catch(function () {});
+        navigator.serviceWorker.register('/app/static/sw.js?v=' + v).catch(function () {});
     }
 })();
 </script>
-""", height=0, width=0)
+""".replace("__PWA_VERSION__", PWA_ASSET_VERSION), height=0, width=0)
 
 # =========================
 # LOGO HELPER
