@@ -1286,6 +1286,13 @@ with st.sidebar:
 
     st.divider()
 
+    if st.button(T["install_button"], use_container_width=True, key="install_toggle_btn"):
+        st.session_state["show_install_instructions"] = not st.session_state.get(
+            "show_install_instructions", False
+        )
+
+    st.divider()
+
     MODE_KEYS = ["sms", "call", "file", "batch"]
     mode = st.selectbox(
         T["mode"],
@@ -1405,6 +1412,19 @@ st.markdown(f"""
     </div>
 </div>
 """, unsafe_allow_html=True)
+
+# =========================
+# INSTALL INSTRUCTIONS (toggled by the sidebar button)
+# =========================
+if st.session_state.get("show_install_instructions"):
+    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+    st.markdown(f'<div class="section-title">📲 {T["install_panel_title"]}</div>', unsafe_allow_html=True)
+    st.markdown(f"**{T['install_mobile_title']}**")
+    st.markdown(T["install_mobile_android"])
+    st.markdown(T["install_mobile_ios"])
+    st.markdown(f"**{T['install_extension_title']}**")
+    st.markdown(T["install_extension_steps"])
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # =========================
 # HOW TO USE (plain-language guide, for any age/skill level)
