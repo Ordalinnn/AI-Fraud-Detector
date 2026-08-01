@@ -31,30 +31,43 @@ st.set_page_config(
 # so a manifest link / theme-color meta / service worker registration can
 # only be added by reaching into window.parent.document from inside a
 # components.html iframe.
+#
+# Hosts like Streamlit Community Cloud inject their OWN <link rel="manifest">
+# / favicon tags for their platform branding, so this must forcibly replace
+# any existing tags rather than skip-if-present, or our icon never wins.
+# Paths use a leading slash (absolute from site root) since a relative path
+# can resolve incorrectly behind a hosting proxy (e.g. Codespaces).
 components.html("""
 <script>
 (function () {
     const doc = window.parent.document;
-    if (!doc.querySelector('link[rel="manifest"]')) {
+
+    function setLink(rel, href, type) {
+        doc.querySelectorAll('link[rel="' + rel + '"]').forEach(function (el) {
+            el.remove();
+        });
         const link = doc.createElement('link');
-        link.rel = 'manifest';
-        link.href = 'app/static/manifest.json';
+        link.rel = rel;
+        link.href = href;
+        if (type) link.type = type;
         doc.head.appendChild(link);
     }
-    if (!doc.querySelector('meta[name="theme-color"]')) {
-        const meta = doc.createElement('meta');
-        meta.name = 'theme-color';
-        meta.content = '#2563eb';
-        doc.head.appendChild(meta);
-    }
-    if (!doc.querySelector('link[rel="apple-touch-icon"]')) {
-        const appleIcon = doc.createElement('link');
-        appleIcon.rel = 'apple-touch-icon';
-        appleIcon.href = 'app/static/icon.png';
-        doc.head.appendChild(appleIcon);
-    }
+
+    setLink('manifest', '/app/static/manifest.json');
+    setLink('icon', '/app/static/icon.png', 'image/png');
+    setLink('shortcut icon', '/app/static/icon.png', 'image/png');
+    setLink('apple-touch-icon', '/app/static/icon.png');
+
+    doc.querySelectorAll('meta[name="theme-color"]').forEach(function (el) {
+        el.remove();
+    });
+    const meta = doc.createElement('meta');
+    meta.name = 'theme-color';
+    meta.content = '#2563eb';
+    doc.head.appendChild(meta);
+
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('app/static/sw.js').catch(function () {});
+        navigator.serviceWorker.register('/app/static/sw.js').catch(function () {});
     }
 })();
 </script>
