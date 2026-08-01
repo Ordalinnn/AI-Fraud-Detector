@@ -800,7 +800,13 @@ def make_batch_summary_chart(fraud_count, safe_count, title):
 # TRAIN MODELS (ENSEMBLE)
 # =========================
 @st.cache_resource(show_spinner=False)
-def train_models():
+def train_models(feature_schema):
+    """`feature_schema` isn't used in the body — it exists purely so the
+    cache key changes whenever extract_features()'s output shape changes.
+    st.cache_resource only invalidates on this function's OWN source
+    changing, not on a helper it calls; without this, adding/removing a
+    feature (like brand_flag) silently leaves a stale cached model with
+    the wrong number of columns, causing a ValueError at predict time."""
     rows, labels = [], []
     for text, label in data:
         f, _ = extract_features(text)
@@ -842,7 +848,8 @@ def train_models():
     return lr_model, rf_model, gb_model, metrics, X_train, y_train
 
 
-lr_model, rf_model, gb_model, model_metrics, X_train, y_train = train_models()
+FEATURE_SCHEMA = tuple(sorted(extract_features("")[0].keys()))
+lr_model, rf_model, gb_model, model_metrics, X_train, y_train = train_models(FEATURE_SCHEMA)
 
 # =========================
 # UI STYLE
