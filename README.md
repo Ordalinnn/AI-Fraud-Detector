@@ -64,7 +64,7 @@ Final risk score → risk level (Low / Suspicious / High / Critical)
 
 The first three models are trained on **hand-engineered features** (keyword counts, domain checks). The fourth model (TF-IDF + Naive Bayes) is trained directly on the **raw text**, so it can pick up on fraud-indicative language patterns the hand-curated keyword lists don't explicitly cover. Averaging all four, rather than trusting a single model, is what the in-app "model agreement" indicator is measuring — when the four disagree strongly, the UI flags the result as lower-confidence.
 
-The pure detection logic (feature extraction, rule boosting, domain/brand checks, risk levels, text highlighting) lives in [`fraud_logic.py`](fraud_logic.py), completely independent of Streamlit, so it's unit-testable and reusable — the browser extension's `detector.js` is a JavaScript port of the same logic.
+The pure detection logic (feature extraction, rule boosting, domain/brand checks, risk levels, text highlighting) lives in [`fraud_logic.py`](fraud_logic.py), completely independent of Streamlit, so it's unit-testable and reusable — the browser extension's `detector.js` is a JavaScript port of the same logic. UI strings for all three languages live in [`translations.py`](translations.py), which validates that KZ/RU/EN all define the same set of keys before the app ever renders a page.
 
 ## Features
 
@@ -96,11 +96,16 @@ The pure detection logic (feature extraction, rule boosting, domain/brand checks
 ## Project structure
 
 ```
-app.py                        Streamlit app: UI, translations, model training, all pages
+app.py                        Streamlit app: UI, model training, all pages
 fraud_logic.py                Pure detection logic (no Streamlit dependency) — feature
                                extraction, rule boosting, domain/brand checks, risk levels,
                                text highlighting. Imported by app.py, covered by tests/.
+translations.py                KZ/RU/EN UI strings. Validates at import time that all three
+                               languages have identical key sets, so a missing translation
+                               fails loudly at startup instead of silently as a runtime
+                               KeyError the first time a user picks that language.
 tests/test_fraud_logic.py     Pytest suite for fraud_logic.py
+tests/test_translations.py    Pytest suite for translations.py
 .github/workflows/tests.yml   Runs the test suite on every push/PR
 
 static/
