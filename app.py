@@ -421,6 +421,39 @@ data = [
     # impersonating Halyk Bank)
     ["обменяйте бонусы halyk bank на деньги перейдите по ссылке и подтвердите карту", 1],
 
+    # FRAUD: Unpaid toll SMS scam (FCC/FBI IC3: 60,000+ complaints by 2025,
+    # impersonating E-ZPass, FasTrak, and similar toll payment systems)
+    ["you have an unpaid toll balance pay now to avoid additional fees and license suspension", 1],
+    ["missed toll payment detected settle your balance today via the link to avoid a fine", 1],
+    ["у вас есть неоплаченный проезд по платной дороге оплатите сейчас чтобы избежать штрафа", 1],
+
+    # FRAUD: AI voice-cloning "family emergency" scam (2026 reporting: a
+    # cloned voice of a grandchild/relative begging for urgent money,
+    # generated from a few seconds of public audio)
+    ["бабушка это я я попал в аварию мне очень больно пожалуйста переведи деньги никому не говори", 1],
+    ["grandma it's me i've been in a car accident please send money right away don't tell anyone", 1],
+    ["немен телефон арқылы сөйлесе алмаймын дауысым өзгерген шұғыл ақша керек", 1],
+
+    # FRAUD: "Pig butchering" — romance scam that pivots into a fake crypto
+    # investment platform
+    ["любимый я нашла платформу для инвестиций в криптовалюту давай вместе вложим и разбогатеем", 1],
+    ["darling i've been making great profits on this crypto platform let me help you invest too", 1],
+
+    # FRAUD: Bank "callback" scheme (2026 Russian banking fraud reporting:
+    # scammer asks the victim to call back a number instead of clicking a link)
+    ["это служба безопасности сбербанка перезвоните на этот номер срочно по поводу вашего счета", 1],
+    ["sberbank security department call us back immediately regarding suspicious activity on your account", 1],
+
+    # FRAUD: NFC "tap your phone" scam (2026 reporting: caller talks the
+    # victim into tapping their phone on a terminal under a fake pretext,
+    # linking it to the scammer's payment device)
+    ["поднесите телефон к терминалу чтобы отменить платеж следуйте инструкциям оператора", 1],
+    ["hold your phone near the terminal and follow the operator's instructions to cancel the charge", 1],
+
+    # FRAUD: Landlord impersonation / rent redirection scam
+    ["это арендодатель переведите оплату за квартиру на новые реквизиты счета", 1],
+    ["hi it's your landlord please send this month's rent to my new bank account details below", 1],
+
     # SAFE examples — expanded and more diverse
     ["привет как дела", 0],
     ["завтра урок математики в 9", 0],
@@ -530,6 +563,20 @@ data = [
     ["меню кафе доступно по qr коду на столе оплата на кассе", 0],
     ["scan the table qr code to view today's menu no payment needed here", 0],
     ["бонусы halyk bank автоматически зачисляются на карту раз в месяц", 0],
+
+    # SAFE: matching counterparts to the newest real-world-grounded categories
+    ["your toll payment for this month was processed automatically as usual", 0],
+    ["ваш проезд по платной дороге оплачен автоматически с привязанной карты", 0],
+    ["бабушка привет это я как ты себя чувствуешь", 0],
+    ["grandma hi it's me just checking in how are you feeling", 0],
+    ["любимый посмотри какие фото я сделала сегодня на прогулке", 0],
+    ["darling check out these photos from my walk today", 0],
+    ["служба безопасности банка подтвердила что операция была совершена вами", 0],
+    ["the bank's security team confirmed the transaction was made by you", 0],
+    ["оплата картой прошла успешно через терминал спасибо за покупку", 0],
+    ["thank you for your contactless payment your receipt is in the app", 0],
+    ["арендодатель подтвердил получение оплаты за этот месяц спасибо", 0],
+    ["landlord confirmed this month's rent payment was received thank you", 0],
 ]
 
 def explain(features):
@@ -1457,7 +1504,7 @@ st.markdown(f"""
             <div class="metrics-item-label">{T['stat_examples']}</div>
         </div>
         <div class="metrics-item">
-            <div class="metrics-item-val">17+</div>
+            <div class="metrics-item-val">23+</div>
             <div class="metrics-item-label">{T['stat_categories']}</div>
         </div>
         <div class="metrics-item">
