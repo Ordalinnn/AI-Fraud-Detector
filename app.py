@@ -56,6 +56,22 @@ def save_history(history):
     except OSError:
         pass
 
+FEEDBACK_FILE = Path("feedback.json")
+
+def load_feedback():
+    if FEEDBACK_FILE.exists():
+        try:
+            return json.loads(FEEDBACK_FILE.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return []
+    return []
+
+def save_feedback(feedback):
+    try:
+        FEEDBACK_FILE.write_text(json.dumps(feedback, ensure_ascii=False, indent=2), encoding="utf-8")
+    except OSError:
+        pass
+
 # =========================
 # LANGUAGE
 # =========================
@@ -155,6 +171,13 @@ TEXT = {
         "feature_contrib": "Әр белгінің әсері (Logistic Regression моделі)",
         "feature_importance": "Ең маңызды белгілер (Random Forest моделі)",
         "simple_result": "Қысқаша қорытынды",
+        "disclaimer": "⚠️ Бұл — прототип. Ол шамамен 90 мысалдан үйретілген және қателесуі мүмкін. Бұл ресми қауіпсіздік құралы емес — маңызды шешім қабылдамас бұрын әрқашан ресми дереккөз арқылы тексеріңіз.",
+        "feedback_prompt": "Нәтиже дұрыс болды ма?",
+        "feedback_yes": "✅ Иә, дұрыс",
+        "feedback_no": "❌ Жоқ, қате",
+        "feedback_thanks": "Рахмет! Пікіріңіз сақталды.",
+        "dev_stack": "Әзірлеушілерге арналған ақпарат",
+        "download_json": "📥 JSON түрінде жүктеу",
     },
     "🇷🇺 RU": {
         "title": "AI Fraud Detector",
@@ -228,6 +251,13 @@ TEXT = {
         "feature_contrib": "Вклад каждого признака (модель Logistic Regression)",
         "feature_importance": "Самые важные признаки (модель Random Forest)",
         "simple_result": "Короткий вывод",
+        "disclaimer": "⚠️ Это прототип. Он обучен всего на ~90 примерах и может ошибаться. Это не официальный инструмент безопасности — всегда проверяйте важные решения через официальные источники.",
+        "feedback_prompt": "Результат был точным?",
+        "feedback_yes": "✅ Да, верно",
+        "feedback_no": "❌ Нет, ошибка",
+        "feedback_thanks": "Спасибо! Ваш отзыв сохранён.",
+        "dev_stack": "Информация для разработчиков",
+        "download_json": "📥 Скачать в формате JSON",
     },
     "🇬🇧 EN": {
         "title": "AI Fraud Detector",
@@ -301,6 +331,13 @@ TEXT = {
         "feature_contrib": "Feature contribution (Logistic Regression model)",
         "feature_importance": "Most important features (Random Forest model)",
         "simple_result": "Simple summary",
+        "disclaimer": "⚠️ This is a prototype. It's trained on only ~90 examples and can be wrong. It is not an official security tool — always verify important decisions through official sources.",
+        "feedback_prompt": "Was this result accurate?",
+        "feedback_yes": "✅ Yes, correct",
+        "feedback_no": "❌ No, wrong",
+        "feedback_thanks": "Thanks! Your feedback was saved.",
+        "dev_stack": "For developers",
+        "download_json": "📥 Download as JSON",
     },
 }
 
@@ -424,11 +461,20 @@ threat_words = [
     "ограничен", "будет закрыт"
 ]
 suspicious_domain_words = [
-    "login", "verify", "secure", "bonus", "gift", "bank", "kaspi",
+    "login", "verify", "secure", "bonus", "gift",
     "account", "support", "confirm", "prize", "payment", "wallet",
     "security", "update", "auth", "free"
 ]
 suspicious_zones = [".xyz", ".top", ".click", ".site", ".online", ".live", ".info", ".icu"]
+
+# Known KZ/RU financial & delivery brands commonly impersonated in phishing
+# domains (e.g. "kaspi-login.xyz"). Kept separate from suspicious_domain_words
+# above so a *legitimate* bank.kz / kaspi.kz domain isn't itself flagged as
+# suspicious just for containing the brand name.
+KNOWN_BRANDS = [
+    "kaspi.kz", "halykbank.kz", "sberbank.kz", "sberbank.ru",
+    "tinkoff.ru", "vtb.ru", "egov.kz", "kazpost.kz", "dhl.com",
+]
 
 identity_words = [
     "паспорт", "иин", "удостоверение", "личность", "identity",
@@ -458,6 +504,33 @@ def count_matches(text, words):
     text = text.lower()
     return sum(1 for w in words if w in text)
 
+def brand_impersonation(domain):
+    """Returns the brand being impersonated if the domain contains a known
+    brand's name but isn't that brand's real domain (classic phishing pattern
+    like "kaspi-login.xyz"), otherwise None."""
+    for brand in KNOWN_BRANDS:
+        brand_core = brand.split(".")[0]
+        if brand_core in domain and domain != brand and not domain.endswith("." + brand):
+            return brand
+    return None
+
+def domain_flags(d):
+    """Shared list of (label, severity) flags for a single domain, used both
+    for feature extraction and for the Domain analysis display."""
+    flags = []
+    impersonated = brand_impersonation(d)
+    if impersonated:
+        flags.append((f"Impersonates {impersonated}", "critical"))
+    if any(w in d for w in suspicious_domain_words):
+        flags.append(("Suspicious keyword", "warn"))
+    if len(d) > 20:
+        flags.append(("Long domain", "warn"))
+    if any(d.endswith(z) for z in suspicious_zones):
+        flags.append(("Suspicious TLD", "critical"))
+    if any(ch.isdigit() for ch in d):
+        flags.append(("Contains digits", "warn"))
+    return flags
+
 def extract_features(text):
     text_lower = text.lower()
     urls = extract_urls(text_lower)
@@ -467,6 +540,7 @@ def extract_features(text):
     long_domain = 0
     suspicious_zone = 0
     digit_domain = 0
+    brand_flag = 0
 
     for d in domains:
         if any(w in d for w in suspicious_domain_words):
@@ -477,6 +551,8 @@ def extract_features(text):
             suspicious_zone = 1
         if any(ch.isdigit() for ch in d):
             digit_domain = 1
+        if brand_impersonation(d):
+            brand_flag = 1
 
     words = text_lower.split()
     avg_word_len = np.mean([len(w) for w in words]) if words else 0
@@ -494,6 +570,7 @@ def extract_features(text):
         "long_domain": long_domain,
         "suspicious_zone": suspicious_zone,
         "digit_domain": digit_domain,
+        "brand_flag": brand_flag,
         "digit_count": sum(ch.isdigit() for ch in text_lower),
         "exclamation_count": text_lower.count("!"),
         "uppercase_count": sum(1 for ch in text if ch.isupper()),
@@ -528,6 +605,7 @@ def explain(features):
             "uppercase_count": "Үлкен әріптер көп қолданылған",
             "has_multiple_warnings": "Бір уақытта шұғылдық және қорқыту бар",
             "url_count": "Бірнеше сілтеме анықталды",
+            "brand_flag": "Домен белгілі банк/брендке ұқсатылған, бірақ ол емес",
         }
     elif lang == "🇷🇺 RU":
         labels = {
@@ -548,6 +626,7 @@ def explain(features):
             "uppercase_count": "Используется много заглавных букв",
             "has_multiple_warnings": "Одновременно присутствуют срочность и угроза",
             "url_count": "Обнаружено несколько ссылок",
+            "brand_flag": "Домен маскируется под известный банк/бренд, но им не является",
         }
     else:
         labels = {
@@ -568,6 +647,7 @@ def explain(features):
             "uppercase_count": "Many uppercase letters were used",
             "has_multiple_warnings": "Both urgency and threat were detected simultaneously",
             "url_count": "Multiple links were detected",
+            "brand_flag": "Domain mimics a known bank/brand but isn't the real one",
         }
 
     # Only explain features that are relevant (non-zero and meaningful)
@@ -654,6 +734,8 @@ def rule_boost(features):
         boost += 0.10
     if features["suspicious_zone"] or features["suspicious_domain"]:
         boost += 0.10
+    if features["brand_flag"]:
+        boost += 0.15
     if features["has_multiple_warnings"]:
         boost += 0.08
     if features["url_count"] > 1:
@@ -1067,6 +1149,18 @@ html, body, [class*="css"] {
 .legend-high     {background:#ffedd5; color:#9a3412; border-color:#fed7aa;}
 .legend-critical {background:#fee2e2; color:#991b1b; border-color:#fecaca;}
 
+.disclaimer-box {
+    margin-top: 16px;
+    padding: 12px 16px;
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: 14px;
+    color: #92400e;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.5;
+}
+
 @media (max-width: 640px) {
     .howto-steps { flex-direction: column; }
     .howto-step { min-width: 0; font-size: 15px; }
@@ -1398,10 +1492,10 @@ with st.sidebar:
         )
 
     st.divider()
-    st.markdown("### 🛡️ Project stack")
-    for item in ["Ensemble (LR + RF + GB)", "Feature Engineering", "Domain Analysis",
-                 "Explainable AI", "Rule-based Risk Boost", "Real-life Scam Scenarios"]:
-        st.markdown(f"• {item}")
+    with st.expander(f"🛠️ {T['dev_stack']}"):
+        for item in ["Ensemble (LR + RF + GB)", "Feature Engineering", "Domain Analysis",
+                     "Explainable AI", "Rule-based Risk Boost", "Real-life Scam Scenarios"]:
+            st.markdown(f"• {item}")
 
 # =========================
 # HERO
@@ -1452,6 +1546,7 @@ st.markdown(f"""
         <span class="legend-chip legend-high">🟠 {T['high']}</span>
         <span class="legend-chip legend-critical">🔴 {T['critical']}</span>
     </div>
+    <div class="disclaimer-box">{T['disclaimer']}</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -1523,10 +1618,12 @@ with right:
     """, unsafe_allow_html=True)
 
 # =========================
-# HISTORY INIT
+# HISTORY & FEEDBACK INIT
 # =========================
 if "history" not in st.session_state:
     st.session_state.history = load_history()
+if "feedback" not in st.session_state:
+    st.session_state.feedback = load_feedback()
 
 # =========================
 # BATCH ANALYSIS
@@ -1608,10 +1705,10 @@ if mode != "batch" and analyze:
         features, domains = extract_features(input_text)
         X_input = pd.DataFrame([features])
 
-        # FIX: Ensemble prediction — average probabilities from all 3 models
-        lr_prob = lr_model.predict_proba(X_input)[0][1]
-        rf_prob = rf_model.predict_proba(X_input)[0][1]
-        gb_prob = gb_model.predict_proba(X_input)[0][1]
+        # Ensemble prediction — average probabilities from all 3 models
+        lr_prob = float(lr_model.predict_proba(X_input)[0][1])
+        rf_prob = float(rf_model.predict_proba(X_input)[0][1])
+        gb_prob = float(gb_model.predict_proba(X_input)[0][1])
         raw_prob = (lr_prob + rf_prob + gb_prob) / 3.0
 
         boost = rule_boost(features)
@@ -1620,160 +1717,31 @@ if mode != "batch" and analyze:
         risk_label, risk_class, emoji = risk_style(prob)
         explanations = explain(features)
 
-        st.markdown(f'<div class="section-title">📊 {T["result"]}</div>', unsafe_allow_html=True)
-
-        c1, c2, c3, c4 = st.columns(4)
-        c1.markdown(f'<div class="metric-card"><div class="metric-icon">%</div><div class="metric-label">{T["risk"]}</div><div class="metric-value">{prob*100:.1f}%</div></div>', unsafe_allow_html=True)
-        c2.markdown(f'<div class="metric-card"><div class="metric-icon">⚠️</div><div class="metric-label">{T["detected"]}</div><div class="metric-value">{len(explanations)}</div></div>', unsafe_allow_html=True)
-        c3.markdown(f'<div class="metric-card"><div class="metric-icon">🎚️</div><div class="metric-label">{T["threshold"]}</div><div class="metric-value">{threshold:.2f}</div></div>', unsafe_allow_html=True)
-        c4.markdown(f'<div class="metric-card"><div class="metric-icon">🧠</div><div class="metric-label">{T["model"]}</div><div class="metric-value">3-way</div></div>', unsafe_allow_html=True)
-        st.caption(f"ℹ️ {T['model_help']}")
-
-        st.markdown(f'<div class="{risk_class}">{emoji} {risk_label}</div>', unsafe_allow_html=True)
-        st.progress(float(prob))
-
-        # Plain-language verdict shown immediately, not buried in a tab
-        st.markdown(f'<div class="section-title" style="font-size:19px;">💡 {T["simple_result"]}</div>', unsafe_allow_html=True)
-        if pred == 1:
-            st.error(T["bad_advice"])
-        else:
-            st.success(T["good_advice"])
-
-        chart_col1, chart_col2 = st.columns(2)
-        with chart_col1:
-            st.plotly_chart(make_gauge_chart(prob, threshold, T["gauge_title"]), use_container_width=True)
-        with chart_col2:
-            st.plotly_chart(make_model_bar_chart(lr_prob, rf_prob, gb_prob, T["model_compare"]), use_container_width=True)
-
-        # FIX: Show per-model breakdown
-        st.markdown(f"**{T['ensemble']}:**")
-        mc1, mc2, mc3 = st.columns(3)
-        mc1.metric("Logistic Regression", f"{lr_prob*100:.1f}%")
-        mc2.metric("Random Forest", f"{rf_prob*100:.1f}%")
-        mc3.metric("Gradient Boosting", f"{gb_prob*100:.1f}%")
-
-        tab1, tab2, tab3, tab4, tab5 = st.tabs([
-            T["explain_tab"],
-            f"🌐 {T['domain']}",
-            f"🧠 {T['vector']}",
-            f"📥 {T['report']}",
-            f"📜 {T['history']}"
-        ])
-
-        with tab1:
-            st.subheader(T["why"])
-            if explanations:
-                chips = "".join([f'<span class="feature-chip">{e}</span>' for e in explanations])
-                st.markdown(chips, unsafe_allow_html=True)
-            else:
-                st.success(T["no_features"])
-
-            st.subheader(T["highlighted"])
-            st.markdown(
-                f'<div class="highlight-box">{highlight_text(input_text)}</div>',
-                unsafe_allow_html=True
-            )
-
-            st.subheader(T["feature_contrib"])
-            coef = lr_model.named_steps["clf"].coef_[0]
-            feature_names = list(X_input.columns)
-            contrib = []
-            for name, value, w in zip(feature_names, X_input.iloc[0], coef):
-                contrib.append([name, round(float(value), 3), round(float(w), 3), round(float(value) * round(float(w), 3), 3)])
-
-            contrib_df = pd.DataFrame(contrib, columns=["Feature", "Value", "Weight", "Contribution"])
-            # FIX: Highlight most impactful rows in dataframe
-            st.dataframe(
-                contrib_df.sort_values("Contribution", ascending=False),
-                use_container_width=True,
-                hide_index=True
-            )
-
-            # FIX: Also show Random Forest importances
-            st.subheader(T["feature_importance"])
-            rf_importances = rf_model.named_steps["clf"].feature_importances_
-            imp_df = pd.DataFrame({
-                "Feature": feature_names,
-                "Importance": [round(float(i), 4) for i in rf_importances]
-            }).sort_values("Importance", ascending=False)
-            st.dataframe(imp_df, use_container_width=True, hide_index=True)
-
-        with tab2:
-            st.subheader(T["domain"])
-            if domains:
-                for d in domains:
-                    flags = []
-                    if any(w in d for w in suspicious_domain_words):
-                        flags.append("⚠️ Suspicious keyword")
-                    if len(d) > 20:
-                        flags.append("⚠️ Long domain")
-                    if any(d.endswith(z) for z in suspicious_zones):
-                        flags.append("🔴 Suspicious TLD")
-                    if any(ch.isdigit() for ch in d):
-                        flags.append("⚠️ Contains digits")
-                    flag_str = " | ".join(flags) if flags else "✅ No issues found"
-                    st.markdown(
-                        f'<div class="domain-box">🌐 {d}<br><small style="color:#94a3b8">{flag_str}</small></div>',
-                        unsafe_allow_html=True
-                    )
-            else:
-                st.info(T["no_domain"])
-
-        with tab3:
-            st.subheader(T["vector"])
-            # FIX: Transpose for better readability
-            display_df = X_input.T.reset_index()
-            display_df.columns = ["Feature", "Value"]
-            st.dataframe(display_df, use_container_width=True, hide_index=True)
-
-            # FIX: Show text statistics
-            st.subheader(T["text_stats"])
-            ts1, ts2, ts3 = st.columns(3)
-            ts1.metric(T["char_count"], char_count)
-            ts2.metric(T["word_count"], word_count_val)
-            ts3.metric("URLs", len(domains))
-
-        with tab4:
-            report = f"""
-AI Fraud Detector Report
-========================
-Date: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-Language: {lang}
-
-INPUT TEXT:
-{input_text}
-
-ANALYSIS RESULTS:
------------------
-Logistic Regression probability: {lr_prob*100:.1f}%
-Random Forest probability:       {rf_prob*100:.1f}%
-Gradient Boosting probability:   {gb_prob*100:.1f}%
-Ensemble average (raw):          {raw_prob*100:.1f}%
-Rule boost applied:              +{boost*100:.1f}%
-Final fraud risk:                {prob*100:.1f}%
-Risk level:                      {risk_label}
-Decision threshold:              {threshold}
-Prediction:                      {"FRAUD" if pred == 1 else "SAFE"}
-
-DETECTED FEATURES ({len(explanations)}):
-{chr(10).join("- " + e for e in explanations) if explanations else "No strong fraud indicators"}
-
-DETECTED DOMAINS ({len(domains)}):
-{chr(10).join("- " + d for d in domains) if domains else "No domains"}
-
-TEXT STATS:
-Characters: {char_count}
-Words: {word_count_val}
-
-SECURITY ADVICE:
-{T["bad_advice"] if pred == 1 else T["good_advice"]}
-"""
-            st.download_button(
-                T["download"],
-                report,
-                file_name=f"fraud_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
-                use_container_width=True
-            )
+        # Persist the result in session_state so it stays on screen across
+        # reruns triggered by feedback/download/clear-history buttons, which
+        # aren't this form's own submit button and would otherwise make the
+        # whole results section disappear on the next rerun.
+        st.session_state["last_result"] = {
+            "input_text": input_text,
+            "char_count": char_count,
+            "word_count_val": word_count_val,
+            "features": features,
+            "domains": domains,
+            "lr_prob": lr_prob,
+            "rf_prob": rf_prob,
+            "gb_prob": gb_prob,
+            "raw_prob": raw_prob,
+            "boost": boost,
+            "prob": prob,
+            "pred": pred,
+            "threshold": threshold,
+            "risk_label": risk_label,
+            "risk_class": risk_class,
+            "emoji": emoji,
+            "explanations": explanations,
+            "lang": lang,
+        }
+        st.session_state.pop("feedback_given", None)
 
         # Save to history with richer info, persisted to disk
         st.session_state.history.append({
@@ -1786,28 +1754,227 @@ SECURITY ADVICE:
         })
         save_history(st.session_state.history)
 
-        with tab5:
-            if st.session_state.history:
-                history_df = pd.DataFrame(st.session_state.history)
-                st.dataframe(
-                    history_df,
-                    use_container_width=True,
-                    hide_index=True
+# =========================
+# RESULT DISPLAY (reads from session_state so it survives feedback/history
+# button clicks instead of disappearing on the next rerun)
+# =========================
+if mode != "batch" and "last_result" in st.session_state:
+    r = st.session_state["last_result"]
+    X_input = pd.DataFrame([r["features"]])
+
+    st.markdown(f'<div class="section-title">📊 {T["result"]}</div>', unsafe_allow_html=True)
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.markdown(f'<div class="metric-card"><div class="metric-icon">%</div><div class="metric-label">{T["risk"]}</div><div class="metric-value">{r["prob"]*100:.1f}%</div></div>', unsafe_allow_html=True)
+    c2.markdown(f'<div class="metric-card"><div class="metric-icon">⚠️</div><div class="metric-label">{T["detected"]}</div><div class="metric-value">{len(r["explanations"])}</div></div>', unsafe_allow_html=True)
+    c3.markdown(f'<div class="metric-card"><div class="metric-icon">🎚️</div><div class="metric-label">{T["threshold"]}</div><div class="metric-value">{r["threshold"]:.2f}</div></div>', unsafe_allow_html=True)
+    c4.markdown(f'<div class="metric-card"><div class="metric-icon">🧠</div><div class="metric-label">{T["model"]}</div><div class="metric-value">3-way</div></div>', unsafe_allow_html=True)
+    st.caption(f"ℹ️ {T['model_help']}")
+
+    st.markdown(f'<div class="{r["risk_class"]}">{r["emoji"]} {r["risk_label"]}</div>', unsafe_allow_html=True)
+    st.progress(float(r["prob"]))
+
+    # Plain-language verdict shown immediately, not buried in a tab
+    st.markdown(f'<div class="section-title" style="font-size:19px;">💡 {T["simple_result"]}</div>', unsafe_allow_html=True)
+    if r["pred"] == 1:
+        st.error(T["bad_advice"])
+    else:
+        st.success(T["good_advice"])
+
+    already_gave_feedback = st.session_state.get("feedback_given")
+    fb_label, fb1, fb2 = st.columns([2, 1, 1])
+    fb_label.markdown(
+        f"**{T['feedback_thanks'] if already_gave_feedback else T['feedback_prompt']}**"
+    )
+    if fb1.button(T["feedback_yes"], use_container_width=True, disabled=bool(already_gave_feedback), key="fb_yes"):
+        st.session_state.feedback.append({
+            "Time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "Text": r["input_text"][:200],
+            "Predicted": "FRAUD" if r["pred"] == 1 else "SAFE",
+            "Risk %": round(r["prob"] * 100, 1),
+            "UserSaysCorrect": True,
+        })
+        save_feedback(st.session_state.feedback)
+        st.session_state["feedback_given"] = True
+        st.rerun()
+    if fb2.button(T["feedback_no"], use_container_width=True, disabled=bool(already_gave_feedback), key="fb_no"):
+        st.session_state.feedback.append({
+            "Time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "Text": r["input_text"][:200],
+            "Predicted": "FRAUD" if r["pred"] == 1 else "SAFE",
+            "Risk %": round(r["prob"] * 100, 1),
+            "UserSaysCorrect": False,
+        })
+        save_feedback(st.session_state.feedback)
+        st.session_state["feedback_given"] = True
+        st.rerun()
+
+    chart_col1, chart_col2 = st.columns(2)
+    with chart_col1:
+        st.plotly_chart(make_gauge_chart(r["prob"], r["threshold"], T["gauge_title"]), use_container_width=True)
+    with chart_col2:
+        st.plotly_chart(make_model_bar_chart(r["lr_prob"], r["rf_prob"], r["gb_prob"], T["model_compare"]), use_container_width=True)
+
+    tab1, tab2, tab3, tab4 = st.tabs([
+        T["explain_tab"],
+        f"🧠 {T['vector']}",
+        f"📥 {T['report']}",
+        f"📜 {T['history']}"
+    ])
+
+    with tab1:
+        st.subheader(T["why"])
+        if r["explanations"]:
+            chips = "".join([f'<span class="feature-chip">{e}</span>' for e in r["explanations"]])
+            st.markdown(chips, unsafe_allow_html=True)
+        else:
+            st.success(T["no_features"])
+
+        st.subheader(T["highlighted"])
+        st.markdown(
+            f'<div class="highlight-box">{highlight_text(r["input_text"])}</div>',
+            unsafe_allow_html=True
+        )
+
+        st.subheader(T["domain"])
+        if r["domains"]:
+            for d in r["domains"]:
+                flags = domain_flags(d)
+                flag_str = " | ".join(
+                    ("🔴 " if sev == "critical" else "⚠️ ") + label for label, sev in flags
+                ) if flags else "✅ No issues found"
+                st.markdown(
+                    f'<div class="domain-box">🌐 {d}<br><small style="color:#94a3b8">{flag_str}</small></div>',
+                    unsafe_allow_html=True
                 )
-                hc1, hc2 = st.columns(2)
-                hc1.download_button(
-                    T["download_history"],
-                    history_df.to_csv(index=False).encode("utf-8"),
-                    file_name=f"fraud_history_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                    mime="text/csv",
-                    use_container_width=True,
-                )
-                if hc2.button(T["clear_history"], use_container_width=True):
-                    st.session_state.history = []
-                    save_history([])
-                    st.rerun()
-            else:
-                st.info(T["no_history"])
+        else:
+            st.info(T["no_domain"])
+
+        st.subheader(T["feature_contrib"])
+        coef = lr_model.named_steps["clf"].coef_[0]
+        feature_names = list(X_input.columns)
+        contrib = []
+        for name, value, w in zip(feature_names, X_input.iloc[0], coef):
+            contrib.append([name, round(float(value), 3), round(float(w), 3), round(float(value) * round(float(w), 3), 3)])
+
+        contrib_df = pd.DataFrame(contrib, columns=["Feature", "Value", "Weight", "Contribution"])
+        st.dataframe(
+            contrib_df.sort_values("Contribution", ascending=False),
+            use_container_width=True,
+            hide_index=True
+        )
+
+        st.subheader(T["feature_importance"])
+        rf_importances = rf_model.named_steps["clf"].feature_importances_
+        imp_df = pd.DataFrame({
+            "Feature": feature_names,
+            "Importance": [round(float(i), 4) for i in rf_importances]
+        }).sort_values("Importance", ascending=False)
+        st.dataframe(imp_df, use_container_width=True, hide_index=True)
+
+    with tab2:
+        st.subheader(T["vector"])
+        display_df = X_input.T.reset_index()
+        display_df.columns = ["Feature", "Value"]
+        st.dataframe(display_df, use_container_width=True, hide_index=True)
+
+        st.subheader(T["text_stats"])
+        ts1, ts2, ts3 = st.columns(3)
+        ts1.metric(T["char_count"], r["char_count"])
+        ts2.metric(T["word_count"], r["word_count_val"])
+        ts3.metric("URLs", len(r["domains"]))
+
+    with tab3:
+        report = f"""
+AI Fraud Detector Report
+========================
+Date: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+Language: {r["lang"]}
+
+INPUT TEXT:
+{r["input_text"]}
+
+ANALYSIS RESULTS:
+-----------------
+Logistic Regression probability: {r["lr_prob"]*100:.1f}%
+Random Forest probability:       {r["rf_prob"]*100:.1f}%
+Gradient Boosting probability:   {r["gb_prob"]*100:.1f}%
+Ensemble average (raw):          {r["raw_prob"]*100:.1f}%
+Rule boost applied:              +{r["boost"]*100:.1f}%
+Final fraud risk:                {r["prob"]*100:.1f}%
+Risk level:                      {r["risk_label"]}
+Decision threshold:              {r["threshold"]}
+Prediction:                      {"FRAUD" if r["pred"] == 1 else "SAFE"}
+
+DETECTED FEATURES ({len(r["explanations"])}):
+{chr(10).join("- " + e for e in r["explanations"]) if r["explanations"] else "No strong fraud indicators"}
+
+DETECTED DOMAINS ({len(r["domains"])}):
+{chr(10).join("- " + d for d in r["domains"]) if r["domains"] else "No domains"}
+
+TEXT STATS:
+Characters: {r["char_count"]}
+Words: {r["word_count_val"]}
+
+SECURITY ADVICE:
+{T["bad_advice"] if r["pred"] == 1 else T["good_advice"]}
+"""
+        result_json = json.dumps({
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "language": r["lang"],
+            "input_text": r["input_text"],
+            "probabilities": {
+                "logistic_regression": round(r["lr_prob"], 4),
+                "random_forest": round(r["rf_prob"], 4),
+                "gradient_boosting": round(r["gb_prob"], 4),
+                "ensemble_raw": round(r["raw_prob"], 4),
+                "rule_boost": round(r["boost"], 4),
+                "final": round(r["prob"], 4),
+            },
+            "threshold": r["threshold"],
+            "prediction": "FRAUD" if r["pred"] == 1 else "SAFE",
+            "risk_level": r["risk_label"],
+            "detected_features": r["explanations"],
+            "detected_domains": r["domains"],
+        }, ensure_ascii=False, indent=2)
+
+        dl1, dl2 = st.columns(2)
+        dl1.download_button(
+            T["download"],
+            report,
+            file_name=f"fraud_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+            use_container_width=True
+        )
+        dl2.download_button(
+            T["download_json"],
+            result_json,
+            file_name=f"fraud_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+            mime="application/json",
+            use_container_width=True
+        )
+
+    with tab4:
+        if st.session_state.history:
+            history_df = pd.DataFrame(st.session_state.history)
+            st.dataframe(
+                history_df,
+                use_container_width=True,
+                hide_index=True
+            )
+            hc1, hc2 = st.columns(2)
+            hc1.download_button(
+                T["download_history"],
+                history_df.to_csv(index=False).encode("utf-8"),
+                file_name=f"fraud_history_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
+            if hc2.button(T["clear_history"], use_container_width=True):
+                st.session_state.history = []
+                save_history([])
+                st.rerun()
+        else:
+            st.info(T["no_history"])
 
 # =========================
 # HOW IT WORKS

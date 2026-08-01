@@ -1,5 +1,6 @@
-# Local analysis history (may contain pasted message content)
+# Local analysis history and feedback (may contain pasted message content)
 history.json
+feedback.json
 
 # Python
 __pycache__/
