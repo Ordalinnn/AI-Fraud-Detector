@@ -11,6 +11,9 @@ entirely on your device — no server, no network request, no data collection.
   (SMS, email, message) and analyze it manually.
 - The last analysis (from either method) is remembered and shown when you
   reopen the popup.
+- **Language switcher** (🇰🇿 KZ / 🇷🇺 RU / 🇬🇧 EN) in the popup header — your
+  choice is saved and also applied to notifications and the right-click
+  menu label.
 
 ## How it detects fraud
 
@@ -36,8 +39,13 @@ no server and never sends your text anywhere.
 
 - `manifest.json` — Manifest V3 extension config.
 - `detector.js` — the fraud-scoring logic (shared by the popup and the
-  right-click context menu).
+  right-click context menu). Returns language-agnostic keys (risk level,
+  reason keys, domain flag keys) rather than hardcoded text, so the same
+  result can be rendered in any supported language.
+- `i18n.js` — KZ/RU/EN translations, shared by `popup.js` and `background.js`,
+  plus helpers for reading/writing the saved language preference.
 - `background.js` — service worker: registers the right-click menu and shows
-  notifications.
-- `popup.html` / `popup.css` / `popup.js` — the toolbar popup UI.
+  notifications, both in the currently selected language.
+- `popup.html` / `popup.css` / `popup.js` — the toolbar popup UI, including
+  the language switcher.
 - `icons/` — extension icons (reused from the main app's logo).

@@ -120,6 +120,10 @@ components.html("""
 # =========================
 @st.cache_data(show_spinner=False)
 def image_to_base64(path: str) -> str:
+    """Reads an image file and returns it as a base64 string, so it can be
+    embedded directly in HTML (e.g. <img src="data:image/png;base64,...">)
+    without a separate network request. Cached so the file is only read once
+    per session instead of on every Streamlit rerun."""
     file_path = Path(path)
     if not file_path.exists():
         return ""
@@ -134,6 +138,10 @@ LOGO_HTML = f"data:image/png;base64,{LOGO_B64}" if LOGO_B64 else ""
 HISTORY_FILE = Path("history.json")
 
 def load_history():
+    """Loads past analysis results from history.json (created on first
+    analysis) so the History tab survives an app restart, not just a
+    Streamlit rerun. Returns an empty list if the file doesn't exist or
+    is corrupted."""
     if HISTORY_FILE.exists():
         try:
             return json.loads(HISTORY_FILE.read_text(encoding="utf-8"))
@@ -142,6 +150,9 @@ def load_history():
     return []
 
 def save_history(history):
+    """Writes the full history list back to history.json. Called after
+    every analysis and after clearing history. Never stored in git
+    (see .gitignore) since it can contain pasted message content."""
     try:
         HISTORY_FILE.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
     except OSError:
@@ -150,6 +161,9 @@ def save_history(history):
 FEEDBACK_FILE = Path("feedback.json")
 
 def load_feedback():
+    """Loads user-submitted "was this correct?" feedback from feedback.json,
+    used only to track potential mislabeled predictions for future dataset
+    improvements — not read back into the UI anywhere."""
     if FEEDBACK_FILE.exists():
         try:
             return json.loads(FEEDBACK_FILE.read_text(encoding="utf-8"))
@@ -158,6 +172,8 @@ def load_feedback():
     return []
 
 def save_feedback(feedback):
+    """Writes the full feedback list back to feedback.json. Also never
+    committed to git — see .gitignore."""
     try:
         FEEDBACK_FILE.write_text(json.dumps(feedback, ensure_ascii=False, indent=2), encoding="utf-8")
     except OSError:

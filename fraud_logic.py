@@ -66,13 +66,16 @@ pressure_phrases = [
 # URL / DOMAIN HELPERS
 # =========================
 def extract_urls(text):
+    """Returns every http(s):// or www. link found in the text, in the order they appear."""
     return re.findall(r"https?://[^\s]+|www\.[^\s]+", text.lower())
 
 def get_domain(url):
+    """Strips the protocol/www prefix and any path, leaving just the bare domain (e.g. "kaspi-login.xyz")."""
     url = url.replace("https://", "").replace("http://", "").replace("www.", "")
     return url.split("/")[0]
 
 def count_matches(text, words):
+    """Counts how many entries from `words` appear anywhere in `text` (case-insensitive substring match)."""
     text = text.lower()
     return sum(1 for w in words if w in text)
 
@@ -107,6 +110,12 @@ def domain_flags(d):
 # FEATURE EXTRACTION
 # =========================
 def extract_features(text):
+    """Turns raw message text into the 20-value numeric feature vector the
+    LR/RF/GB models are trained on: counts of urgency/secrecy/money/threat/
+    identity/reward/pressure words, link and domain-reputation flags
+    (suspicious keywords, TLD, length, digits, brand impersonation), plus
+    basic text statistics (length, word count, punctuation/case usage).
+    Returns (features_dict, list_of_domains_found)."""
     text_lower = text.lower()
     urls = extract_urls(text_lower)
     domains = [get_domain(u) for u in urls]
