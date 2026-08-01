@@ -1,6 +1,4 @@
-import re
 import json
-import html
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -13,6 +11,16 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import cross_val_score
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.naive_bayes import MultinomialNB
+from fraud_logic import (
+    urgent_words, secret_words, money_words, threat_words,
+    suspicious_domain_words, suspicious_zones, KNOWN_BRANDS,
+    identity_words, reward_words, pressure_phrases,
+    extract_urls, get_domain, count_matches,
+    brand_impersonation, domain_flags, extract_features,
+    rule_boost, risk_level, highlight_text,
+)
 
 # =========================
 # PAGE CONFIG
@@ -227,6 +235,26 @@ TEXT = {
         "feedback_thanks": "Рахмет! Пікіріңіз сақталды.",
         "dev_stack": "Әзірлеушілерге арналған ақпарат",
         "download_json": "📥 JSON түрінде жүктеу",
+        "learned_words": "AI мәтіннен қандай сөздерді үйренді?",
+        "learned_fraud_words": "🚩 Алаяқтықпен байланысты сөздер",
+        "learned_safe_words": "✅ Қауіпсізбен байланысты сөздер",
+        "methodology_title": "Әдістеме және модель туралы ақпарат",
+        "methodology_dataset_title": "📊 Деректер жиынтығы",
+        "methodology_dataset_body": "Модель {total} қолмен жазылған мысалда үйретілген ({fraud} алаяқтық, {safe} қауіпсіз), қазақ, орыс және ағылшын тілдерінде, 14-тен астам алаяқтық түрін қамтиды: банк/карта, жеткізу/сыйлық, туыс-алаяқтығы, инвестиция/жұмыс, техникалық қолдау, романтикалық алаяқтық, крипто, QR-код, қайырымдылық, жазылым, SIM-карта, әлеуметтік желі, салық қайтарымы және мұрагерлік алаяқтығы.",
+        "methodology_models_title": "🧠 Модельдер",
+        "methodology_models_body": "Жүйе 4 модельдің ансамблін пайдаланады: Logistic Regression, Random Forest және Gradient Boosting қолмен жасалған 20 белгіде (сөз санау, домен тексеру) үйретілген, ал 4-ші модель (TF-IDF + Naive Bayes) тікелей мәтіннен сөз үлгілерін үйренеді. Орташа кросс-валидация дәлдігі: шамамен {avg_acc}%.",
+        "methodology_limitations_title": "⚠️ Шектеулер",
+        "methodology_limitations_body": "- Деректер жиынтығы шағын (бірнеше жүз мысал), сондықтан нақты әлемдегі жаңа алаяқтық тәсілдеріне толық жалпыламауы мүмкін.\n- Кросс-валидация дәлдігі тым жоғары көрінуі мүмкін, себебі мысалдар бір-біріне ұқсас.\n- Жүйе тек мәтінді талдайды — дауыс, бейне немесе нақты уақыттағы алдау белгілерін анықтай алмайды.\n- Бұл ресми қауіпсіздік құралы емес, тек оқу мақсатындағы прототип.",
+        "methodology_ethics_title": "🔒 Жеке деректер мен этика",
+        "methodology_ethics_body": "- Талданған мәтін серверде сақталмайды, тек сіздің сеансыңызда тарихқа жазылады (жергілікті файл, GitHub-қа жүктелмейді).\n- Браузер кеңейтімі барлық талдауды құрылғыда жасайды — мәтін ешқашан жіберілмейді.\n- Пікір түймесі арқылы жіберілген деректер моделді жақсарту үшін ғана пайдаланылады.",
+        "stat_examples": "Оқыту мысалдары",
+        "stat_categories": "Алаяқтық түрлері",
+        "stat_accuracy": "Орташа дәлдік",
+        "stat_languages": "Тілдер",
+        "agreement_title": "Модельдер келісімі",
+        "agreement_high": "🟢 Барлық 4 модель бір-бірімен келіседі — нәтижеге сенімді",
+        "agreement_mid": "🟡 Модельдер жартылай келіседі",
+        "agreement_low": "🔴 Модельдер бір-бірімен келіспейді — нәтижені абайлап қараңыз",
     },
     "🇷🇺 RU": {
         "title": "AI Fraud Detector",
@@ -307,6 +335,26 @@ TEXT = {
         "feedback_thanks": "Спасибо! Ваш отзыв сохранён.",
         "dev_stack": "Информация для разработчиков",
         "download_json": "📥 Скачать в формате JSON",
+        "learned_words": "Какие слова AI выучил из текста?",
+        "learned_fraud_words": "🚩 Слова, связанные с мошенничеством",
+        "learned_safe_words": "✅ Слова, связанные с безопасными сообщениями",
+        "methodology_title": "Методология и карточка модели",
+        "methodology_dataset_title": "📊 Датасет",
+        "methodology_dataset_body": "Модель обучена на {total} вручную составленных примерах ({fraud} мошеннических, {safe} безопасных) на казахском, русском и английском языках, охватывающих более 14 типов мошенничества: банк/карта, доставка/приз, аферы с «родственником», инвестиции/работа, техподдержка, романтическое мошенничество, крипто, QR-коды, благотворительность, подписки, SIM-карта, соцсети, налоговый возврат и наследство.",
+        "methodology_models_title": "🧠 Модели",
+        "methodology_models_body": "Система использует ансамбль из 4 моделей: Logistic Regression, Random Forest и Gradient Boosting обучены на 20 вручную созданных признаках (подсчёт слов, проверка доменов), а 4-я модель (TF-IDF + Naive Bayes) учится на словесных паттернах прямо из текста. Средняя точность кросс-валидации: около {avg_acc}%.",
+        "methodology_limitations_title": "⚠️ Ограничения",
+        "methodology_limitations_body": "- Датасет небольшой (несколько сотен примеров), поэтому обобщение на совершенно новые схемы мошенничества ограничено.\n- Точность кросс-валидации может казаться завышенной из-за схожести примеров.\n- Система анализирует только текст — она не распознаёт голос, видео или признаки обмана в реальном времени.\n- Это не сертифицированный инструмент безопасности, а учебный прототип.",
+        "methodology_ethics_title": "🔒 Приватность и этика",
+        "methodology_ethics_body": "- Анализируемый текст не отправляется на сервер — он сохраняется только в истории вашей текущей сессии (локальный файл, не попадает в GitHub).\n- Расширение для браузера выполняет весь анализ на устройстве — текст никуда не отправляется.\n- Данные, отправленные через кнопку обратной связи, используются только для улучшения модели.",
+        "stat_examples": "Обучающих примеров",
+        "stat_categories": "Видов мошенничества",
+        "stat_accuracy": "Средняя точность",
+        "stat_languages": "Языков",
+        "agreement_title": "Согласие моделей",
+        "agreement_high": "🟢 Все 4 модели согласны друг с другом — результату можно доверять",
+        "agreement_mid": "🟡 Модели частично расходятся во мнениях",
+        "agreement_low": "🔴 Модели сильно расходятся во мнениях — отнеситесь к результату с осторожностью",
     },
     "🇬🇧 EN": {
         "title": "AI Fraud Detector",
@@ -387,6 +435,26 @@ TEXT = {
         "feedback_thanks": "Thanks! Your feedback was saved.",
         "dev_stack": "For developers",
         "download_json": "📥 Download as JSON",
+        "learned_words": "What words did the AI learn from the text?",
+        "learned_fraud_words": "🚩 Words linked to fraud",
+        "learned_safe_words": "✅ Words linked to safe messages",
+        "methodology_title": "Methodology & Model Card",
+        "methodology_dataset_title": "📊 Dataset",
+        "methodology_dataset_body": "The model is trained on {total} hand-written examples ({fraud} fraud, {safe} safe) in Kazakh, Russian, and English, covering 14+ scam categories: bank/card, delivery/prize, relative-in-trouble scams, investment/job offers, tech support, romance scams, crypto, QR codes, charity, subscriptions, SIM swap, social media, tax refunds, and inheritance scams.",
+        "methodology_models_title": "🧠 Models",
+        "methodology_models_body": "The system uses an ensemble of 4 models: Logistic Regression, Random Forest, and Gradient Boosting are trained on 20 hand-engineered features (word counts, domain checks), while a 4th model (TF-IDF + Naive Bayes) learns word patterns directly from the text. Average cross-validated accuracy: roughly {avg_acc}%.",
+        "methodology_limitations_title": "⚠️ Limitations",
+        "methodology_limitations_body": "- The dataset is small (a few hundred examples), so generalization to entirely new scam wording is limited.\n- Cross-validated accuracy may look inflated because many examples are similar to each other.\n- The system only analyzes text — it can't detect voice, video, or real-time deception cues.\n- This is not a certified security tool, it's an educational prototype.",
+        "methodology_ethics_title": "🔒 Privacy & ethics",
+        "methodology_ethics_body": "- Analyzed text is never sent to a server — it's only saved to your session's local history file, which isn't committed to GitHub.\n- The browser extension does all analysis on-device — text is never transmitted anywhere.\n- Data submitted via the feedback buttons is used only to improve the model.",
+        "stat_examples": "Training examples",
+        "stat_categories": "Scam categories",
+        "stat_accuracy": "Average accuracy",
+        "stat_languages": "Languages",
+        "agreement_title": "Model agreement",
+        "agreement_high": "🟢 All 4 models agree with each other — this result is reliable",
+        "agreement_mid": "🟡 Models partially disagree",
+        "agreement_low": "🔴 Models strongly disagree — treat this result with caution",
     },
 }
 
@@ -458,6 +526,49 @@ data = [
     ["гарантированный доход 30 процентов переведите деньги для активации", 1],
     ["удаленная работа заработок 500 в день отправьте регистрационный взнос", 1],
 
+    # FRAUD: Tech support scams
+    ["внимание ваш компьютер заражен вирусом позвоните в службу поддержки немедленно", 1],
+    ["your computer has been infected call microsoft support immediately to fix it", 1],
+    ["компьютеріңізде вирус табылды қолдау қызметіне дереу хабарласыңыз", 1],
+
+    # FRAUD: Romance scams
+    ["любимая мне нужны деньги на билет чтобы прилететь к тебе переведи на карту", 1],
+    ["i love you but i am stuck at customs please send money to release my package", 1],
+
+    # FRAUD: Crypto / investment platform scams
+    ["ваш криптокошелек скомпрометирован подтвердите seed фразу немедленно", 1],
+    ["confirm your wallet seed phrase now or you will lose access to your crypto", 1],
+    ["инвестируйте в криптовалюту и удвойте деньги за 24 часа переведите биткоин", 1],
+
+    # FRAUD: QR code scams
+    ["отсканируйте qr код для оплаты парковки штраф удвоится если не оплатить сейчас", 1],
+    ["scan this qr code to pay the parking fine immediately or it will double", 1],
+
+    # FRAUD: Charity scams
+    ["помогите пострадавшим от наводнения переведите пожертвование на карту срочно", 1],
+    ["donate now to help earthquake victims click this link to send money", 1],
+
+    # FRAUD: Subscription / free trial scams
+    ["ваша бесплатная подписка заканчивается сегодня введите данные карты чтобы не потерять доступ", 1],
+    ["your free trial ends today enter your card details now to keep access", 1],
+
+    # FRAUD: SIM swap / number deactivation scams
+    ["ваш номер будет отключен через час подтвердите данные по ссылке", 1],
+    ["your sim card will be deactivated confirm your identity now by clicking here", 1],
+
+    # FRAUD: Social media account recovery scams
+    ["ваш инстаграм аккаунт будет удален через 24 часа подтвердите личность по ссылке", 1],
+    ["your whatsapp account will be suspended verify now or lose all your chats", 1],
+    ["ватсап аккаунтыңыз жойылады растау үшін сілтемеге өтіңіз", 1],
+
+    # FRAUD: Fake tax refund scams
+    ["вам одобрен налоговый возврат введите реквизиты карты для получения", 1],
+    ["you are eligible for a tax refund enter your bank details to claim it", 1],
+
+    # FRAUD: Lottery / inheritance from abroad
+    ["вам полагается наследство от дальнего родственника за границей вышлите данные для перевода", 1],
+    ["you have inherited money from a relative abroad send your bank details to claim", 1],
+
     # SAFE examples — expanded and more diverse
     ["привет как дела", 0],
     ["завтра урок математики в 9", 0],
@@ -487,152 +598,31 @@ data = [
     ["кездесу жоспарланды сейсенбіде сағат 14-те", 0],
     ["тапсырысыңыз дайын алып кетуге болады", 0],
     ["your salary has been credited to your account", 0],
+
+    # SAFE: matching everyday counterparts to the new scam categories above,
+    # including safe messages that mention money/bank/subscriptions to help
+    # the model learn those words alone aren't a fraud signal
+    ["спасибо перевод получен вовремя", 0],
+    ["ваша подписка продлена автоматически как обычно", 0],
+    ["your subscription has been renewed successfully thank you", 0],
+    ["напоминание оплатите коммунальные услуги до конца месяца в приложении банка", 0],
+    ["your tax return has been processed and refund issued to your account on file", 0],
+    ["добро пожаловать в клуб лояльности бонусы уже на вашем счету", 0],
+    ["ваш билет на самолет подтвержден вылет завтра в 10 утра", 0],
+    ["антивирус успешно обновлен угроз не найдено", 0],
+    ["your antivirus scan completed no threats found", 0],
+    ["сәлем ертең кездесеміз сағат 5-те", 0],
+    ["қаражат картаңызға сәтті аударылды", 0],
+    ["your instagram password was changed successfully", 0],
+    ["your whatsapp backup completed successfully", 0],
+    ["конференция начнется через 10 минут ссылка в календаре", 0],
+    ["your package qr code is ready show it at the pickup point", 0],
+    ["спасибо за пожертвование фонду мы очень ценим вашу помощь", 0],
+    ["thank you for your donation to the foundation we truly appreciate it", 0],
+    ["ваш кредит одобрен банком менеджер свяжется с вами в течение дня", 0],
+    ["зарплата поступила на карту как обычно", 0],
+    ["сіздің тапсырысыңыз жолға шықты", 0],
 ]
-
-urgent_words = [
-    "срочно", "шұғыл", "быстро", "немедленно", "қазір", "тез",
-    "urgent", "now", "immediately", "asap", "прямо сейчас",
-    "сейчас же", "без промедления"
-]
-secret_words = [
-    "код", "пароль", "cvv", "sms", "құпия", "password",
-    "пин", "pin", "код подтверждения", "verification code",
-    "one time code", "otp"
-]
-money_words = [
-    "карта", "счет", "банк", "ақша", "төле", "оплата", "перевод",
-    "баланс", "средства", "деньги", "transfer", "payment",
-    "wallet", "iban"
-]
-threat_words = [
-    "заблокирована", "удален", "штраф", "угрозой", "бұғатталды", "жабылады",
-    "blocked", "suspended", "terminated", "penalty", "freeze",
-    "ограничен", "будет закрыт"
-]
-suspicious_domain_words = [
-    "login", "verify", "secure", "bonus", "gift",
-    "account", "support", "confirm", "prize", "payment", "wallet",
-    "security", "update", "auth", "free"
-]
-suspicious_zones = [".xyz", ".top", ".click", ".site", ".online", ".live", ".info", ".icu"]
-
-# Known KZ/RU financial & delivery brands commonly impersonated in phishing
-# domains (e.g. "kaspi-login.xyz"). Kept separate from suspicious_domain_words
-# above so a *legitimate* bank.kz / kaspi.kz domain isn't itself flagged as
-# suspicious just for containing the brand name.
-KNOWN_BRANDS = [
-    "kaspi.kz", "halykbank.kz", "sberbank.kz", "sberbank.ru",
-    "tinkoff.ru", "vtb.ru", "egov.kz", "kazpost.kz", "dhl.com",
-]
-
-identity_words = [
-    "паспорт", "иин", "удостоверение", "личность", "identity",
-    "document", "id card", "жсн", "құжат"
-]
-reward_words = [
-    "выиграли", "приз", "бонус", "подарок", "акция", "компенсация",
-    "won", "prize", "gift", "bonus", "reward", "ұтыс", "сыйлық"
-]
-pressure_phrases = [
-    "не говорите никому", "никому не сообщайте", "это секретно",
-    "только сейчас", "последний шанс", "иначе", "do not tell anyone",
-    "last chance", "only now", "қазір ғана"
-]
-
-# =========================
-# FUNCTIONS
-# =========================
-def extract_urls(text):
-    return re.findall(r"https?://[^\s]+|www\.[^\s]+", text.lower())
-
-def get_domain(url):
-    url = url.replace("https://", "").replace("http://", "").replace("www.", "")
-    return url.split("/")[0]
-
-def count_matches(text, words):
-    text = text.lower()
-    return sum(1 for w in words if w in text)
-
-def brand_impersonation(domain):
-    """Returns the brand being impersonated if the domain contains a known
-    brand's name but isn't that brand's real domain (classic phishing pattern
-    like "kaspi-login.xyz"), otherwise None."""
-    for brand in KNOWN_BRANDS:
-        brand_core = brand.split(".")[0]
-        if brand_core in domain and domain != brand and not domain.endswith("." + brand):
-            return brand
-    return None
-
-def domain_flags(d):
-    """Shared list of (label, severity) flags for a single domain, used both
-    for feature extraction and for the Domain analysis display."""
-    flags = []
-    impersonated = brand_impersonation(d)
-    if impersonated:
-        flags.append((f"Impersonates {impersonated}", "critical"))
-    if any(w in d for w in suspicious_domain_words):
-        flags.append(("Suspicious keyword", "warn"))
-    if len(d) > 20:
-        flags.append(("Long domain", "warn"))
-    if any(d.endswith(z) for z in suspicious_zones):
-        flags.append(("Suspicious TLD", "critical"))
-    if any(ch.isdigit() for ch in d):
-        flags.append(("Contains digits", "warn"))
-    return flags
-
-def extract_features(text):
-    text_lower = text.lower()
-    urls = extract_urls(text_lower)
-    domains = [get_domain(u) for u in urls]
-
-    suspicious_domain = 0
-    long_domain = 0
-    suspicious_zone = 0
-    digit_domain = 0
-    brand_flag = 0
-
-    for d in domains:
-        if any(w in d for w in suspicious_domain_words):
-            suspicious_domain = 1
-        if len(d) > 20:
-            long_domain = 1
-        if any(d.endswith(z) for z in suspicious_zones):
-            suspicious_zone = 1
-        if any(ch.isdigit() for ch in d):
-            digit_domain = 1
-        if brand_impersonation(d):
-            brand_flag = 1
-
-    words = text_lower.split()
-    avg_word_len = np.mean([len(w) for w in words]) if words else 0
-
-    return {
-        "has_link": int(len(urls) > 0),
-        "urgent_count": count_matches(text_lower, urgent_words),
-        "secret_count": count_matches(text_lower, secret_words),
-        "money_count": count_matches(text_lower, money_words),
-        "threat_count": count_matches(text_lower, threat_words),
-        "identity_count": count_matches(text_lower, identity_words),
-        "reward_count": count_matches(text_lower, reward_words),
-        "pressure_count": count_matches(text_lower, pressure_phrases),
-        "suspicious_domain": suspicious_domain,
-        "long_domain": long_domain,
-        "suspicious_zone": suspicious_zone,
-        "digit_domain": digit_domain,
-        "brand_flag": brand_flag,
-        "digit_count": sum(ch.isdigit() for ch in text_lower),
-        "exclamation_count": text_lower.count("!"),
-        "uppercase_count": sum(1 for ch in text if ch.isupper()),
-        # FIX: new meaningful features added
-        "text_length": len(text),
-        "word_count": len(words),
-        "avg_word_length": round(avg_word_len, 2),
-        "url_count": len(urls),
-        "has_multiple_warnings": int(
-            count_matches(text_lower, urgent_words) > 0
-            and count_matches(text_lower, threat_words) > 0
-        ),
-    }, domains
 
 def explain(features):
     if lang == "🇰🇿 KZ":
@@ -703,93 +693,11 @@ def explain(features):
     irrelevant = {"text_length", "word_count", "avg_word_length"}
     return [labels[k] for k, v in features.items() if v > 0 and k in labels and k not in irrelevant]
 
-def _compile_word_pattern(words):
-    """One alternation regex per category, longest phrases first so they win over substrings."""
-    escaped = sorted((re.escape(w) for w in words if w), key=len, reverse=True)
-    return re.compile("|".join(escaped), flags=re.IGNORECASE) if escaped else None
-
-HIGHLIGHT_PATTERNS = [
-    (_compile_word_pattern(pressure_phrases), "hl-pressure"),
-    (_compile_word_pattern(threat_words), "hl-threat"),
-    (_compile_word_pattern(secret_words), "hl-secret"),
-    (_compile_word_pattern(reward_words), "hl-reward"),
-    (_compile_word_pattern(identity_words), "hl-identity"),
-    (_compile_word_pattern(urgent_words), "hl-urgent"),
-    (_compile_word_pattern(money_words), "hl-money"),
-]
-LINK_PATTERN = re.compile(r"https?://[^\s]+|www\.[^\s]+", flags=re.IGNORECASE)
-
-def highlight_text(text):
-    """Wrap detected trigger words/links in colored <span> tags for display."""
-    matches = []
-    for pattern, css_class in HIGHLIGHT_PATTERNS:
-        if pattern is None:
-            continue
-        for m in pattern.finditer(text):
-            matches.append((m.start(), m.end(), css_class))
-    for m in LINK_PATTERN.finditer(text):
-        matches.append((m.start(), m.end(), "hl-link"))
-
-    if not matches:
-        return html.escape(text).replace("\n", "<br>")
-
-    matches.sort(key=lambda x: (x[0], -(x[1] - x[0])))
-
-    filtered = []
-    last_end = -1
-    for start, end, css_class in matches:
-        if start >= last_end:
-            filtered.append((start, end, css_class))
-            last_end = end
-
-    pieces = []
-    cursor = 0
-    for start, end, css_class in filtered:
-        if start > cursor:
-            pieces.append(html.escape(text[cursor:start]))
-        pieces.append(f'<span class="{css_class}">{html.escape(text[start:end])}</span>')
-        cursor = end
-    if cursor < len(text):
-        pieces.append(html.escape(text[cursor:]))
-
-    return "".join(pieces).replace("\n", "<br>")
-
 def risk_style(prob):
-    if prob < 0.3:
-        return T["low"], "risk-low", "🟢"
-    if prob < 0.6:
-        return T["mid"], "risk-mid", "🟡"
-    if prob < 0.8:
-        return T["high"], "risk-high", "🟠"
-    return T["critical"], "risk-critical", "🔴"
-
-def rule_boost(features):
-    """
-    Rule-based boost for realistic scam patterns.
-    Capped at 0.30 to prevent runaway scores on safe messages.
-    """
-    boost = 0.0
-    if features["has_link"] and features["secret_count"]:
-        boost += 0.15
-    if features["urgent_count"] and features["money_count"]:
-        boost += 0.12
-    if features["secret_count"] and features["money_count"]:
-        boost += 0.15
-    if features["threat_count"] and features["has_link"]:
-        boost += 0.10
-    if features["reward_count"] and features["money_count"]:
-        boost += 0.12
-    if features["pressure_count"]:
-        boost += 0.10
-    if features["suspicious_zone"] or features["suspicious_domain"]:
-        boost += 0.10
-    if features["brand_flag"]:
-        boost += 0.15
-    if features["has_multiple_warnings"]:
-        boost += 0.08
-    if features["url_count"] > 1:
-        boost += 0.05
-    return min(boost, 0.30)  # FIX: cap boost so safe messages aren't over-flagged
+    """Thin wrapper over fraud_logic.risk_level() that resolves the level
+    key to the current UI language's translated label."""
+    level_key, css_class, emoji = risk_level(prob)
+    return T[level_key], css_class, emoji
 
 def render_risk_meter(prob, threshold, title):
     """Pure CSS/HTML risk meter (no charting library needed): a gradient
@@ -820,16 +728,17 @@ def train_models(feature_schema):
     changing, not on a helper it calls; without this, adding/removing a
     feature (like brand_flag) silently leaves a stale cached model with
     the wrong number of columns, causing a ValueError at predict time."""
-    rows, labels = [], []
+    rows, labels, texts = [], [], []
     for text, label in data:
         f, _ = extract_features(text)
         rows.append(f)
         labels.append(label)
+        texts.append(text)
 
     X_train = pd.DataFrame(rows)
     y_train = np.array(labels)
 
-    # FIX: Use ensemble of 3 models for more reliable predictions
+    # Ensemble of 4 models for more reliable predictions
     lr_model = Pipeline([
         ("scaler", StandardScaler()),
         ("clf", LogisticRegression(C=1.0, max_iter=1000, random_state=42))
@@ -847,22 +756,34 @@ def train_models(feature_schema):
     rf_model.fit(X_train, y_train)
     gb_model.fit(X_train, y_train)
 
+    # 4th ensemble member: learns fraud-indicative language directly from the
+    # training text (word/bigram frequencies) instead of only scoring against
+    # the hand-curated keyword lists above — this is what lets the system
+    # catch scam phrasing that isn't in any of those lists.
+    tfidf_model = Pipeline([
+        ("tfidf", TfidfVectorizer(ngram_range=(1, 2), min_df=1, lowercase=True)),
+        ("clf", MultinomialNB())
+    ])
+    tfidf_model.fit(texts, y_train)
+
     # Cross-validation accuracy for each model (3-fold: dataset is small, keeps startup fast)
     lr_cv = cross_val_score(lr_model, X_train, y_train, cv=3, scoring="accuracy").mean()
     rf_cv = cross_val_score(rf_model, X_train, y_train, cv=3, scoring="accuracy").mean()
     gb_cv = cross_val_score(gb_model, X_train, y_train, cv=3, scoring="accuracy").mean()
+    tfidf_cv = cross_val_score(tfidf_model, texts, y_train, cv=3, scoring="accuracy").mean()
 
     metrics = {
         "Logistic Regression": round(lr_cv * 100, 1),
         "Random Forest": round(rf_cv * 100, 1),
         "Gradient Boosting": round(gb_cv * 100, 1),
+        "Text Patterns (TF-IDF)": round(tfidf_cv * 100, 1),
     }
 
-    return lr_model, rf_model, gb_model, metrics, X_train, y_train
+    return lr_model, rf_model, gb_model, tfidf_model, metrics, X_train, y_train
 
 
 FEATURE_SCHEMA = tuple(sorted(extract_features("")[0].keys()))
-lr_model, rf_model, gb_model, model_metrics, X_train, y_train = train_models(FEATURE_SCHEMA)
+lr_model, rf_model, gb_model, tfidf_model, model_metrics, X_train, y_train = train_models(FEATURE_SCHEMA)
 
 # =========================
 # UI STYLE
@@ -1573,7 +1494,7 @@ with st.sidebar:
 
     st.divider()
     with st.expander(f"🛠️ {T['dev_stack']}"):
-        for item in ["Ensemble (LR + RF + GB)", "Feature Engineering", "Domain Analysis",
+        for item in ["Ensemble (LR + RF + GB + TF-IDF/NB)", "Feature Engineering", "Domain Analysis",
                      "Explainable AI", "Rule-based Risk Boost", "Real-life Scam Scenarios"]:
             st.markdown(f"• {item}")
 
@@ -1602,7 +1523,35 @@ st.markdown(f"""
         <div class="hero-panel">
             <div class="hero-panel-title">Prototype readiness</div>
             <div class="hero-panel-value">Demo-ready</div>
-            <div class="hero-panel-small">Analyzes text, links, pressure words, secret-code requests and suspicious domains using an ensemble of 3 ML models.</div>
+            <div class="hero-panel-small">Analyzes text, links, pressure words, secret-code requests and suspicious domains using an ensemble of 4 ML models.</div>
+        </div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+# =========================
+# IMPACT / STATS BANNER
+# =========================
+_avg_acc = round(sum(model_metrics.values()) / len(model_metrics), 1)
+
+st.markdown(f"""
+<div class="metrics-bar">
+    <div class="metrics-row">
+        <div class="metrics-item">
+            <div class="metrics-item-val">{len(data)}</div>
+            <div class="metrics-item-label">{T['stat_examples']}</div>
+        </div>
+        <div class="metrics-item">
+            <div class="metrics-item-val">14+</div>
+            <div class="metrics-item-label">{T['stat_categories']}</div>
+        </div>
+        <div class="metrics-item">
+            <div class="metrics-item-val">{_avg_acc}%</div>
+            <div class="metrics-item-label">{T['stat_accuracy']}</div>
+        </div>
+        <div class="metrics-item">
+            <div class="metrics-item-val">3</div>
+            <div class="metrics-item-label">{T['stat_languages']}</div>
         </div>
     </div>
 </div>
@@ -1734,7 +1683,8 @@ if mode == "batch" and batch_go:
                 lr_p = lr_model.predict_proba(X_batch)[:, 1]
                 rf_p = rf_model.predict_proba(X_batch)[:, 1]
                 gb_p = gb_model.predict_proba(X_batch)[:, 1]
-                raw_p = (lr_p + rf_p + gb_p) / 3.0
+                tfidf_p = tfidf_model.predict_proba(texts)[:, 1]
+                raw_p = (lr_p + rf_p + gb_p + tfidf_p) / 4.0
                 boosts = np.array([rule_boost(f) for f in feats_list])
                 probs = np.minimum(0.99, raw_p + boosts)
 
@@ -1786,11 +1736,12 @@ if mode != "batch" and analyze:
         features, domains = extract_features(input_text)
         X_input = pd.DataFrame([features])
 
-        # Ensemble prediction — average probabilities from all 3 models
+        # Ensemble prediction — average probabilities from all 4 models
         lr_prob = float(lr_model.predict_proba(X_input)[0][1])
         rf_prob = float(rf_model.predict_proba(X_input)[0][1])
         gb_prob = float(gb_model.predict_proba(X_input)[0][1])
-        raw_prob = (lr_prob + rf_prob + gb_prob) / 3.0
+        tfidf_prob = float(tfidf_model.predict_proba([input_text])[0][1])
+        raw_prob = (lr_prob + rf_prob + gb_prob + tfidf_prob) / 4.0
 
         boost = rule_boost(features)
         prob = min(0.99, raw_prob + boost)
@@ -1811,6 +1762,7 @@ if mode != "batch" and analyze:
             "lr_prob": lr_prob,
             "rf_prob": rf_prob,
             "gb_prob": gb_prob,
+            "tfidf_prob": tfidf_prob,
             "raw_prob": raw_prob,
             "boost": boost,
             "prob": prob,
@@ -1849,7 +1801,7 @@ if mode != "batch" and "last_result" in st.session_state:
     c1.markdown(f'<div class="metric-card"><div class="metric-icon">%</div><div class="metric-label">{T["risk"]}</div><div class="metric-value">{r["prob"]*100:.1f}%</div></div>', unsafe_allow_html=True)
     c2.markdown(f'<div class="metric-card"><div class="metric-icon">⚠️</div><div class="metric-label">{T["detected"]}</div><div class="metric-value">{len(r["explanations"])}</div></div>', unsafe_allow_html=True)
     c3.markdown(f'<div class="metric-card"><div class="metric-icon">🎚️</div><div class="metric-label">{T["threshold"]}</div><div class="metric-value">{r["threshold"]:.2f}</div></div>', unsafe_allow_html=True)
-    c4.markdown(f'<div class="metric-card"><div class="metric-icon">🧠</div><div class="metric-label">{T["model"]}</div><div class="metric-value">3-way</div></div>', unsafe_allow_html=True)
+    c4.markdown(f'<div class="metric-card"><div class="metric-icon">🧠</div><div class="metric-label">{T["model"]}</div><div class="metric-value">4-way</div></div>', unsafe_allow_html=True)
     st.caption(f"ℹ️ {T['model_help']}")
 
     st.markdown(f'<div class="{r["risk_class"]}">{r["emoji"]} {r["risk_label"]}</div>', unsafe_allow_html=True)
@@ -1896,10 +1848,20 @@ if mode != "batch" and "last_result" in st.session_state:
     with chart_col2:
         st.markdown(f"**{T['model_compare']}**")
         model_df = pd.DataFrame(
-            {"Probability (%)": [r["lr_prob"] * 100, r["rf_prob"] * 100, r["gb_prob"] * 100]},
-            index=["Logistic Regression", "Random Forest", "Gradient Boosting"],
+            {"Probability (%)": [r["lr_prob"] * 100, r["rf_prob"] * 100, r["gb_prob"] * 100, r["tfidf_prob"] * 100]},
+            index=["Logistic Regression", "Random Forest", "Gradient Boosting", "Text Patterns (TF-IDF)"],
         )
         st.bar_chart(model_df, height=220)
+
+        probs_spread = max(r["lr_prob"], r["rf_prob"], r["gb_prob"], r["tfidf_prob"]) - \
+            min(r["lr_prob"], r["rf_prob"], r["gb_prob"], r["tfidf_prob"])
+        if probs_spread < 0.15:
+            agreement_msg = T["agreement_high"]
+        elif probs_spread < 0.35:
+            agreement_msg = T["agreement_mid"]
+        else:
+            agreement_msg = T["agreement_low"]
+        st.caption(f"**{T['agreement_title']}:** {agreement_msg}")
 
     tab1, tab2, tab3, tab4 = st.tabs([
         T["explain_tab"],
@@ -1958,6 +1920,33 @@ if mode != "batch" and "last_result" in st.session_state:
         }).sort_values("Importance", ascending=False)
         st.dataframe(imp_df, use_container_width=True, hide_index=True)
 
+        # Words the TF-IDF/Naive Bayes model learned directly from the
+        # training text — not from the hand-curated keyword lists above.
+        st.subheader(T["learned_words"])
+        vectorizer = tfidf_model.named_steps["tfidf"]
+        nb = tfidf_model.named_steps["clf"]
+        vocab = np.array(vectorizer.get_feature_names_out())
+        log_ratio = nb.feature_log_prob_[1] - nb.feature_log_prob_[0]
+        top_n = min(10, len(vocab))
+        top_fraud_idx = np.argsort(log_ratio)[-top_n:][::-1]
+        top_safe_idx = np.argsort(log_ratio)[:top_n]
+
+        lw1, lw2 = st.columns(2)
+        with lw1:
+            st.markdown(f"**{T['learned_fraud_words']}**")
+            chips = "".join(
+                f'<span class="feature-chip" style="background:#fee2e2;color:#991b1b;border-color:#fecaca;">{w}</span>'
+                for w in vocab[top_fraud_idx]
+            )
+            st.markdown(chips, unsafe_allow_html=True)
+        with lw2:
+            st.markdown(f"**{T['learned_safe_words']}**")
+            chips = "".join(
+                f'<span class="feature-chip" style="background:#dcfce7;color:#166534;border-color:#bbf7d0;">{w}</span>'
+                for w in vocab[top_safe_idx]
+            )
+            st.markdown(chips, unsafe_allow_html=True)
+
     with tab2:
         st.subheader(T["vector"])
         display_df = X_input.T.reset_index()
@@ -1985,7 +1974,9 @@ ANALYSIS RESULTS:
 Logistic Regression probability: {r["lr_prob"]*100:.1f}%
 Random Forest probability:       {r["rf_prob"]*100:.1f}%
 Gradient Boosting probability:   {r["gb_prob"]*100:.1f}%
+Text Patterns (TF-IDF) probability: {r["tfidf_prob"]*100:.1f}%
 Ensemble average (raw):          {r["raw_prob"]*100:.1f}%
+Model agreement spread:          {(max(r["lr_prob"], r["rf_prob"], r["gb_prob"], r["tfidf_prob"]) - min(r["lr_prob"], r["rf_prob"], r["gb_prob"], r["tfidf_prob"]))*100:.1f} pts
 Rule boost applied:              +{r["boost"]*100:.1f}%
 Final fraud risk:                {r["prob"]*100:.1f}%
 Risk level:                      {r["risk_label"]}
@@ -2013,10 +2004,16 @@ SECURITY ADVICE:
                 "logistic_regression": round(r["lr_prob"], 4),
                 "random_forest": round(r["rf_prob"], 4),
                 "gradient_boosting": round(r["gb_prob"], 4),
+                "text_patterns_tfidf": round(r["tfidf_prob"], 4),
                 "ensemble_raw": round(r["raw_prob"], 4),
                 "rule_boost": round(r["boost"], 4),
                 "final": round(r["prob"], 4),
             },
+            "model_agreement_spread": round(
+                max(r["lr_prob"], r["rf_prob"], r["gb_prob"], r["tfidf_prob"])
+                - min(r["lr_prob"], r["rf_prob"], r["gb_prob"], r["tfidf_prob"]),
+                4,
+            ),
             "threshold": r["threshold"],
             "prediction": "FRAUD" if r["pred"] == 1 else "SAFE",
             "risk_level": r["risk_label"],
@@ -2067,10 +2064,30 @@ SECURITY ADVICE:
 # =========================
 with st.expander(f"📘 {T['how']}"):
     if lang == "🇰🇿 KZ":
-        st.write("1. Мәтіннен 20 белгі алынады. 2. Олар сандық векторға айналады. 3. 3 ML модель ықтималдық есептейді. 4. Ереже күшейткіш қолданылады. 5. Сайт нәтиже мен кеңес береді.")
+        st.write("1. Мәтіннен 20 белгі алынады. 2. Олар сандық векторға айналады. 3. 4 ML модель (соның ішінде мәтіннен сөз үлгілерін үйренетін TF-IDF моделі) ықтималдық есептейді. 4. Ереже күшейткіш қолданылады. 5. Сайт нәтиже мен кеңес береді.")
     elif lang == "🇷🇺 RU":
-        st.write("1. Из текста извлекаются 20 признаков. 2. Они превращаются в числовой вектор. 3. 3 модели ML считают вероятность мошенничества. 4. Применяется ансамблирование и правило-буст. 5. Сайт показывает результат и совет по безопасности.")
+        st.write("1. Из текста извлекаются 20 признаков. 2. Они превращаются в числовой вектор. 3. 4 модели ML (включая TF-IDF модель, которая учится на словах самого текста) считают вероятность мошенничества. 4. Применяется ансамблирование и правило-буст. 5. Сайт показывает результат и совет по безопасности.")
     else:
-        st.write("1. 20 features are extracted from the text. 2. They are converted into a numeric vector. 3. Three ML models (LR, RF, GB) independently predict fraud probability. 4. Probabilities are averaged and a rule-based boost is applied. 5. The app shows the result, explanation, and safety advice.")
+        st.write("1. 20 features are extracted from the text. 2. They are converted into a numeric vector. 3. Four ML models (LR, RF, GB, plus a TF-IDF/Naive Bayes model that learns word patterns directly from the text) independently predict fraud probability. 4. Probabilities are averaged and a rule-based boost is applied. 5. The app shows the result, explanation, and safety advice.")
+
+# =========================
+# METHODOLOGY / MODEL CARD
+# =========================
+with st.expander(f"📋 {T['methodology_title']}"):
+    fraud_n = sum(1 for _, lbl in data if lbl == 1)
+    safe_n = sum(1 for _, lbl in data if lbl == 0)
+    avg_acc = round(sum(model_metrics.values()) / len(model_metrics), 1)
+
+    st.markdown(f"#### {T['methodology_dataset_title']}")
+    st.markdown(T["methodology_dataset_body"].format(total=len(data), fraud=fraud_n, safe=safe_n))
+
+    st.markdown(f"#### {T['methodology_models_title']}")
+    st.markdown(T["methodology_models_body"].format(avg_acc=avg_acc))
+
+    st.markdown(f"#### {T['methodology_limitations_title']}")
+    st.markdown(T["methodology_limitations_body"])
+
+    st.markdown(f"#### {T['methodology_ethics_title']}")
+    st.markdown(T["methodology_ethics_body"])
 
 st.markdown(f'<div class="footer">{T["footer"]} · Ensemble ML · {datetime.now().year}</div>', unsafe_allow_html=True)
