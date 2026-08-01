@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>AI Fraud Detector</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <img src="icons/icon48.png" alt="">
+    <div>
+      <div class="title">AI Fraud Detector</div>
+      <div class="subtitle">Runs locally — nothing leaves your device</div>
+    </div>
+  </header>
+
+  <textarea id="input" placeholder="Paste a suspicious SMS, message, or call transcript…"></textarea>
+  <button id="analyzeBtn">🚀 Analyze</button>
+
+  <div id="result" class="result hidden">
+    <div id="riskBanner" class="risk-banner"></div>
+    <div id="advice" class="advice"></div>
+    <div id="reasons" class="reasons"></div>
+    <div id="domains" class="domains"></div>
+  </div>
+
+  <footer>Lightweight rule-based prototype — not a certified security tool.</footer>
+
+  <script src="detector.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

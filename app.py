@@ -4,6 +4,7 @@ import html
 import numpy as np
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 from datetime import datetime
 from pathlib import Path
 import base64
@@ -22,6 +23,42 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# =========================
+# PWA SUPPORT (installable "Add to Home Screen" on mobile)
+# =========================
+# Streamlit renders st.markdown into the page body, not the document <head>,
+# so a manifest link / theme-color meta / service worker registration can
+# only be added by reaching into window.parent.document from inside a
+# components.html iframe.
+components.html("""
+<script>
+(function () {
+    const doc = window.parent.document;
+    if (!doc.querySelector('link[rel="manifest"]')) {
+        const link = doc.createElement('link');
+        link.rel = 'manifest';
+        link.href = 'app/static/manifest.json';
+        doc.head.appendChild(link);
+    }
+    if (!doc.querySelector('meta[name="theme-color"]')) {
+        const meta = doc.createElement('meta');
+        meta.name = 'theme-color';
+        meta.content = '#2563eb';
+        doc.head.appendChild(meta);
+    }
+    if (!doc.querySelector('link[rel="apple-touch-icon"]')) {
+        const appleIcon = doc.createElement('link');
+        appleIcon.rel = 'apple-touch-icon';
+        appleIcon.href = 'app/static/icon.png';
+        doc.head.appendChild(appleIcon);
+    }
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('app/static/sw.js').catch(function () {});
+    }
+})();
+</script>
+""", height=0, width=0)
 
 # =========================
 # LOGO HELPER
