@@ -4,7 +4,6 @@ import html
 import numpy as np
 import pandas as pd
 import streamlit as st
-import plotly.graph_objects as go
 from datetime import datetime
 from pathlib import Path
 import base64
@@ -742,59 +741,23 @@ def rule_boost(features):
         boost += 0.05
     return min(boost, 0.30)  # FIX: cap boost so safe messages aren't over-flagged
 
-def make_gauge_chart(prob, threshold, title):
-    fig = go.Figure(go.Indicator(
-        mode="gauge+number",
-        value=prob * 100,
-        number={"suffix": "%", "font": {"size": 36}},
-        title={"text": title, "font": {"size": 15}},
-        gauge={
-            "axis": {"range": [0, 100], "tickwidth": 1},
-            "bar": {"color": "#0f172a"},
-            "steps": [
-                {"range": [0, 30], "color": "#dcfce7"},
-                {"range": [30, 60], "color": "#fef9c3"},
-                {"range": [60, 80], "color": "#ffedd5"},
-                {"range": [80, 100], "color": "#fee2e2"},
-            ],
-            "threshold": {
-                "line": {"color": "#dc2626", "width": 4},
-                "thickness": 0.85,
-                "value": threshold * 100,
-            },
-        },
-    ))
-    fig.update_layout(height=250, margin=dict(l=20, r=20, t=50, b=10), paper_bgcolor="rgba(0,0,0,0)")
-    return fig
-
-def make_model_bar_chart(lr_prob, rf_prob, gb_prob, title):
-    values = [lr_prob * 100, rf_prob * 100, gb_prob * 100]
-    fig = go.Figure(go.Bar(
-        x=["Logistic Regression", "Random Forest", "Gradient Boosting"],
-        y=values,
-        marker_color=["#2563eb", "#14b8a6", "#7c3aed"],
-        text=[f"{v:.1f}%" for v in values],
-        textposition="outside",
-    ))
-    fig.update_layout(
-        title=title,
-        yaxis=dict(range=[0, 100], title="Probability (%)"),
-        height=280,
-        margin=dict(l=20, r=20, t=50, b=10),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-    )
-    return fig
-
-def make_batch_summary_chart(fraud_count, safe_count, title):
-    fig = go.Figure(go.Pie(
-        labels=[title[0], title[1]],
-        values=[fraud_count, safe_count],
-        marker_colors=["#dc2626", "#16a34a"],
-        hole=0.55,
-    ))
-    fig.update_layout(height=280, margin=dict(l=20, r=20, t=30, b=10), paper_bgcolor="rgba(0,0,0,0)")
-    return fig
+def render_risk_meter(prob, threshold, title):
+    """Pure CSS/HTML risk meter (no charting library needed): a gradient
+    track from green to red, a pointer at the current score, and a dashed
+    line marking the decision threshold."""
+    pct = max(0.0, min(1.0, prob)) * 100
+    threshold_pct = max(0.0, min(1.0, threshold)) * 100
+    return f"""
+    <div class="meter-wrap">
+        <div class="meter-title">{title}</div>
+        <div class="meter-track">
+            <div class="meter-value-label" style="left:{pct:.1f}%;">{pct:.0f}%</div>
+            <div class="meter-pointer" style="left:{pct:.1f}%;"></div>
+            <div class="meter-threshold-line" style="left:{threshold_pct:.1f}%;"></div>
+        </div>
+        <div class="meter-scale"><span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span></div>
+    </div>
+    """
 
 # =========================
 # TRAIN MODELS (ENSEMBLE)
@@ -856,10 +819,8 @@ lr_model, rf_model, gb_model, model_metrics, X_train, y_train = train_models(FEA
 # =========================
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
-
 html, body, [class*="css"] {
-    font-family: 'Inter', sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
 .stApp {
@@ -1166,6 +1127,68 @@ html, body, [class*="css"] {
     font-size: 13px;
     font-weight: 600;
     line-height: 1.5;
+}
+
+.meter-wrap {
+    padding: 10px 6px 4px 6px;
+}
+
+.meter-title {
+    font-size: 13px;
+    font-weight: 750;
+    color: #475569;
+    margin-bottom: 22px;
+}
+
+.meter-track {
+    position: relative;
+    height: 22px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #22c55e 0%, #eab308 35%, #f97316 65%, #ef4444 100%);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    overflow: visible;
+}
+
+.meter-pointer {
+    position: absolute;
+    top: -3px;
+    width: 4px;
+    height: 28px;
+    background: #0f172a;
+    border-radius: 2px;
+    transform: translateX(-2px);
+    box-shadow: 0 0 0 2px #ffffff;
+}
+
+.meter-threshold-line {
+    position: absolute;
+    top: -6px;
+    height: 34px;
+    border-left: 2px dashed #334155;
+    opacity: 0.85;
+}
+
+.meter-value-label {
+    position: absolute;
+    top: -30px;
+    transform: translateX(-50%);
+    font-weight: 900;
+    font-size: 13px;
+    color: #0f172a;
+    background: #ffffff;
+    padding: 2px 8px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    white-space: nowrap;
+}
+
+.meter-scale {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 8px;
+    font-size: 11px;
+    color: #94a3b8;
+    font-weight: 700;
 }
 
 @media (max-width: 640px) {
@@ -1697,10 +1720,11 @@ if mode == "batch" and batch_go:
                         use_container_width=True,
                     )
                 with bc2:
-                    st.plotly_chart(
-                        make_batch_summary_chart(fraud_n, safe_n, (T["fraud_count"], T["safe_count"])),
-                        use_container_width=True,
+                    summary_df = pd.DataFrame(
+                        {"Count": [fraud_n, safe_n]},
+                        index=[T["fraud_count"], T["safe_count"]],
                     )
+                    st.bar_chart(summary_df, height=220)
 
 # =========================
 # ANALYSIS
@@ -1818,9 +1842,14 @@ if mode != "batch" and "last_result" in st.session_state:
 
     chart_col1, chart_col2 = st.columns(2)
     with chart_col1:
-        st.plotly_chart(make_gauge_chart(r["prob"], r["threshold"], T["gauge_title"]), use_container_width=True)
+        st.markdown(render_risk_meter(r["prob"], r["threshold"], T["gauge_title"]), unsafe_allow_html=True)
     with chart_col2:
-        st.plotly_chart(make_model_bar_chart(r["lr_prob"], r["rf_prob"], r["gb_prob"], T["model_compare"]), use_container_width=True)
+        st.markdown(f"**{T['model_compare']}**")
+        model_df = pd.DataFrame(
+            {"Probability (%)": [r["lr_prob"] * 100, r["rf_prob"] * 100, r["gb_prob"] * 100]},
+            index=["Logistic Regression", "Random Forest", "Gradient Boosting"],
+        )
+        st.bar_chart(model_df, height=220)
 
     tab1, tab2, tab3, tab4 = st.tabs([
         T["explain_tab"],
