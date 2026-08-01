@@ -48,11 +48,21 @@ st.set_page_config(
 # page still showed Streamlit Cloud's own manifest/icon). window.top always
 # jumps straight to the true outermost document regardless of nesting depth.
 #
+# IMPORTANT #2: don't hardcode "/app/static/..." as an absolute, root-relative
+# path. Streamlit Community Cloud proxies the actual app (including static
+# files) only under an internal "/~/+/" path prefix — a request to the bare
+# "/app/static/icon.png" at the domain root gets swallowed by Streamlit
+# Cloud's own routing and returns its wrapper HTML instead of our file
+# (confirmed with a direct fetch against a live deployment: 200 OK but
+# text/html, not image/png). That prefix is Cloud-specific and doesn't exist
+# on Codespaces/self-hosted, so hardcoding it would break those instead.
+# Fix: resolve the static path against window.parent.location — the actual
+# app iframe's own URL — which already contains whatever prefix the current
+# host needs, then use that fully-resolved absolute URL on window.top's tags.
+#
 # Hosts like Streamlit Community Cloud inject their OWN <link rel="manifest">
 # / favicon tags for their platform branding, so this must forcibly replace
 # any existing tags rather than skip-if-present, or our icon never wins.
-# Paths use a leading slash (absolute from site root) since a relative path
-# can resolve incorrectly behind a hosting proxy (e.g. Codespaces).
 #
 # Bump this whenever the icon/manifest content changes. Browsers (especially
 # iOS Safari) cache favicons/manifests very aggressively, sometimes
@@ -60,41 +70,46 @@ st.set_page_config(
 # forces a fresh fetch instead of relying on the user to clear their cache.
 # If you change static/manifest.json or static/icon.png, bump this AND the
 # matching "?v=" inside static/manifest.json's own icon entries.
-PWA_ASSET_VERSION = "2"
+PWA_ASSET_VERSION = "3"
 
 components.html("""
 <script>
 (function () {
-    const doc = window.top.document;
+    const topDoc = window.top.document;
     const v = "__PWA_VERSION__";
+    const baseHref = window.parent.location.href;
 
-    function setLink(rel, href, type) {
-        doc.querySelectorAll('link[rel="' + rel + '"]').forEach(function (el) {
-            el.remove();
-        });
-        const link = doc.createElement('link');
-        link.rel = rel;
-        link.href = href + '?v=' + v;
-        if (type) link.type = type;
-        doc.head.appendChild(link);
+    function resolvedUrl(path) {
+        return new URL(path, baseHref).href + '?v=' + v;
     }
 
-    setLink('manifest', '/app/static/manifest.json');
-    setLink('icon', '/app/static/icon.png', 'image/png');
-    setLink('shortcut icon', '/app/static/icon.png', 'image/png');
-    setLink('alternate icon', '/app/static/icon.png', 'image/png');
-    setLink('apple-touch-icon', '/app/static/icon.png');
+    function setLink(rel, path, type) {
+        topDoc.querySelectorAll('link[rel="' + rel + '"]').forEach(function (el) {
+            el.remove();
+        });
+        const link = topDoc.createElement('link');
+        link.rel = rel;
+        link.href = resolvedUrl(path);
+        if (type) link.type = type;
+        topDoc.head.appendChild(link);
+    }
 
-    doc.querySelectorAll('meta[name="theme-color"]').forEach(function (el) {
+    setLink('manifest', 'app/static/manifest.json');
+    setLink('icon', 'app/static/icon.png', 'image/png');
+    setLink('shortcut icon', 'app/static/icon.png', 'image/png');
+    setLink('alternate icon', 'app/static/icon.png', 'image/png');
+    setLink('apple-touch-icon', 'app/static/icon.png');
+
+    topDoc.querySelectorAll('meta[name="theme-color"]').forEach(function (el) {
         el.remove();
     });
-    const meta = doc.createElement('meta');
+    const meta = topDoc.createElement('meta');
     meta.name = 'theme-color';
     meta.content = '#2563eb';
-    doc.head.appendChild(meta);
+    topDoc.head.appendChild(meta);
 
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/app/static/sw.js?v=' + v).catch(function () {});
+        navigator.serviceWorker.register(resolvedUrl('app/static/sw.js')).catch(function () {});
     }
 })();
 </script>
