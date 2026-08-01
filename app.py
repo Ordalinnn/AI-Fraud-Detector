@@ -380,6 +380,47 @@ data = [
     ["apple id disabled tap to verify before your account is permanently closed", 1],
     ["google security alert someone tried to access your account verify now", 1],
 
+    # FRAUD: Business email compromise — impersonating a boss or vendor to
+    # rush an urgent payment (FBI IC3 2025: among the top scam categories by
+    # dollar losses)
+    ["срочно оплатите счет поставщику иначе сорвется важная сделка перевод сегодня", 1],
+    ["this is the ceo i need you to process an urgent wire transfer today confidentially", 1],
+    ["please update the vendor bank account details before today's payment run", 1],
+    ["бухгалтерия смените реквизиты поставщика и переведите оплату срочно сегодня", 1],
+
+    # FRAUD: AI-generated deepfake investment videos (FBI IC3 2025 added
+    # "AI-related" as a new formal crime category; also reported in
+    # Kazakhstan as deepfakes of public figures promoting fake investments)
+    ["посмотрите видео известного бизнесмена он лично приглашает вложить деньги и утроить их", 1],
+    ["watch this exclusive video where a famous investor personally invites you to triple your money", 1],
+    ["белгілі бизнесмен бейнеролда ақшаңызды үш еседе өсіруге шақырады сілтеме арқылы тіркеліңіз", 1],
+
+    # FRAUD: Fake courier demanding the SMS code at the door (reported in
+    # Kazakhstan as fake couriers claiming to be from Kaspi.kz)
+    ["курьер kaspi доставляет посылку назовите код из смс чтобы подтвердить получение", 1],
+    ["delivery courier at your door needs the sms code to confirm you received the package", 1],
+
+    # FRAUD: Expiring rewards points (FTC-reported pattern)
+    ["ваши бонусные баллы сгорают сегодня войдите по ссылке чтобы успеть их использовать", 1],
+    ["your reward points expire tonight click here before you lose them forever", 1],
+
+    # FRAUD: Traffic violation QR code scam (FTC-reported pattern: fake
+    # official notice with a QR code demanding immediate payment)
+    ["штраф за нарушение пдд отсканируйте qr код и оплатите сегодня во избежание суда", 1],
+    ["unpaid traffic ticket scan this qr code now to avoid court action", 1],
+
+    # FRAUD: Fake "verify you're human" instructions (FTC-reported pattern
+    # mimicking CAPTCHA checks to trick users into running malicious steps)
+    ["подтвердите что вы не робот и следуйте инструкциям чтобы получить доступ к файлу", 1],
+    ["verify you are human by following these steps to unlock your download", 1],
+
+    # FRAUD: QR code swapped at a physical location (table, parking meter)
+    ["scan the qr code on the table to pay your bill and get a discount today only", 1],
+
+    # FRAUD: Bank bonus-exchange phishing (reported in Kazakhstan
+    # impersonating Halyk Bank)
+    ["обменяйте бонусы halyk bank на деньги перейдите по ссылке и подтвердите карту", 1],
+
     # SAFE examples — expanded and more diverse
     ["привет как дела", 0],
     ["завтра урок математики в 9", 0],
@@ -471,6 +512,24 @@ data = [
     ["ваш заказ на маркетплейсе подтвержден продавцом", 0],
     ["thanks for shopping with us your receipt is attached", 0],
     ["сіздің кездесуіңіз сағат 10-да басталады", 0],
+
+    # SAFE: matching counterparts to the real-world-grounded categories above
+    ["счет поставщика оплачен по обычному графику согласно договору", 0],
+    ["the vendor invoice was approved and will be paid on the usual schedule", 0],
+    ["записал новые банковские реквизиты поставщика после звонка с бухгалтерией для сверки", 0],
+    ["записала видео с советами по инвестициям для канала выйдет завтра", 0],
+    ["thanks for watching my finance channel new episode drops next week", 0],
+    ["курьер оставил посылку на ресепшене можно забрать в любое время", 0],
+    ["the courier delivered your package to the front desk no code needed", 0],
+    ["ваши бонусные баллы за этот месяц уже начислены на счет", 0],
+    ["your reward points balance was updated after your last purchase", 0],
+    ["штраф оплачен через приложение банка чек сохранен", 0],
+    ["your traffic ticket payment was confirmed by the city portal", 0],
+    ["антивирус попросил подтвердить что вы не робот перед обновлением базы", 0],
+    ["please complete the captcha to continue browsing our website", 0],
+    ["меню кафе доступно по qr коду на столе оплата на кассе", 0],
+    ["scan the table qr code to view today's menu no payment needed here", 0],
+    ["бонусы halyk bank автоматически зачисляются на карту раз в месяц", 0],
 ]
 
 def explain(features):
@@ -1398,7 +1457,7 @@ st.markdown(f"""
             <div class="metrics-item-label">{T['stat_examples']}</div>
         </div>
         <div class="metrics-item">
-            <div class="metrics-item-val">14+</div>
+            <div class="metrics-item-val">17+</div>
             <div class="metrics-item-label">{T['stat_categories']}</div>
         </div>
         <div class="metrics-item">
