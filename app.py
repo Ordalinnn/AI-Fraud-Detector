@@ -992,6 +992,158 @@ data = [
     ["картаны қорғау үшін телефонды терминалға апарыңыз нұсқауды орындаңыз", 1],
     ["операцияны болдырмау үшін телефонды pos терминалға тигізіңіз", 1],
 
+    # =========================
+    # MORE REAL-WORLD-GROUNDED CATEGORIES: additional reported scam patterns
+    # (FTC, FBI IC3, CFPB, SSA-OIG, US Marshals, FCC, Action Fraud UK,
+    # Airbnb/Booking trust & safety, BBB Scam Tracker) not yet covered above
+    # =========================
+
+    # FRAUD: Grandparent bail-money scam — classic elder fraud reported by
+    # the FTC where a caller pretends to be a grandchild arrested and in
+    # need of bail money, pressuring secrecy from other family members
+    ["бабушка это я меня арестовали пришли деньги на залог никому не говори", 1],
+    ["grandma it's me i got arrested please wire bail money and don't tell mom and dad", 1],
+    ["внучок попал в беду нужны деньги на адвоката срочно и тихо", 1],
+
+    # FRAUD: Fake mystery-shopper / check-cashing scam — FTC-reported pattern
+    # where the victim is mailed a check to deposit, then asked to wire back
+    # part of it before the check is discovered to be fake
+    ["поздравляем вы приняты тайным покупателем обналичьте чек и переведите часть суммы обратно", 1],
+    ["congratulations you're hired as a mystery shopper deposit this check and wire back the difference", 1],
+
+    # FRAUD: Puppy / pet adoption scam — Better Business Bureau's most
+    # commonly reported online purchase scam, demanding extra fees before
+    # the pet is ever shipped
+    ["щенок ждет вас оплатите доставку и страховку перед отправкой", 1],
+    ["your puppy is ready for shipping pay the crate and insurance fee first", 1],
+
+    # FRAUD: Fake vacation rental listing scam — FTC-reported pattern of a
+    # too-good listing that only accepts wire transfer or gift cards
+    ["отличная квартира на побережье переведите предоплату сегодня чтобы забронировать", 1],
+    ["amazing beachfront rental wire the deposit today by bank transfer only to secure it", 1],
+
+    # FRAUD: IRS/tax authority gift-card scam — IRS.gov consumer alert: a
+    # caller claims back taxes are owed and demands payment in gift cards
+    ["налоговая служба вы задолжали оплатите штраф подарочными картами немедленно", 1],
+    ["this is the irs you owe back taxes pay immediately with gift cards or be arrested", 1],
+
+    # FRAUD: Utility disconnection scam — FTC/utility-industry alert: caller
+    # threatens same-day shutoff unless paid instantly with a prepaid card
+    ["ваше электричество будет отключено сегодня оплатите долг предоплаченной картой немедленно", 1],
+    ["your power will be shut off within the hour pay now with a prepaid card to stop it", 1],
+
+    # FRAUD: Social Security number suspension scam — SSA Office of
+    # Inspector General alert: caller claims the victim's SSN is linked to
+    # crime and will be suspended unless verified
+    ["ваш номер социального страхования приостановлен подтвердите личные данные немедленно", 1],
+    ["your social security number has been suspended due to suspicious activity verify your identity now", 1],
+
+    # FRAUD: Jury duty / arrest warrant scam — US Marshals Service public
+    # alert: caller impersonates law enforcement claiming a missed jury
+    # summons and demands immediate payment to avoid arrest
+    ["вы пропустили вызов в суд присяжных оплатите штраф сейчас чтобы избежать ареста", 1],
+    ["you missed jury duty pay the fine right now over the phone or officers will arrest you", 1],
+
+    # FRAUD: Ransomware-style "device locked" popup scam — FBI IC3-reported
+    # pattern where a full-screen warning claims illegal content was found
+    # and demands payment to unlock the device
+    ["ваше устройство заблокировано полицией оплатите штраф чтобы восстановить доступ", 1],
+    ["your device has been locked by federal authorities pay the fine now to restore access", 1],
+
+    # FRAUD: Wangiri "one ring" callback scam — FCC consumer alert: a single
+    # ring from an unknown international number baits the victim into
+    # calling back a premium-rate line
+    ["у вас пропущенный звонок с международного номера перезвоните немедленно", 1],
+    ["you have a missed call from an international number call back right away", 1],
+
+    # FRAUD: Romance scam, soldier deployed overseas — FTC/DOD Inspector
+    # General warning: a fake military profile asks for money to pay for
+    # leave, communication fees, or equipment
+    ["я солдат на службе за границей мне нужны деньги на отпуск домой переведи пожалуйста", 1],
+    ["i'm a soldier stationed overseas i need money for leave papers please send it to me", 1],
+
+    # FRAUD: Task-based "like and earn" job scam — FBI IC3 2024 reported
+    # surge: victims are paid small amounts for simple tasks, then asked to
+    # deposit their own money to "unlock" larger earnings
+    ["выполните простое задание лайкните видео и заработайте внесите депозит чтобы разблокировать доход", 1],
+    ["complete simple like tasks and earn money deposit funds first to unlock higher paying tasks", 1],
+
+    # FRAUD: Job scam reimbursement check for home-office equipment — FTC
+    # pattern: a fake employer sends an overpayment check for equipment and
+    # asks the new hire to wire back the remainder
+    ["для настройки рабочего места мы вышлем чек обналичьте его и переведите остаток поставщику", 1],
+    ["we're sending a check to buy your home office equipment deposit it and wire back the balance", 1],
+
+    # FRAUD: Payroll-diversion BEC — FBI IC3-reported business email
+    # compromise subtype where "HR" asks an employee to confirm new bank
+    # details for the next payroll run
+    ["отдел кадров просит срочно подтвердить новые банковские реквизиты для зарплаты", 1],
+    ["hr here please confirm your updated bank details today so payroll isn't delayed", 1],
+
+    # FRAUD: Accidental-overpayment "send it back" scam — FTC/bank-transfer
+    # warning: scammer sends a fraudulent payment then urgently asks the
+    # victim to return part of it before the original payment is reversed
+    ["я по ошибке перевел вам лишнюю сумму пожалуйста верните разницу на другой счет сегодня", 1],
+    ["i accidentally sent you extra money please send the difference back to this account today", 1],
+
+    # FRAUD: Sextortion email — FBI IC3-reported pattern: an email claims to
+    # have compromising recordings and demands payment in cryptocurrency
+    ["у меня есть запись с вашей камеры оплатите биткоином иначе отправлю всем контактам", 1],
+    ["i recorded you through your webcam pay in bitcoin now or i will send it to all your contacts", 1],
+
+    # FRAUD: Fake subscription renewal call — BBB/FTC-reported pattern: a
+    # bogus invoice for an expensive renewal leads the victim to call a
+    # number where they're talked into remote-access "refund" software
+    ["ваша подписка на антивирус продлена на 499 позвоните для отмены и возврата средств", 1],
+    ["your antivirus subscription renewed for $499 call this number now for a refund", 1],
+
+    # FRAUD: Debt collector demanding gift cards — CFPB warning: a fake debt
+    # collector threatens legal action unless paid immediately in
+    # untraceable gift cards or wire transfer
+    ["это коллекторское агентство оплатите долг подарочными картами сегодня иначе подадим в суд", 1],
+    ["this is a debt collector pay immediately with gift cards today or we will sue you", 1],
+
+    # FRAUD: Car warranty expiring robocall — FTC's most-complained-about
+    # robocall category for several consecutive years
+    ["гарантия на ваш автомобиль истекает продлите сейчас позвонив по этому номеру", 1],
+    ["your car's warranty is about to expire press 1 now to renew before coverage ends", 1],
+
+    # FRAUD: Fake tech-support number from a search ad — FTC-reported
+    # pattern: a sponsored search result leads to a fake support line that
+    # requests remote access to "fix" a nonexistent problem
+    ["служба поддержки обнаружила проблему на вашем компьютере разрешите удаленный доступ для решения", 1],
+    ["our support team detected an issue on your computer grant remote access so we can fix it", 1],
+
+    # FRAUD: Money-mule recruitment — FBI warning: victims are offered a cut
+    # of funds for letting their bank account be used to move money for
+    # someone else
+    ["нужен человек с банковским счетом для перевода средств хорошая оплата за пару минут", 1],
+    ["easy money just let funds pass through your bank account and keep a percentage for yourself", 1],
+
+    # FRAUD: "Pay outside the platform" rental scam — Airbnb/Booking trust &
+    # safety warning: the host asks to move payment off the platform where
+    # there's no buyer protection
+    ["хозяин просит оплатить напрямую переводом чтобы получить скидку вне платформы", 1],
+    ["the host is asking you to pay directly by bank transfer outside the platform for a discount", 1],
+
+    # FRAUD: "I lost my phone, this is my new number" family impersonation —
+    # UK Action Fraud-reported messaging-app pattern impersonating a child
+    # or parent from an unknown number
+    ["мама это я потеряла телефон пишу с нового номера срочно нужны деньги", 1],
+    ["hi mum it's me i lost my phone this is my new number i urgently need some money", 1],
+
+    # FRAUD: LinkedIn recruiter payroll-setup scam — FTC-reported pattern
+    # where a "recruiter" asks for bank details before a start date to
+    # supposedly set up direct deposit
+    ["рекрутер просит номер карты и банковские реквизиты для оформления зарплаты до выхода на работу", 1],
+    ["the recruiter is asking for your bank account number to set up payroll before your start date", 1],
+
+    # FRAUD: Fake jury-duty/court summons email attachment — public alerts
+    # from US courts warning of phishing emails with malicious attachments
+    # disguised as failure-to-appear notices
+    ["вам пришла повестка в суд откройте вложение и подтвердите явку немедленно", 1],
+    ["you have a court summons attached open the file now and confirm your appearance immediately", 1],
+
     # SAFE examples — expanded and more diverse
     ["привет как дела", 0],
     ["завтра урок математики в 9", 0],
@@ -1604,6 +1756,84 @@ data = [
     ["the buyer suggested meeting in a public place for a safer in-person deal", 0],
     ["сатып алушы бүгін кешке келіп затты көруге келісті", 0],
     ["сатып алушы қосымша фото сұрап кездесуде төлеуге келісті", 0],
+
+    # SAFE: matching everyday counterparts to the newest real-world-grounded
+    # categories above
+    ["внук позвонил просто узнать как дела все хорошо", 0],
+    ["my grandson just called to check in everything is fine", 0],
+    ["адвокат подтвердил что дело закрыто без залога", 0],
+
+    ["магазин подтвердил что программа тайного покупателя не требует обналичивания чеков", 0],
+    ["the store confirmed their mystery shopper program never asks you to cash a check", 0],
+
+    ["заводчик прислал видео щенка и согласился на встречу без предоплаты", 0],
+    ["the breeder sent a video of the puppy and agreed to a meet-up with no upfront payment", 0],
+
+    ["агентство недвижимости подтвердило бронь после осмотра квартиры", 0],
+    ["the rental agency confirmed the booking after we viewed the apartment in person", 0],
+
+    ["налоговая прислала официальное письмо по почте без требования оплаты картами", 0],
+    ["the tax office sent an official letter by mail with no demand for gift card payment", 0],
+
+    ["коммунальная компания напомнила об оплате до конца месяца без угроз", 0],
+    ["the utility company sent a normal reminder that the bill is due by the end of the month", 0],
+
+    ["ведомство соцстрахования подтвердило что с моим номером все в порядке", 0],
+    ["the social security office confirmed my number is fine and nothing is suspended", 0],
+
+    ["в суде подтвердили что моя явка перенесена без штрафа", 0],
+    ["the court confirmed my appearance was simply rescheduled with no fine", 0],
+
+    ["антивирус нашел и удалил файл в обычном режиме без блокировки экрана", 0],
+    ["the antivirus found and removed the file normally with no screen lock", 0],
+
+    ["пропущенный звонок оказался от коллеги перезвонила на местный номер", 0],
+    ["the missed call was just from a colleague i called back the regular local number", 0],
+
+    ["брат в армии написал что все хорошо и служба идет по плану", 0],
+    ["my brother in the army wrote that everything is fine and his service is going as planned", 0],
+
+    ["приложение с заданиями выплатило небольшую сумму без каких либо депозитов", 0],
+    ["the task app paid out a small amount with no deposit required at any point", 0],
+
+    ["работодатель прислал оборудование напрямую от поставщика без чеков для обналичивания", 0],
+    ["my employer shipped the equipment directly from the vendor with no check to cash", 0],
+
+    ["отдел кадров подтвердил реквизиты зарплаты через защищенный внутренний портал", 0],
+    ["hr confirmed my payroll details through the secure internal portal as usual", 0],
+
+    ["друг подтвердил перевод был правильным ничего возвращать не нужно", 0],
+    ["my friend confirmed the transfer amount was correct nothing needs to be sent back", 0],
+
+    ["получил обычное рекламное письмо без угроз и вложений", 0],
+    ["i just got a regular marketing email with no threats or attachments", 0],
+
+    ["служба поддержки подтвердила что подписка не продлевалась и платеж не проходил", 0],
+    ["support confirmed the subscription was never renewed and no charge went through", 0],
+
+    ["банк подтвердил что долга по кредиту нет и звонок был мошенническим", 0],
+    ["the bank confirmed there is no outstanding debt and the call was fraudulent", 0],
+
+    ["дилер прислал официальное письмо о продлении гарантии без давления", 0],
+    ["the dealership sent an official letter about the warranty renewal with no pressure", 0],
+
+    ["перезвонила по номеру с сайта производителя а не из рекламы и решила вопрос без удаленного доступа", 0],
+    ["i called the number from the manufacturer's official site and fixed it without remote access", 0],
+
+    ["друг попросил помочь с переездом а не с переводом чужих денег", 0],
+    ["a friend asked for help moving apartments not for moving anyone else's money", 0],
+
+    ["хозяин жилья принял оплату через платформу как обычно", 0],
+    ["the host accepted payment through the platform as usual with full protection", 0],
+
+    ["сестра написала с обычного номера и все совпало с предыдущими разговорами", 0],
+    ["my sister texted from her usual number and everything matched our previous conversations", 0],
+
+    ["рекрутер объяснил что реквизиты зарплаты вносятся после официального оформления в отделе кадров", 0],
+    ["the recruiter explained that payroll details are entered through hr after you're officially hired", 0],
+
+    ["получила уведомление из суда по обычной почте без вложений и без угроз", 0],
+    ["i received a normal court notice by mail with no attachment and no threats", 0],
 ]
 
 def explain(features):
