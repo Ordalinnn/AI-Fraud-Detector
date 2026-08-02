@@ -1,4 +1,5 @@
 import json
+import os
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -174,6 +175,58 @@ def save_feedback(feedback):
         FEEDBACK_FILE.write_text(json.dumps(feedback, ensure_ascii=False, indent=2), encoding="utf-8")
     except OSError:
         pass
+
+# =========================
+# DEEP ANALYSIS (optional, external — sends text to the Anthropic API)
+# =========================
+# Unlike the rest of the app, this feature sends the message text to a
+# third-party API and therefore breaks the "nothing leaves your device"
+# guarantee. It's opt-in per analysis (a button, not an automatic call) and
+# clearly labeled as such in the UI. Configure via Streamlit secrets:
+#   .streamlit/secrets.toml -> ANTHROPIC_API_KEY = "sk-ant-..."
+# (never commit that file — it's already in .gitignore) or the
+# ANTHROPIC_API_KEY environment variable for non-Streamlit-Cloud hosts.
+DEEP_ANALYSIS_MODEL = "claude-haiku-4-5-20251001"
+
+def get_anthropic_api_key():
+    """Reads the API key from Streamlit secrets first, then the
+    environment. Returns None (not an error) if unconfigured, so the
+    feature can degrade gracefully instead of crashing the app."""
+    try:
+        key = st.secrets.get("ANTHROPIC_API_KEY")
+        if key:
+            return key
+    except Exception:
+        pass
+    return os.environ.get("ANTHROPIC_API_KEY")
+
+def run_deep_analysis(text, lang_name):
+    """Sends the message to Claude for a genuine reasoning-based second
+    opinion (not keyword matching): what manipulation tactics it uses, if
+    any, and whether it looks like a real scam pattern. Returns the
+    response text. Raises on any failure — the caller is responsible for
+    catching and showing a friendly error, since network/API issues are
+    expected here (rate limits, missing key, no internet)."""
+    import anthropic
+
+    api_key = get_anthropic_api_key()
+    if not api_key:
+        raise RuntimeError("no_api_key")
+
+    client = anthropic.Anthropic(api_key=api_key)
+    prompt = (
+        f"You are a fraud-detection assistant. Analyze the following message for signs "
+        f"of a scam. Respond in {lang_name}, in 3-5 concise sentences: name the specific "
+        f"manipulation tactics you notice (if any), say whether this matches a real-world "
+        f"scam pattern, and what the recipient should do. If it looks safe, say so plainly "
+        f"and explain why.\n\nMessage to analyze:\n\"\"\"\n{text}\n\"\"\""
+    )
+    response = client.messages.create(
+        model=DEEP_ANALYSIS_MODEL,
+        max_tokens=400,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return response.content[0].text
 
 # =========================
 # LANGUAGE
@@ -2701,6 +2754,11 @@ if mode != "batch" and analyze:
         risk_label, risk_class, emoji = risk_style(prob)
         explanations = explain(features)
 
+        # A fresh analysis invalidates any deep-analysis result from a
+        # previous message, so it doesn't keep showing stale next to a new
+        # verdict until the user clicks the deep-analysis button again.
+        st.session_state.pop("deep_analysis_result", None)
+
         # Persist the result in session_state so it stays on screen across
         # reruns triggered by feedback/download/clear-history buttons, which
         # aren't this form's own submit button and would otherwise make the
@@ -3010,6 +3068,31 @@ SECURITY ADVICE:
                 st.rerun()
         else:
             st.info(T["no_history"])
+
+    # =========================
+    # DEEP ANALYSIS (optional, opt-in per click — sends text to Claude)
+    # =========================
+    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+    st.markdown(f'<div class="section-title">{T["deep_analysis_title"]}</div>', unsafe_allow_html=True)
+    st.markdown(T["deep_analysis_intro"])
+    st.caption(T["deep_analysis_privacy_note"])
+
+    if st.button(T["deep_analysis_button"], key="deep_analysis_btn"):
+        if not get_anthropic_api_key():
+            st.info(T["deep_analysis_not_configured"])
+        else:
+            lang_name = {"🇰🇿 KZ": "Kazakh", "🇷🇺 RU": "Russian", "🇬🇧 EN": "English"}.get(lang, "English")
+            with st.spinner(T["deep_analysis_loading"]):
+                try:
+                    st.session_state["deep_analysis_result"] = run_deep_analysis(r["input_text"], lang_name)
+                except Exception:
+                    st.session_state["deep_analysis_result"] = None
+                    st.error(T["deep_analysis_error"])
+
+    if st.session_state.get("deep_analysis_result"):
+        st.markdown(f"**{T['deep_analysis_result_title']}**")
+        st.info(st.session_state["deep_analysis_result"])
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # =========================
 # HOW IT WORKS

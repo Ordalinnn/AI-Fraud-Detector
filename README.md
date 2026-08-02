@@ -14,6 +14,7 @@ An AI-powered prototype that detects fraud and scam patterns in SMS messages, ch
 - [Features](#features)
 - [Project structure](#project-structure)
 - [Getting started](#getting-started)
+- [Configuration](#configuration)
 - [Running the tests](#running-the-tests)
 - [Mobile app (PWA)](#mobile-app-pwa)
 - [Browser extension](#browser-extension)
@@ -82,6 +83,7 @@ The pure detection logic (feature extraction, rule boosting, domain/brand checks
 - A model-agreement indicator (do all 4 models agree, or should you double-check manually?)
 - "Was this result accurate?" feedback buttons, logged locally for future dataset improvements
 - A Methodology / Model Card section: dataset composition, model architecture, honest limitations, and privacy notes
+- **Optional Deep AI Analysis**: an opt-in button that sends the message to Claude (Anthropic's API) for a genuine reasoning-based second opinion — not keyword matching, actual language understanding of tactics and intent. Unlike the rest of the app, this specific feature sends text to a third-party server, so it's clearly labeled and only runs when you click it. Requires an `ANTHROPIC_API_KEY` — see [Configuration](#configuration) below; without one, the rest of the app is unaffected.
 
 **Everyday usability**
 - Fully bilingual+ UI: 🇰🇿 Kazakh, 🇷🇺 Russian, 🇬🇧 English, switchable without losing your typed text or settings
@@ -140,6 +142,16 @@ streamlit run app.py
 ```
 
 Then open the URL Streamlit prints (usually `http://localhost:8501`).
+
+## Configuration
+
+Everything works out of the box with no configuration. The one optional piece is **Deep AI Analysis** (see [Features](#features)), which needs an Anthropic API key:
+
+1. Get a key at [console.anthropic.com](https://console.anthropic.com/settings/keys).
+2. Copy [`.streamlit/secrets.toml.example`](.streamlit/secrets.toml.example) to `.streamlit/secrets.toml` and paste your key in. That file is gitignored — never commit a real key.
+3. On Streamlit Community Cloud, don't upload a secrets file at all — set `ANTHROPIC_API_KEY` under your app's **Settings → Secrets** in the dashboard instead.
+
+Without a key configured, the button simply explains it isn't set up yet — nothing else in the app is affected.
 
 ## Running the tests
 
