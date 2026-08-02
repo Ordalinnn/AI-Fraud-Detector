@@ -24,9 +24,16 @@ const WORD_LISTS = {
     "one time code", "otp"
   ],
   money: [
-    "карта", "счет", "банк", "ақша", "төле", "оплата", "перевод",
-    "баланс", "средства", "деньги", "transfer", "payment",
+    "карта", "счет", "банк", "ақша", "төле", "оплат", "перевод",
+    "баланс", "средства", "деньги", "transfer", "payment", "pay",
     "wallet", "iban"
+  ],
+  // "оплат" (not "оплата") is a stem: it also catches "оплатить"/
+  // "оплатите"/"оплачивает" since matching is substring-based and doesn't
+  // handle Russian verb conjugation otherwise. Same idea for "pay".
+  verificationService: [
+    "провер", "справк", "сертификат", "реестр", "registry",
+    "verif", "certificate"
   ],
   threat: [
     "заблокирована", "удален", "штраф", "угрозой", "бұғатталды", "жабылады",
@@ -49,7 +56,7 @@ const WORD_LISTS = {
   suspiciousDomainWords: [
     "login", "verify", "secure", "bonus", "gift",
     "account", "support", "confirm", "prize", "payment", "wallet",
-    "security", "update", "auth", "free"
+    "security", "update", "auth", "free", "check", "registry"
   ],
   suspiciousZones: [".xyz", ".top", ".click", ".site", ".online", ".live", ".info", ".icu"],
   knownBrands: [
@@ -64,6 +71,21 @@ function countMatches(textLower, words) {
 
 function extractUrls(textLower) {
   const matches = textLower.match(/https?:\/\/[^\s]+|www\.[^\s]+/g);
+  return matches || [];
+}
+
+// Real scams increasingly write a domain as plain text (e.g. "check-tech-
+// base.ru") instead of a clickable http(s):// or www. link, specifically
+// to dodge filters that only look for literal links. This catches those
+// bare mentions so they still register as a domain.
+const BARE_DOMAIN_PATTERN = /\b[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9-]+)*\.(?:ru|kz|com|net|org|info|xyz|top|site|online|live|icu|click|by|ua|io|me|co)\b/g;
+
+function extractBareDomains(textLower, urls) {
+  let masked = textLower;
+  for (const u of urls) {
+    masked = masked.split(u).join(" ");
+  }
+  const matches = masked.match(BARE_DOMAIN_PATTERN);
   return matches || [];
 }
 
@@ -101,7 +123,9 @@ function domainFlags(domain) {
 function extractFeatures(text) {
   const textLower = text.toLowerCase();
   const urls = extractUrls(textLower);
-  const domains = urls.map(getDomain);
+  const bareDomains = extractBareDomains(textLower, urls);
+  const domains = urls.map(getDomain).concat(bareDomains);
+  const linkCount = urls.length + bareDomains.length;
 
   let suspiciousDomain = 0, longDomain = 0, suspiciousZone = 0, digitDomain = 0, brandFlag = 0;
   for (const d of domains) {
@@ -116,20 +140,21 @@ function extractFeatures(text) {
   const threatCount = countMatches(textLower, WORD_LISTS.threat);
 
   return {
-    hasLink: urls.length > 0 ? 1 : 0,
+    hasLink: linkCount > 0 ? 1 : 0,
     urgentCount,
     secretCount: countMatches(textLower, WORD_LISTS.secret),
     moneyCount: countMatches(textLower, WORD_LISTS.money),
     threatCount,
     identityCount: countMatches(textLower, WORD_LISTS.identity),
     rewardCount: countMatches(textLower, WORD_LISTS.reward),
+    verificationCount: countMatches(textLower, WORD_LISTS.verificationService),
     pressureCount: countMatches(textLower, WORD_LISTS.pressure),
     suspiciousDomain,
     longDomain,
     suspiciousZone,
     digitDomain,
     brandFlag,
-    urlCount: urls.length,
+    urlCount: linkCount,
     hasMultipleWarnings: urgentCount > 0 && threatCount > 0 ? 1 : 0,
     domains
   };
@@ -145,6 +170,7 @@ function heuristicBaseScore(f) {
   score += Math.min(f.identityCount * 0.10, 0.20);
   score += Math.min(f.rewardCount * 0.07, 0.14);
   score += Math.min(f.pressureCount * 0.10, 0.20);
+  score += Math.min(f.verificationCount * 0.05, 0.15);
   score += f.suspiciousDomain ? 0.10 : 0;
   score += f.suspiciousZone ? 0.10 : 0;
   score += f.longDomain ? 0.05 : 0;
@@ -160,6 +186,7 @@ function ruleBoost(f) {
   if (f.secretCount && f.moneyCount) boost += 0.15;
   if (f.threatCount && f.hasLink) boost += 0.10;
   if (f.rewardCount && f.moneyCount) boost += 0.12;
+  if (f.verificationCount && (f.moneyCount || f.hasLink)) boost += 0.15;
   if (f.pressureCount) boost += 0.10;
   if (f.suspiciousZone || f.suspiciousDomain) boost += 0.10;
   if (f.brandFlag) boost += 0.15;
@@ -172,9 +199,9 @@ function ruleBoost(f) {
 // the current UI language's text via I18N.strings(lang).reasonLabels.
 const EXPLAIN_KEYS = [
   "hasLink", "urgentCount", "secretCount", "moneyCount", "threatCount",
-  "identityCount", "rewardCount", "pressureCount", "suspiciousDomain",
-  "longDomain", "suspiciousZone", "digitDomain", "brandFlag",
-  "hasMultipleWarnings", "urlCount"
+  "identityCount", "rewardCount", "pressureCount", "verificationCount",
+  "suspiciousDomain", "longDomain", "suspiciousZone", "digitDomain",
+  "brandFlag", "hasMultipleWarnings", "urlCount"
 ];
 
 function explain(f) {
