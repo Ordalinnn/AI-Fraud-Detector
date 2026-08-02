@@ -21,6 +21,7 @@ from fraud_logic import (
     domain_flags,
     get_domain,
     extract_urls,
+    extract_bare_domains,
 )
 
 
@@ -169,3 +170,51 @@ def test_highlight_text_escapes_html_to_prevent_injection():
 def test_highlight_text_plain_safe_text_is_unwrapped():
     result = highlight_text("hello there")
     assert "<span" not in result
+
+
+# =========================
+# Marketplace fake-verification scam (bare domains, verb-conjugation
+# stems, and the new verification_count feature). This category was
+# initially scored as low-risk because it deliberately avoids urgency,
+# threats, and secret-code requests, and its link is written as plain
+# text ("check-tech-base.ru") rather than a http(s):// or www. URL.
+# =========================
+def test_bare_domain_is_detected_without_protocol():
+    domains = extract_bare_domains("проверьте на check-tech-base.ru прямо сейчас", [])
+    assert "check-tech-base.ru" in domains
+
+
+def test_bare_domain_is_not_double_counted_when_also_a_full_url():
+    urls = extract_urls("visit http://check-tech-base.ru/verify now")
+    bare = extract_bare_domains("visit http://check-tech-base.ru/verify now", urls)
+    assert bare == []
+
+
+def test_marketplace_verification_scam_now_triggers_signals():
+    features, domains = extract_features(
+        "покупатель просит проверить ноутбук на воровство через сайт "
+        "check-tech-base.ru и оплатить справку"
+    )
+    assert features["has_link"] == 1
+    assert domains == ["check-tech-base.ru"]
+    assert features["money_count"] > 0  # "оплатить" via the "оплат" stem
+    assert features["verification_count"] > 0  # "проверить" / "справку"
+    assert features["suspicious_domain"] == 1  # domain contains "check"
+
+
+def test_money_stem_catches_pay_verb_conjugations():
+    features, _ = extract_features("пожалуйста оплатите справку сегодня")
+    assert features["money_count"] > 0
+
+
+def test_rule_boost_fires_for_verification_plus_money():
+    # Uses "pay" (not "paid" — an irregular verb that doesn't contain the
+    # substring "pay") and "registry" so both verification_count and
+    # money_count are unambiguously > 0.
+    features, _ = extract_features(
+        "the buyer on the marketplace insists you pay for an official "
+        "equipment registry check before viewing"
+    )
+    assert features["money_count"] > 0
+    assert features["verification_count"] > 0
+    assert rule_boost(features) > 0

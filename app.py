@@ -14,12 +14,7 @@ from sklearn.model_selection import cross_val_score
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.naive_bayes import MultinomialNB
 from fraud_logic import (
-    urgent_words, secret_words, money_words, threat_words,
-    suspicious_domain_words, suspicious_zones, KNOWN_BRANDS,
-    identity_words, reward_words, pressure_phrases,
-    extract_urls, get_domain, count_matches,
-    brand_impersonation, domain_flags, extract_features,
-    rule_boost, risk_level, highlight_text,
+    domain_flags, extract_features, rule_boost, risk_level, highlight_text,
 )
 from translations import LANG_OPTIONS, OLD_LANG_MAP, DEFAULT_LANG, get_translations
 
@@ -1579,6 +1574,7 @@ def explain(features):
             "has_multiple_warnings": "Бір уақытта шұғылдық және қорқыту бар",
             "url_count": "Бірнеше сілтеме анықталды",
             "brand_flag": "Домен белгілі банк/брендке ұқсатылған, бірақ ол емес",
+            "verification_count": "Ақылы \"тексеру қызметі\" немесе \"ресми реестр\" туралы сөз бар",
         }
     elif lang == "🇷🇺 RU":
         labels = {
@@ -1600,6 +1596,7 @@ def explain(features):
             "has_multiple_warnings": "Одновременно присутствуют срочность и угроза",
             "url_count": "Обнаружено несколько ссылок",
             "brand_flag": "Домен маскируется под известный банк/бренд, но им не является",
+            "verification_count": "Упоминается платная \"проверка\" или \"официальный реестр\"",
         }
     else:
         labels = {
@@ -1621,6 +1618,7 @@ def explain(features):
             "has_multiple_warnings": "Both urgency and threat were detected simultaneously",
             "url_count": "Multiple links were detected",
             "brand_flag": "Domain mimics a known bank/brand but isn't the real one",
+            "verification_count": "Mentions a paid \"verification service\" or \"official registry\"",
         }
 
     # Only explain features that are relevant (non-zero and meaningful)

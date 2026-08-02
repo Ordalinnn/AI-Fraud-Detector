@@ -23,10 +23,28 @@ secret_words = [
     "one time code", "otp"
 ]
 money_words = [
-    "карта", "счет", "банк", "ақша", "төле", "оплата", "перевод",
-    "баланс", "средства", "деньги", "transfer", "payment",
+    "карта", "счет", "банк", "ақша", "төле", "оплат", "перевод",
+    "баланс", "средства", "деньги", "transfer", "payment", "pay",
     "wallet", "iban"
 ]
+# "оплат" (not "оплата") is deliberate: as a substring-match stem it also
+# catches "оплатить"/"оплатите"/"оплачивает"/etc. — Russian verb conjugation
+# isn't handled by exact-word matching, so a shorter stem covers the family
+# of forms for free. Same reasoning for "pay" covering "pay"/"paying"/"repay".
+
+# Message-text language for fake "verification service" scams — e.g. a fake
+# marketplace buyer asking a seller to pay a bogus registry/certificate site
+# before a deal (see the check-tech-base.ru style scam). Distinct from
+# suspicious_domain_words below, which matches against a DOMAIN, not the
+# message body.
+verification_service_words = [
+    "провер", "справк", "сертификат", "реестр", "registry",
+    "verif", "certificate",
+]
+# Short stems again: "провер" covers проверка/проверить/проверьте/проверку,
+# and "verif" covers verify/verifying/verification — real phrasing varies
+# too much ("verify the item", "verification website", "please verify")
+# for exact multi-word phrase matching to hold up.
 threat_words = [
     "заблокирована", "удален", "штраф", "угрозой", "бұғатталды", "жабылады",
     "blocked", "suspended", "terminated", "penalty", "freeze",
@@ -35,7 +53,7 @@ threat_words = [
 suspicious_domain_words = [
     "login", "verify", "secure", "bonus", "gift",
     "account", "support", "confirm", "prize", "payment", "wallet",
-    "security", "update", "auth", "free"
+    "security", "update", "auth", "free", "check", "registry",
 ]
 suspicious_zones = [".xyz", ".top", ".click", ".site", ".online", ".live", ".info", ".icu"]
 
@@ -68,6 +86,24 @@ pressure_phrases = [
 def extract_urls(text):
     """Returns every http(s):// or www. link found in the text, in the order they appear."""
     return re.findall(r"https?://[^\s]+|www\.[^\s]+", text.lower())
+
+# Real scams increasingly write a domain as plain text (e.g. "check-tech-
+# base.ru") instead of a clickable http(s):// or www. link, specifically to
+# dodge filters that only look for literal links. This regex catches those
+# bare mentions so they still register as a domain, not just as invisible text.
+BARE_DOMAIN_PATTERN = re.compile(
+    r"\b[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9-]+)*\."
+    r"(?:ru|kz|com|net|org|info|xyz|top|site|online|live|icu|click|by|ua|io|me|co)\b",
+    re.IGNORECASE,
+)
+
+def extract_bare_domains(text_lower, urls):
+    """Finds domain-like mentions with no http(s):// or www. prefix. Full
+    URLs are masked out first so their domain isn't double-counted."""
+    masked = text_lower
+    for u in urls:
+        masked = masked.replace(u, " ")
+    return BARE_DOMAIN_PATTERN.findall(masked)
 
 def get_domain(url):
     """Strips the protocol/www prefix and any path, leaving just the bare domain (e.g. "kaspi-login.xyz")."""
@@ -110,15 +146,17 @@ def domain_flags(d):
 # FEATURE EXTRACTION
 # =========================
 def extract_features(text):
-    """Turns raw message text into the 20-value numeric feature vector the
-    LR/RF/GB models are trained on: counts of urgency/secrecy/money/threat/
-    identity/reward/pressure words, link and domain-reputation flags
-    (suspicious keywords, TLD, length, digits, brand impersonation), plus
-    basic text statistics (length, word count, punctuation/case usage).
+    """Turns raw message text into the numeric feature vector the LR/RF/GB
+    models are trained on: counts of urgency/secrecy/money/threat/identity/
+    reward/pressure/verification-service words, link and domain-reputation
+    flags (suspicious keywords, TLD, length, digits, brand impersonation),
+    plus basic text statistics (length, word count, punctuation/case usage).
     Returns (features_dict, list_of_domains_found)."""
     text_lower = text.lower()
     urls = extract_urls(text_lower)
-    domains = [get_domain(u) for u in urls]
+    bare_domains = extract_bare_domains(text_lower, urls)
+    domains = [get_domain(u) for u in urls] + bare_domains
+    link_count = len(urls) + len(bare_domains)
 
     suspicious_domain = 0
     long_domain = 0
@@ -142,7 +180,7 @@ def extract_features(text):
     avg_word_len = sum(len(w) for w in words) / len(words) if words else 0
 
     return {
-        "has_link": int(len(urls) > 0),
+        "has_link": int(link_count > 0),
         "urgent_count": count_matches(text_lower, urgent_words),
         "secret_count": count_matches(text_lower, secret_words),
         "money_count": count_matches(text_lower, money_words),
@@ -150,6 +188,7 @@ def extract_features(text):
         "identity_count": count_matches(text_lower, identity_words),
         "reward_count": count_matches(text_lower, reward_words),
         "pressure_count": count_matches(text_lower, pressure_phrases),
+        "verification_count": count_matches(text_lower, verification_service_words),
         "suspicious_domain": suspicious_domain,
         "long_domain": long_domain,
         "suspicious_zone": suspicious_zone,
@@ -161,7 +200,7 @@ def extract_features(text):
         "text_length": len(text),
         "word_count": len(words),
         "avg_word_length": round(avg_word_len, 2),
-        "url_count": len(urls),
+        "url_count": link_count,
         "has_multiple_warnings": int(
             count_matches(text_lower, urgent_words) > 0
             and count_matches(text_lower, threat_words) > 0
@@ -187,6 +226,8 @@ def rule_boost(features):
         boost += 0.10
     if features["reward_count"] and features["money_count"]:
         boost += 0.12
+    if features["verification_count"] and (features["money_count"] or features["has_link"]):
+        boost += 0.15
     if features["pressure_count"]:
         boost += 0.10
     if features["suspicious_zone"] or features["suspicious_domain"]:
