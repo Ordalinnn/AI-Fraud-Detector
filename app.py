@@ -3072,15 +3072,17 @@ SECURITY ADVICE:
     # =========================
     # DEEP ANALYSIS (optional, opt-in per click — sends text to Claude)
     # =========================
-    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-    st.markdown(f'<div class="section-title">{T["deep_analysis_title"]}</div>', unsafe_allow_html=True)
-    st.markdown(T["deep_analysis_intro"])
-    st.caption(T["deep_analysis_privacy_note"])
+    # Only rendered at all when a key is actually configured, so the
+    # section is fully invisible rather than a dead-end "not set up"
+    # button when nobody's configured ANTHROPIC_API_KEY. Reappears on its
+    # own, with no code changes, the moment a key is added.
+    if get_anthropic_api_key():
+        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-title">{T["deep_analysis_title"]}</div>', unsafe_allow_html=True)
+        st.markdown(T["deep_analysis_intro"])
+        st.caption(T["deep_analysis_privacy_note"])
 
-    if st.button(T["deep_analysis_button"], key="deep_analysis_btn"):
-        if not get_anthropic_api_key():
-            st.info(T["deep_analysis_not_configured"])
-        else:
+        if st.button(T["deep_analysis_button"], key="deep_analysis_btn"):
             lang_name = {"🇰🇿 KZ": "Kazakh", "🇷🇺 RU": "Russian", "🇬🇧 EN": "English"}.get(lang, "English")
             with st.spinner(T["deep_analysis_loading"]):
                 try:
@@ -3089,10 +3091,10 @@ SECURITY ADVICE:
                     st.session_state["deep_analysis_result"] = None
                     st.error(T["deep_analysis_error"])
 
-    if st.session_state.get("deep_analysis_result"):
-        st.markdown(f"**{T['deep_analysis_result_title']}**")
-        st.info(st.session_state["deep_analysis_result"])
-    st.markdown('</div>', unsafe_allow_html=True)
+        if st.session_state.get("deep_analysis_result"):
+            st.markdown(f"**{T['deep_analysis_result_title']}**")
+            st.info(st.session_state["deep_analysis_result"])
+        st.markdown('</div>', unsafe_allow_html=True)
 
 # =========================
 # HOW IT WORKS
