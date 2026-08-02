@@ -1,6 +1,14 @@
 [server]
 enableStaticServing = true
 
+[client]
+# Hides Streamlit's own in-app hamburger menu (Deploy button, GitHub link,
+# About/Settings/"Record a screencast", etc.) so only your own UI shows.
+# This does NOT affect the outer Streamlit Community Cloud page chrome
+# (the "Fork" button / Streamlit logo bar) — that's injected by the free
+# hosting platform itself, not controllable from app code.
+toolbarMode = "minimal"
+
 [theme]
 base = "light"
 primaryColor = "#2563eb"
