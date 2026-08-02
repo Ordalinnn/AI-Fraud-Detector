@@ -464,6 +464,20 @@ data = [
     ["үй иесі жаңа шотқа ақы төлеуді сұрайды міне деректемелер", 1],
     ["жалдаушы төлемді басқа шотқа аударуды сұрайды шұғыл", 1],
 
+    # FRAUD: Marketplace fake-verification scam (Avito/OLX/Telegram) — the
+    # scammer poses as a BUYER, not the usual seller-side scam, and talks
+    # the seller into paying a small fee on a fake "stolen item registry"
+    # site before a meetup, promising reimbursement, then disappears once
+    # the seller pays and sends the PDF "certificate"
+    ["покупатель просит проверить ноутбук на воровство через сайт check-tech-base.ru и оплатить справку", 1],
+    ["buyer asks you to verify the laptop isn't stolen through a paid verification website before meeting", 1],
+    ["покупатель обещает вернуть деньги за проверку при встрече но пропадает после оплаты", 1],
+    ["the buyer promises to reimburse the verification fee at pickup then goes silent after you pay", 1],
+    ["покупатель на авито просит оплатить официальный реестр техники прежде чем приедет смотреть товар", 1],
+    ["the buyer on the marketplace insists you pay for an official equipment registry check before viewing", 1],
+    ["сатып алушы ноутбукты тексеру үшін ақылы сайтқа сілтеме жіберіп ақша төлеуді сұрайды", 1],
+    ["сатып алушы кездесуден бұрын заттың тазалығын растайтын ақылы қызметке төлеуді талап етеді", 1],
+
     # =========================
     # SYNTHETIC AUGMENTATION: the batch below systematically varies real bank
     # and service names, and rephrases the categories above, so the model
@@ -1531,6 +1545,17 @@ data = [
     ["the landlord said the bank account has not changed", 0],
     ["үй иесі осы айдың ақысын алды рахмет", 0],
     ["жалдаушы төлемді уақытында алды", 0],
+
+    # SAFE: matching legitimate marketplace exchanges (no verification-fee
+    # request, no fake registry site, just a normal in-person deal)
+    ["покупатель согласен приехать сегодня вечером посмотреть ноутбук и купить при встрече", 0],
+    ["buyer agreed to come check out the laptop in person tonight and pay on pickup", 0],
+    ["покупатель уточнил комплектацию и попросил скинуть еще фото при встрече", 0],
+    ["the buyer asked about the accessories included and wants a few more photos before coming", 0],
+    ["покупатель предложил встретиться в людном месте для безопасности сделки", 0],
+    ["the buyer suggested meeting in a public place for a safer in-person deal", 0],
+    ["сатып алушы бүгін кешке келіп затты көруге келісті", 0],
+    ["сатып алушы қосымша фото сұрап кездесуде төлеуге келісті", 0],
 ]
 
 def explain(features):
@@ -2458,7 +2483,7 @@ st.markdown(f"""
             <div class="metrics-item-label">{T['stat_examples']}</div>
         </div>
         <div class="metrics-item">
-            <div class="metrics-item-val">23+</div>
+            <div class="metrics-item-val">24+</div>
             <div class="metrics-item-label">{T['stat_categories']}</div>
         </div>
         <div class="metrics-item">
