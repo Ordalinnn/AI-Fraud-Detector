@@ -2986,34 +2986,6 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # =========================
-# IMPACT / STATS BANNER
-# =========================
-_avg_acc = round(sum(model_metrics.values()) / len(model_metrics), 1)
-
-st.markdown(f"""
-<div class="metrics-bar">
-    <div class="metrics-row">
-        <div class="metrics-item">
-            <div class="metrics-item-val">{len(data)}</div>
-            <div class="metrics-item-label">{T['stat_examples']}</div>
-        </div>
-        <div class="metrics-item">
-            <div class="metrics-item-val">24+</div>
-            <div class="metrics-item-label">{T['stat_categories']}</div>
-        </div>
-        <div class="metrics-item">
-            <div class="metrics-item-val">{_avg_acc}%</div>
-            <div class="metrics-item-label">{T['stat_accuracy']}</div>
-        </div>
-        <div class="metrics-item">
-            <div class="metrics-item-val">3</div>
-            <div class="metrics-item-label">{T['stat_languages']}</div>
-        </div>
-    </div>
-</div>
-""", unsafe_allow_html=True)
-
-# =========================
 # INSTALL INSTRUCTIONS (toggled by the sidebar button)
 # =========================
 if st.session_state.get("show_install_instructions"):
@@ -3027,11 +2999,36 @@ if st.session_state.get("show_install_instructions"):
     st.markdown('</div>', unsafe_allow_html=True)
 
 # =========================
-# HOW TO USE (plain-language guide, for any age/skill level)
+# STATS + HOW TO USE + COLOR LEGEND — collapsed by default so a first-time
+# visitor (especially on mobile) reaches the input box without first
+# scrolling past four stat tiles and a 3-step guide. The safety disclaimer
+# stays visible outside the expander since it matters even to someone who
+# never opens this.
 # =========================
-st.markdown(f"""
-<div class="glass-card howto-card">
-    <div class="section-title">🧭 {T['how_to_use']}</div>
+_avg_acc = round(sum(model_metrics.values()) / len(model_metrics), 1)
+
+with st.expander(f"🧭 {T['how_to_use']}", expanded=False):
+    st.markdown(f"""
+    <div class="metrics-bar">
+        <div class="metrics-row">
+            <div class="metrics-item">
+                <div class="metrics-item-val">{len(data)}</div>
+                <div class="metrics-item-label">{T['stat_examples']}</div>
+            </div>
+            <div class="metrics-item">
+                <div class="metrics-item-val">24+</div>
+                <div class="metrics-item-label">{T['stat_categories']}</div>
+            </div>
+            <div class="metrics-item">
+                <div class="metrics-item-val">{_avg_acc}%</div>
+                <div class="metrics-item-label">{T['stat_accuracy']}</div>
+            </div>
+            <div class="metrics-item">
+                <div class="metrics-item-val">3</div>
+                <div class="metrics-item-label">{T['stat_languages']}</div>
+            </div>
+        </div>
+    </div>
     <div class="howto-steps">
         <div class="howto-step">{T['step1']}</div>
         <div class="howto-step">{T['step2']}</div>
@@ -3044,9 +3041,9 @@ st.markdown(f"""
         <span class="legend-chip legend-high">🟠 {T['high']}</span>
         <span class="legend-chip legend-critical">🔴 {T['critical']}</span>
     </div>
-    <div class="disclaimer-box">{T['disclaimer']}</div>
-</div>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
+
+st.markdown(f'<div class="disclaimer-box">{T["disclaimer"]}</div>', unsafe_allow_html=True)
 
 # =========================
 # INPUT
