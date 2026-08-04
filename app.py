@@ -1144,6 +1144,143 @@ data = [
     ["вам пришла повестка в суд откройте вложение и подтвердите явку немедленно", 1],
     ["you have a court summons attached open the file now and confirm your appearance immediately", 1],
 
+    # =========================
+    # MORE REAL-WORLD-GROUNDED CATEGORIES, ROUND 2: further documented scam
+    # patterns (FTC, FBI IC3, CFPB, SSA-OIG, FCC, US Dept of Labor, BBB)
+    # =========================
+
+    # FRAUD: Timeshare resale/exit scam — FTC-documented pattern where a
+    # caller claims to have a buyer lined up for the victim's timeshare and
+    # demands an upfront "closing fee"
+    ["у нас есть покупатель на ваш таймшер оплатите комиссию агентству чтобы закрыть сделку", 1],
+    ["we have a buyer lined up for your timeshare pay the closing fee upfront to finalize the sale", 1],
+
+    # FRAUD: Advance-fee loan scam — FTC-reported pattern: guaranteed loan
+    # approval regardless of credit history, but an upfront "insurance" or
+    # "processing" fee must be paid first
+    ["кредит одобрен без проверки кредитной истории оплатите страховой взнос для получения средств", 1],
+    ["your loan is pre-approved with no credit check pay the processing fee first to release the funds", 1],
+
+    # FRAUD: Sweepstakes / Publishers Clearing House impersonation — classic
+    # FTC-tracked scam: victim is told they won a major sweepstakes and must
+    # pay taxes or fees before the prize is delivered
+    ["вы выиграли крупный приз всероссийской лотереи оплатите налог чтобы получить выигрыш", 1],
+    ["you've won the publishers clearing house sweepstakes pay the delivery tax to claim your prize", 1],
+
+    # FRAUD: Credit repair / debt relief advance-fee scam — CFPB/FTC
+    # warning: a company promises to erase debt or fix credit for an
+    # upfront fee, before any service is performed
+    ["мы полностью очистим вашу кредитную историю оплатите услугу заранее результат гарантирован", 1],
+    ["we can wipe your debt clean pay our fee upfront and your credit score is guaranteed to improve", 1],
+
+    # FRAUD: Long-term apartment rental application scam — FTC-reported
+    # pattern distinct from vacation rentals: a fake listing collects an
+    # application or holding fee by wire before any in-person viewing
+    ["квартира сдается срочно переведите залог до просмотра чтобы забронировать за вами", 1],
+    ["the apartment is available now wire the holding deposit before the viewing to secure it", 1],
+
+    # FRAUD: Dating app "verification badge" scam — FTC 2024 online-dating
+    # scam reporting: a match asks the victim to pay for a safety or
+    # verification badge through a fake link before meeting in person
+    ["для безопасности переведи небольшую сумму за верификационный значок на сайте знакомств", 1],
+    ["before we meet just pay a small fee for the dating safety verification badge through this link", 1],
+
+    # FRAUD: Fake online storefront / never-ships ad scam — FTC-reported
+    # pattern: a heavily discounted ad on social media leads to a fake store
+    # that takes payment and never ships anything
+    ["огромная скидка только сегодня оплатите заказ картой на сайте пока распродажа не закончилась", 1],
+    ["huge discount today only pay for your order now on the site before the sale ends", 1],
+
+    # FRAUD: Scam-recovery scam — FTC specifically warns this targets people
+    # who already lost money to a scam, promising to recover it for an
+    # upfront fee
+    ["мы можем вернуть деньги которые вы потеряли мошенникам оплатите нашу комиссию заранее", 1],
+    ["we specialize in recovering money lost to scammers just pay our recovery fee upfront first", 1],
+
+    # FRAUD: Fake law firm debt-lawsuit threat — CFPB/FTC warning: a caller
+    # poses as a law firm or process server threatening an imminent lawsuit
+    # unless a debt is paid immediately
+    ["это юридическая фирма против вас подан иск оплатите долг сейчас чтобы избежать суда", 1],
+    ["this is a law firm a lawsuit has been filed against you pay the debt now to avoid court", 1],
+
+    # FRAUD: Fake unemployment benefits identity theft — US Department of
+    # Labor warning: scammers phish for SSN/bank info claiming it's needed
+    # to process an unemployment claim
+    ["для оформления пособия по безработице подтвердите номер социального страхования и счет", 1],
+    ["to process your unemployment claim confirm your social security number and bank account now", 1],
+
+    # FRAUD: Romance scam, customs duty for a gift/inheritance package —
+    # FTC-documented romance-scam variant: the online partner claims to be
+    # sending an expensive gift or inheritance that's stuck at customs
+    ["дорогой я отправила тебе посылку с драгоценностями оплати таможенную пошлину чтобы забрать", 1],
+    ["my love i sent you a package with jewelry just pay the customs fee to release it", 1],
+
+    # FRAUD: School-emergency impersonation scam — reported variant of
+    # family-emergency scams: caller poses as a school administrator or
+    # nurse claiming the victim's child was in an accident
+    ["это школа с вашим ребенком произошел несчастный случай срочно переведите деньги на лечение", 1],
+    ["this is the school your child has been in an accident please send money for treatment now", 1],
+
+    # FRAUD: Mandatory certification/training fee job scam — FTC job-scam
+    # pattern: a new hire is told they must pay for required certification
+    # or training materials before starting
+    ["для трудоустройства необходимо оплатить обязательный сертификат курса заранее", 1],
+    ["before you can start the job you must pay for the required certification course upfront", 1],
+
+    # FRAUD: KYC "verify to keep your account open" scam — bank-
+    # impersonation pattern distinct in framing from a blocked-card alert:
+    # claims a mandatory identity-verification update is needed
+    ["банк проводит обновление данных клиентов подтвердите личность по ссылке иначе счет закроют", 1],
+    ["your bank requires a mandatory kyc update verify your identity by this link or your account will close", 1],
+
+    # FRAUD: Global brand impersonation, more brands (Temu/Shein) —
+    # FTC-reported pattern impersonating popular shopping platforms about a
+    # failed delivery or account issue
+    ["temu не может доставить ваш заказ обновите данные оплаты по ссылке", 1],
+    ["shein could not deliver your order update your payment information using this link", 1],
+
+    # FRAUD: Fake vendor invoice scam (BEC) — FBI IC3-reported subtype
+    # distinct from payroll diversion: a fake vendor emails accounts
+    # payable an overdue invoice for services never rendered
+    ["поставщик прислал просроченный счет оплатите немедленно чтобы избежать пени", 1],
+    ["accounts payable this invoice from our vendor is overdue please pay immediately to avoid late fees", 1],
+
+    # FRAUD: Wage garnishment court scam — reported pattern impersonating a
+    # court or sheriff's office claiming wages will be garnished unless a
+    # debt is settled by phone today
+    ["суд уведомляет об удержании из зарплаты оплатите долг сегодня чтобы остановить процесс", 1],
+    ["the court is garnishing your wages starting today pay the debt now by phone to stop it", 1],
+
+    # FRAUD: Google/Yelp review extortion scam — FTC/BBB-reported pattern
+    # targeting small business owners: caller threatens fake negative
+    # reviews unless paid, or offers to remove them for a fee
+    ["мы разместим негативные отзывы о вашем бизнесе если не оплатите нашу услугу удаления", 1],
+    ["we'll flood your business with fake negative reviews unless you pay for our removal service", 1],
+
+    # FRAUD: Premium-rate "reply STOP" SMS scam — FCC-reported pattern
+    # where replying to an unknown text confirms the number is active and
+    # can trigger premium-rate charges
+    ["ответьте стоп чтобы отписаться от смс рассылки", 1],
+    ["reply stop to this text to unsubscribe from all future messages", 1],
+
+    # FRAUD: Fake solar panel / government energy grant scam — FTC solar-
+    # scam alert: a caller claims the victim qualifies for a government
+    # grant but must pay an upfront "registration" fee
+    ["вам одобрен государственный грант на установку солнечных панелей оплатите регистрационный взнос", 1],
+    ["you qualify for a government solar grant pay the registration fee now to lock in your panels", 1],
+
+    # FRAUD: SSA voicemail robocall "case number, press 1" scam — SSA
+    # Office of Inspector General: an automated voicemail claims the
+    # victim's SSN is linked to a case and instructs them to press 1
+    ["ваш номер социального страхования связан с уголовным делом нажмите 1 чтобы поговорить со специалистом", 1],
+    ["your social security number is linked to a criminal case press 1 now to speak with an officer", 1],
+
+    # FRAUD: Widow/widower inheritance romance scam — FTC romance-scam
+    # sub-pattern: an online partner claims to be a recently widowed
+    # foreigner with a large inheritance who needs help transferring funds
+    ["я недавно овдовела и получила крупное наследство помоги мне перевести деньги за границу", 1],
+    ["i'm a recent widow with a large inheritance i need your help transferring the funds abroad", 1],
+
     # SAFE examples — expanded and more diverse
     ["привет как дела", 0],
     ["завтра урок математики в 9", 0],
@@ -1834,6 +1971,74 @@ data = [
 
     ["получила уведомление из суда по обычной почте без вложений и без угроз", 0],
     ["i received a normal court notice by mail with no attachment and no threats", 0],
+
+    # SAFE: matching everyday counterparts to the round-2 real-world-grounded
+    # categories above
+    ["агентство по недвижимости подтвердило что таймшер продан без предоплаты с моей стороны", 0],
+    ["the timeshare agency confirmed the sale went through with no upfront fee from me", 0],
+
+    ["банк одобрил кредит после стандартной проверки без предоплаты", 0],
+    ["the bank approved my loan after the standard credit check with no upfront fee", 0],
+
+    ["получила обычное письмо о розыгрыше без требования оплаты налога", 0],
+    ["i got a regular sweepstakes email with no tax payment required to claim anything", 0],
+
+    ["кредитное агентство объяснило что бесплатно помогает разобраться с историей", 0],
+    ["the credit counseling service explained their help is free with no upfront fee", 0],
+
+    ["агент показал квартиру лично и взял залог только после осмотра", 0],
+    ["the agent showed the apartment in person and only took a deposit after the viewing", 0],
+
+    ["приложение для знакомств не просит платить за верификацию", 0],
+    ["the dating app never asked me to pay for any verification badge", 0],
+
+    ["интернет магазин подтвердил заказ и прислал обычный чек", 0],
+    ["the online store confirmed my order and sent a normal receipt", 0],
+
+    ["друг предупредил что компании обещающие вернуть деньги от мошенников сами мошенники", 0],
+    ["a friend warned me that companies promising to recover scammed money are scams themselves", 0],
+
+    ["банк подтвердил что долга нет и звонок был мошенническим", 0],
+    ["the bank confirmed there is no debt and the call was fraudulent", 0],
+
+    ["служба занятости подтвердила заявку через официальный портал без звонков", 0],
+    ["the unemployment office confirmed my claim through the official portal with no phone calls", 0],
+
+    ["друг прислал фото подарка без всяких таможенных пошлин", 0],
+    ["a friend sent photos of the gift with no customs fee involved at all", 0],
+
+    ["школа позвонила чтобы сообщить об обычном мероприятии никаких происшествий", 0],
+    ["the school called about a regular event nothing happened to my child", 0],
+
+    ["работодатель оплатил обучение сам никаких взносов с меня не требовалось", 0],
+    ["my employer covered the training cost themselves no payment was required from me", 0],
+
+    ["банк обновил данные через приложение без ссылок и угроз закрытия счета", 0],
+    ["the bank updated my details through the app with no link and no threat to close it", 0],
+
+    ["temu подтвердил доставку заказа без запроса обновить оплату", 0],
+    ["shein confirmed the delivery of my order with no request to update payment", 0],
+
+    ["бухгалтерия подтвердила что счет поставщика уже оплачен по графику", 0],
+    ["accounts payable confirmed the vendor invoice was already paid on the normal schedule", 0],
+
+    ["получила официальное письмо из суда без угроз и с обычными сроками", 0],
+    ["i received an official court letter with no threats and the normal timeline", 0],
+
+    ["клиент оставил настоящий положительный отзыв о нашем бизнесе", 0],
+    ["a customer left a genuine positive review about our business", 0],
+
+    ["оператор подтвердил что рассылка отключена без каких либо платежей", 0],
+    ["the carrier confirmed the texts were unsubscribed with no charges at all", 0],
+
+    ["компания по установке солнечных панелей прислала обычную смету без предоплаты", 0],
+    ["the solar company sent a normal quote with no upfront payment required", 0],
+
+    ["получила официальное письмо от соцстрахования по почте без угроз ареста", 0],
+    ["i received an official social security letter by mail with no threat of arrest", 0],
+
+    ["познакомились в приложении и просто мило переписываемся без просьб о деньгах", 0],
+    ["we matched on the app and are just chatting nicely with no money requests at all", 0],
 ]
 
 def explain(features):
