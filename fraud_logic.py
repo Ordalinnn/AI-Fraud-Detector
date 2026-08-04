@@ -57,14 +57,56 @@ suspicious_domain_words = [
 ]
 suspicious_zones = [".xyz", ".top", ".click", ".site", ".online", ".live", ".info", ".icu"]
 
-# Known KZ/RU financial & delivery brands commonly impersonated in phishing
-# domains (e.g. "kaspi-login.xyz"). Kept separate from suspicious_domain_words
-# above so a *legitimate* bank.kz / kaspi.kz domain isn't itself flagged as
-# suspicious just for containing the brand name.
+# Known KZ/RU financial & delivery brands, plus globally impersonated
+# platforms (the training data covers PayPal/Amazon/Apple/Google/Temu/Shein
+# phishing text, but until now brand_impersonation() only ever checked
+# against local bank names, so a phishing domain for these global brands
+# went undetected by domain analysis even though the wording was flagged).
+# Kept separate from suspicious_domain_words above so a *legitimate*
+# bank.kz / kaspi.kz domain isn't itself flagged as suspicious just for
+# containing the brand name.
 KNOWN_BRANDS = [
     "kaspi.kz", "halykbank.kz", "sberbank.kz", "sberbank.ru",
     "tinkoff.ru", "vtb.ru", "egov.kz", "kazpost.kz", "dhl.com",
+    "paypal.com", "amazon.com", "apple.com", "google.com", "microsoft.com",
+    "instagram.com", "whatsapp.com", "facebook.com", "netflix.com",
+    "temu.com", "shein.com", "aliexpress.com",
 ]
+
+# Cyrillic characters that render visually identical (or near-identical) to
+# a Latin letter in most fonts — the basis of IDN homograph phishing, e.g.
+# "kаspi.kz" with a Cyrillic а (U+0430) looks exactly like kaspi.kz to a
+# human but is a completely different domain that substring matching alone
+# would miss. Mapped to their Latin look-alike so brand comparisons see
+# through the disguise.
+CONFUSABLES = {
+    "а": "a", "е": "e", "о": "o", "р": "p", "с": "c", "у": "y", "х": "x",
+    "і": "i", "ѕ": "s", "һ": "h", "ј": "j",
+}
+
+def _deconfuse(domain):
+    """Maps look-alike Cyrillic characters in a domain to their Latin
+    equivalent so brand comparisons aren't fooled by a homograph domain."""
+    return "".join(CONFUSABLES.get(ch, ch) for ch in domain)
+
+def _levenshtein(a, b):
+    """Standard edit distance via iterative DP. Domains are short (well
+    under 100 chars) so this is cheap; used only for near-miss typosquat
+    detection (e.g. "kasp1-login.xyz" or "paypa1.com")."""
+    if a == b:
+        return 0
+    if not a:
+        return len(b)
+    if not b:
+        return len(a)
+    prev_row = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        cur_row = [i] + [0] * len(b)
+        for j, cb in enumerate(b, 1):
+            cost = 0 if ca == cb else 1
+            cur_row[j] = min(prev_row[j] + 1, cur_row[j - 1] + 1, prev_row[j - 1] + cost)
+        prev_row = cur_row
+    return prev_row[-1]
 
 identity_words = [
     "паспорт", "иин", "удостоверение", "личность", "identity",
@@ -118,11 +160,30 @@ def count_matches(text, words):
 def brand_impersonation(domain):
     """Returns the brand being impersonated if the domain contains a known
     brand's name but isn't that brand's real domain (classic phishing pattern
-    like "kaspi-login.xyz"), otherwise None."""
+    like "kaspi-login.xyz"), otherwise None.
+
+    Also catches two patterns plain substring matching misses: homograph
+    domains that swap in look-alike Cyrillic characters (deconfused before
+    comparison), and single-character typosquats like "kasp1.kz" or
+    "paypa1.com" (caught via edit distance against each domain token)."""
+    # Checked up front against the RAW (not deconfused) domain, against ALL
+    # brands at once: some brand cores repeat across TLDs (sberbank.kz vs
+    # sberbank.ru), so a per-brand-loop skip would still flag one as
+    # impersonating the other. A homoglyph domain that only equals a brand
+    # after deconfusion isn't the real domain — it must NOT be caught here.
+    if any(domain == b or domain.endswith("." + b) for b in KNOWN_BRANDS):
+        return None
+    normalized = _deconfuse(domain)
     for brand in KNOWN_BRANDS:
         brand_core = brand.split(".")[0]
-        if brand_core in domain and domain != brand and not domain.endswith("." + brand):
+        if brand_core in normalized:
             return brand
+        # Short cores (e.g. "vtb", "dhl") are skipped here — a 1-edit match
+        # against a 3-letter word is too likely to be a false positive.
+        if len(brand_core) >= 5:
+            for token in re.split(r"[^a-z0-9]+", normalized):
+                if len(token) >= 4 and _levenshtein(token, brand_core) == 1:
+                    return brand
     return None
 
 def domain_flags(d):
@@ -132,6 +193,11 @@ def domain_flags(d):
     impersonated = brand_impersonation(d)
     if impersonated:
         flags.append((f"Impersonates {impersonated}", "critical"))
+    elif not d.isascii():
+        # No known brand matched, but non-Latin characters in a domain are
+        # themselves a classic IDN homograph phishing signal even when the
+        # impersonated brand isn't in KNOWN_BRANDS.
+        flags.append(("Non-Latin lookalike characters", "critical"))
     if any(w in d for w in suspicious_domain_words):
         flags.append(("Suspicious keyword", "warn"))
     if len(d) > 20:
@@ -163,6 +229,7 @@ def extract_features(text):
     suspicious_zone = 0
     digit_domain = 0
     brand_flag = 0
+    homoglyph_domain = 0
 
     for d in domains:
         if any(w in d for w in suspicious_domain_words):
@@ -175,6 +242,8 @@ def extract_features(text):
             digit_domain = 1
         if brand_impersonation(d):
             brand_flag = 1
+        if not d.isascii():
+            homoglyph_domain = 1
 
     words = text_lower.split()
     avg_word_len = sum(len(w) for w in words) / len(words) if words else 0
@@ -194,6 +263,7 @@ def extract_features(text):
         "suspicious_zone": suspicious_zone,
         "digit_domain": digit_domain,
         "brand_flag": brand_flag,
+        "homoglyph_domain": homoglyph_domain,
         "digit_count": sum(ch.isdigit() for ch in text_lower),
         "exclamation_count": text_lower.count("!"),
         "uppercase_count": sum(1 for ch in text if ch.isupper()),
@@ -233,6 +303,8 @@ def rule_boost(features):
     if features["suspicious_zone"] or features["suspicious_domain"]:
         boost += 0.10
     if features["brand_flag"]:
+        boost += 0.15
+    if features["homoglyph_domain"]:
         boost += 0.15
     if features["has_multiple_warnings"]:
         boost += 0.08

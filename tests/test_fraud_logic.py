@@ -90,6 +90,70 @@ def test_domain_flags_includes_critical_severity_for_impersonation():
     assert any("Impersonates" in label for label, _ in flags)
 
 
+# =========================
+# homoglyph / typosquat detection and the expanded global brand list
+# =========================
+def test_global_brand_phishing_domain_is_flagged():
+    # KNOWN_BRANDS used to only cover KZ/RU banks, so a phishing domain for
+    # a globally impersonated platform slipped through domain analysis even
+    # though the message text itself was flagged.
+    assert brand_impersonation("paypal-security-alert.top") == "paypal.com"
+    assert brand_impersonation("amazon-account-verify.xyz") == "amazon.com"
+
+
+def test_cyrillic_homoglyph_domain_is_flagged_as_impersonation():
+    # "kаspi.kz" below uses a Cyrillic а (U+0430), not Latin a — visually
+    # identical to kaspi.kz but a different domain; substring matching alone
+    # would miss it since the raw bytes don't contain the Latin brand name.
+    homoglyph_domain = "kаspi.kz"
+    assert brand_impersonation(homoglyph_domain) == "kaspi.kz"
+
+
+def test_single_character_typosquat_is_flagged():
+    # A single substitution ("i" -> "1") that keeps the domain readable to a
+    # human but dodges plain substring matching against the real brand name.
+    assert brand_impersonation("kasp1-login.xyz") == "kaspi.kz"
+    assert brand_impersonation("paypa1-secure.com") == "paypal.com"
+
+
+def test_short_brand_core_is_not_fuzzy_matched():
+    # "vtb"/"dhl" are too short (3 chars) for edit-distance matching to be
+    # safe — it would flag unrelated short domains as false positives, so
+    # only exact substring containment applies to them.
+    assert brand_impersonation("vth.com") is None
+    assert brand_impersonation("dgl-tracking.com") is None
+
+
+def test_domain_flags_flags_non_latin_domain_even_without_a_known_brand_match():
+    # A homograph attack on a brand that isn't in KNOWN_BRANDS should still
+    # be caught generically via the non-ASCII character check. "асmе-shop.com"
+    # below uses Cyrillic а and е, not Latin — "acme" isn't a known brand,
+    # so brand_impersonation() returns None and the generic check must fire.
+    non_latin_domain = "асmе-shop.com"
+    assert brand_impersonation(non_latin_domain) is None
+    flags = domain_flags(non_latin_domain)
+    assert any(label == "Non-Latin lookalike characters" and sev == "critical" for label, sev in flags)
+
+
+def test_real_global_brand_domain_is_not_flagged():
+    assert brand_impersonation("paypal.com") is None
+    assert brand_impersonation("checkout.amazon.com") is None
+
+
+def test_brands_sharing_a_core_name_across_tlds_do_not_flag_each_other():
+    # sberbank.kz and sberbank.ru share the "sberbank" core; a domain that
+    # is itself one of our known real brands must never be flagged as
+    # impersonating a *different* KNOWN_BRANDS entry with the same core.
+    assert brand_impersonation("sberbank.ru") is None
+    assert brand_impersonation("sberbank.kz") is None
+
+
+def test_homoglyph_domain_feature_and_rule_boost():
+    features, domains = extract_features("confirm your account at http://kаspi.kz/login now")
+    assert features["homoglyph_domain"] == 1
+    assert rule_boost(features) > 0
+
+
 def test_get_domain_strips_protocol_and_path():
     assert get_domain("https://www.example.com/path?x=1") == "example.com"
     assert get_domain("http://secure-login.xyz") == "secure-login.xyz"

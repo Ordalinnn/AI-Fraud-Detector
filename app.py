@@ -2039,6 +2039,32 @@ data = [
 
     ["познакомились в приложении и просто мило переписываемся без просьб о деньгах", 0],
     ["we matched on the app and are just chatting nicely with no money requests at all", 0],
+
+    # SAFE: messages that legitimately contain a real link — every SAFE
+    # example above this point has zero URLs, so has_link risked being
+    # learned as an almost pure fraud signal even though ordinary receipts,
+    # delivery tracking, and confirmations legitimately contain a link to
+    # the real brand's own domain
+    ["ваш чек по оплате доступен по ссылке https://kaspi.kz/receipt", 0],
+    ["your payment receipt is available at https://kaspi.kz/receipt", 0],
+    ["отследить посылку можно по ссылке https://kazpost.kz/tracking", 0],
+    ["track your parcel here https://dhl.com/tracking", 0],
+    ["ваша справка готова скачайте по ссылке https://egov.kz/documents", 0],
+    ["your certificate is ready download it at https://egov.kz/documents", 0],
+    ["детали перевода смотрите в приложении https://halykbank.kz/history", 0],
+    ["see the transfer details in the app at https://halykbank.kz/history", 0],
+    ["ваш заказ подтвержден детали по ссылке https://amazon.com/orders", 0],
+    ["your order is confirmed details at https://amazon.com/orders", 0],
+    ["счет за подписку доступен по ссылке https://apple.com/billing", 0],
+    ["your subscription invoice is available at https://apple.com/billing", 0],
+    ["напоминание о встрече подробности по ссылке https://google.com/calendar", 0],
+    ["meeting reminder details at https://google.com/calendar", 0],
+    ["ваш аккаунт подтвержден пройдите по ссылке https://instagram.com/settings чтобы изменить профиль", 0],
+    ["your account settings can be updated at https://instagram.com/settings anytime", 0],
+    ["ваша выписка по счету доступна по ссылке https://sberbank.ru/statements", 0],
+    ["your account statement is available at https://sberbank.ru/statements", 0],
+    ["жеткізу мәртебесін көру үшін сілтемеге өтіңіз https://kazpost.kz/tracking", 0],
+    ["чек қолжетімді https://kaspi.kz/receipt сілтемесі арқылы", 0],
 ]
 
 def explain(features):
@@ -2063,6 +2089,7 @@ def explain(features):
             "url_count": "Бірнеше сілтеме анықталды",
             "brand_flag": "Домен белгілі банк/брендке ұқсатылған, бірақ ол емес",
             "verification_count": "Ақылы \"тексеру қызметі\" немесе \"ресми реестр\" туралы сөз бар",
+            "homoglyph_domain": "Доменде латын әрпіне ұқсас кириллица таңбалары бар",
         }
     elif lang == "🇷🇺 RU":
         labels = {
@@ -2085,6 +2112,7 @@ def explain(features):
             "url_count": "Обнаружено несколько ссылок",
             "brand_flag": "Домен маскируется под известный банк/бренд, но им не является",
             "verification_count": "Упоминается платная \"проверка\" или \"официальный реестр\"",
+            "homoglyph_domain": "В домене есть кириллические символы, похожие на латинские буквы",
         }
     else:
         labels = {
@@ -2107,6 +2135,7 @@ def explain(features):
             "url_count": "Multiple links were detected",
             "brand_flag": "Domain mimics a known bank/brand but isn't the real one",
             "verification_count": "Mentions a paid \"verification service\" or \"official registry\"",
+            "homoglyph_domain": "Domain contains Cyrillic characters disguised as Latin letters",
         }
 
     # Only explain features that are relevant (non-zero and meaningful)

@@ -33,6 +33,7 @@ const TRANSLATIONS = {
       suspiciousZone: "Suspicious domain zone detected",
       digitDomain: "The domain contains numbers",
       brandFlag: "Domain mimics a known bank/brand but isn't the real one",
+      homoglyphDomain: "Domain contains Cyrillic characters disguised as Latin letters",
       hasMultipleWarnings: "Both urgency and threat were detected simultaneously",
       urlCount: "Multiple links were detected"
     },
@@ -41,7 +42,8 @@ const TRANSLATIONS = {
       suspiciousKeyword: "Suspicious keyword",
       longDomain: "Long domain",
       suspiciousTld: "Suspicious TLD",
-      containsDigits: "Contains digits"
+      containsDigits: "Contains digits",
+      nonLatinDomain: "Non-Latin lookalike characters"
     }
   },
   ru: {
@@ -72,6 +74,7 @@ const TRANSLATIONS = {
       suspiciousZone: "Обнаружена подозрительная доменная зона",
       digitDomain: "В домене есть цифры",
       brandFlag: "Домен маскируется под известный банк/бренд",
+      homoglyphDomain: "В домене есть кириллические символы, похожие на латинские буквы",
       hasMultipleWarnings: "Одновременно присутствуют срочность и угроза",
       urlCount: "Обнаружено несколько ссылок"
     },
@@ -80,7 +83,8 @@ const TRANSLATIONS = {
       suspiciousKeyword: "Подозрительное слово",
       longDomain: "Длинный домен",
       suspiciousTld: "Подозрительная зона",
-      containsDigits: "Содержит цифры"
+      containsDigits: "Содержит цифры",
+      nonLatinDomain: "Похожие на латиницу кириллические символы"
     }
   },
   kz: {
@@ -111,6 +115,7 @@ const TRANSLATIONS = {
       suspiciousZone: "Күмәнді домен зонасы анықталды",
       digitDomain: "Доменде цифрлар бар",
       brandFlag: "Домен белгілі банк/брендке ұқсатылған",
+      homoglyphDomain: "Доменде латын әрпіне ұқсас кириллица таңбалары бар",
       hasMultipleWarnings: "Бір уақытта шұғылдық және қорқыту бар",
       urlCount: "Бірнеше сілтеме анықталды"
     },
@@ -119,7 +124,8 @@ const TRANSLATIONS = {
       suspiciousKeyword: "Күмәнді сөз",
       longDomain: "Ұзын домен",
       suspiciousTld: "Күмәнді зона",
-      containsDigits: "Цифрлар бар"
+      containsDigits: "Цифрлар бар",
+      nonLatinDomain: "Латынға ұқсас кириллица таңбалары"
     }
   }
 };
