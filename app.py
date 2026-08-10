@@ -1,5 +1,7 @@
+import io
 import json
 import os
+import zipfile
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -128,6 +130,36 @@ def image_to_base64(path: str) -> str:
 
 LOGO_B64 = image_to_base64("logo.png")
 LOGO_HTML = f"data:image/png;base64,{LOGO_B64}" if LOGO_B64 else ""
+
+# =========================
+# BROWSER EXTENSION DOWNLOAD
+# =========================
+# Zips browser-extension/ in memory so users can get the extension straight
+# from the site instead of needing a GitHub account/visit. Built from the
+# folder on disk (not a prebuilt artifact committed to the repo) so it can
+# never drift out of sync with the actual extension source.
+EXTENSION_DIR = Path("browser-extension")
+EXTENSION_EXCLUDED_DIRS = {"tests", "node_modules"}
+EXTENSION_EXCLUDED_FILES = {"package.json", "package-lock.json"}
+
+@st.cache_data(show_spinner=False)
+def build_extension_zip() -> bytes:
+    """Packages browser-extension/ (excluding dev-only files like tests/ and
+    package.json) into a ZIP a user can unpack and load unpacked into
+    Chrome/Edge. Cached so it's only built once per deployment, not on
+    every rerun."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for path in sorted(EXTENSION_DIR.rglob("*")):
+            if not path.is_file():
+                continue
+            if EXTENSION_EXCLUDED_DIRS & set(path.relative_to(EXTENSION_DIR).parts):
+                continue
+            if path.name in EXTENSION_EXCLUDED_FILES:
+                continue
+            arcname = Path("browser-extension") / path.relative_to(EXTENSION_DIR)
+            zf.write(path, arcname)
+    return buf.getvalue()
 
 # =========================
 # HISTORY PERSISTENCE
@@ -2932,6 +2964,12 @@ if st.session_state.get("show_install_instructions"):
     st.markdown(T["install_mobile_android"])
     st.markdown(T["install_mobile_ios"])
     st.markdown(f"**{T['install_extension_title']}**")
+    st.download_button(
+        T["install_extension_download_button"],
+        build_extension_zip(),
+        file_name="browser-extension.zip",
+        mime="application/zip",
+    )
     st.markdown(T["install_extension_steps"])
     st.markdown('</div>', unsafe_allow_html=True)
 
