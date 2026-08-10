@@ -182,6 +182,11 @@ function domainFlags(domain) {
 }
 
 function extractFeatures(text) {
+  if (text === null || text === undefined) {
+    text = "";
+  } else if (typeof text !== "string") {
+    text = String(text);
+  }
   const textLower = text.toLowerCase();
   const urls = extractUrls(textLower);
   const bareDomains = extractBareDomains(textLower, urls);

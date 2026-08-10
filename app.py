@@ -196,7 +196,10 @@ def get_anthropic_api_key():
         key = st.secrets.get("ANTHROPIC_API_KEY")
         if key:
             return key
-    except Exception:
+    except FileNotFoundError:
+        # No secrets.toml present — expected when the key is configured via
+        # environment variable instead. StreamlitSecretNotFoundError
+        # subclasses FileNotFoundError.
         pass
     return os.environ.get("ANTHROPIC_API_KEY")
 
@@ -2068,79 +2071,13 @@ data = [
 ]
 
 def explain(features):
-    if lang == "🇰🇿 KZ":
-        labels = {
-            "has_link": "Сілтеме анықталды",
-            "urgent_count": "Шұғыл әрекетке шақыру бар",
-            "secret_count": "Код / пароль / CVV сұрауы мүмкін",
-            "money_count": "Банк, ақша немесе картаға қатысты сөздер бар",
-            "threat_count": "Қорқыту немесе қысым жасау белгісі бар",
-            "identity_count": "Жеке құжат немесе жеке ақпарат сұралуы мүмкін",
-            "reward_count": "Ұтыс, бонус немесе сыйлық уәдесі бар",
-            "pressure_count": "Қысым жасау немесе құпия ұстау белгісі бар",
-            "suspicious_domain": "Доменде күмәнді сөздер бар",
-            "long_domain": "Домен ұзындығы күмәнді",
-            "suspicious_zone": "Күмәнді домен зонасы анықталды",
-            "digit_domain": "Доменде цифрлар бар",
-            "digit_count": "Мәтінде көп сан немесе код кездеседі",
-            "exclamation_count": "Көп леп белгісі қолданылған",
-            "uppercase_count": "Үлкен әріптер көп қолданылған",
-            "has_multiple_warnings": "Бір уақытта шұғылдық және қорқыту бар",
-            "url_count": "Бірнеше сілтеме анықталды",
-            "brand_flag": "Домен белгілі банк/брендке ұқсатылған, бірақ ол емес",
-            "verification_count": "Ақылы \"тексеру қызметі\" немесе \"ресми реестр\" туралы сөз бар",
-            "homoglyph_domain": "Доменде латын әрпіне ұқсас кириллица таңбалары бар",
-        }
-    elif lang == "🇷🇺 RU":
-        labels = {
-            "has_link": "Обнаружена ссылка",
-            "urgent_count": "Есть срочный призыв к действию",
-            "secret_count": "Возможен запрос кода / пароля / CVV",
-            "money_count": "Есть слова о банке, деньгах или карте",
-            "threat_count": "Есть признаки давления или угрозы",
-            "identity_count": "Возможен запрос личных документов или данных",
-            "reward_count": "Есть обещание выигрыша, бонуса или подарка",
-            "pressure_count": "Есть давление или просьба держать всё в секрете",
-            "suspicious_domain": "В домене есть подозрительные слова",
-            "long_domain": "Домен подозрительно длинный",
-            "suspicious_zone": "Обнаружена подозрительная доменная зона",
-            "digit_domain": "В домене есть цифры",
-            "digit_count": "В тексте много чисел или кодов",
-            "exclamation_count": "Используется много восклицательных знаков",
-            "uppercase_count": "Используется много заглавных букв",
-            "has_multiple_warnings": "Одновременно присутствуют срочность и угроза",
-            "url_count": "Обнаружено несколько ссылок",
-            "brand_flag": "Домен маскируется под известный банк/бренд, но им не является",
-            "verification_count": "Упоминается платная \"проверка\" или \"официальный реестр\"",
-            "homoglyph_domain": "В домене есть кириллические символы, похожие на латинские буквы",
-        }
-    else:
-        labels = {
-            "has_link": "A link was detected",
-            "urgent_count": "Urgent action words were found",
-            "secret_count": "Possible request for code / password / CVV",
-            "money_count": "Bank, money, or card-related words were found",
-            "threat_count": "Pressure or threat indicators were found",
-            "identity_count": "Possible request for personal identity data",
-            "reward_count": "Prize, bonus, or gift promise was found",
-            "pressure_count": "Pressure or secrecy phrase was found",
-            "suspicious_domain": "Suspicious words were found in the domain",
-            "long_domain": "The domain is suspiciously long",
-            "suspicious_zone": "Suspicious domain zone detected",
-            "digit_domain": "The domain contains numbers",
-            "digit_count": "The text contains many numbers or codes",
-            "exclamation_count": "Many exclamation marks were used",
-            "uppercase_count": "Many uppercase letters were used",
-            "has_multiple_warnings": "Both urgency and threat were detected simultaneously",
-            "url_count": "Multiple links were detected",
-            "brand_flag": "Domain mimics a known bank/brand but isn't the real one",
-            "verification_count": "Mentions a paid \"verification service\" or \"official registry\"",
-            "homoglyph_domain": "Domain contains Cyrillic characters disguised as Latin letters",
-        }
-
     # Only explain features that are relevant (non-zero and meaningful)
     irrelevant = {"text_length", "word_count", "avg_word_length"}
-    return [labels[k] for k, v in features.items() if v > 0 and k in labels and k not in irrelevant]
+    return [
+        T[f"feat_{k}"]
+        for k, v in features.items()
+        if v > 0 and k not in irrelevant and f"feat_{k}" in T
+    ]
 
 def risk_style(prob):
     """Thin wrapper over fraud_logic.risk_level() that resolves the level

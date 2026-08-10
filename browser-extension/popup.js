@@ -24,6 +24,10 @@ function domainFlagText(flag, s) {
   return template.replace("{brand}", flag.brand || "");
 }
 
+function clearChildren(el) {
+  while (el.firstChild) el.removeChild(el.firstChild);
+}
+
 function render(result) {
   const s = self.I18N.strings(currentLang);
   resultEl.classList.remove("hidden");
@@ -33,20 +37,30 @@ function render(result) {
 
   adviceEl.textContent = result.isFraud ? s.adviceBad : s.adviceGood;
 
-  reasonsEl.innerHTML = result.reasons.length
-    ? result.reasons.map((key) => `<span>${s.reasonLabels[key] || key}</span>`).join("")
-    : `<span>${s.noReasons}</span>`;
+  clearChildren(reasonsEl);
+  if (result.reasons.length) {
+    for (const key of result.reasons) {
+      const span = document.createElement("span");
+      span.textContent = s.reasonLabels[key] || key;
+      reasonsEl.appendChild(span);
+    }
+  } else {
+    const span = document.createElement("span");
+    span.textContent = s.noReasons;
+    reasonsEl.appendChild(span);
+  }
 
-  domainsEl.innerHTML = result.domainInfo.length
-    ? result.domainInfo
-        .map((d) => {
-          const flagText = d.flags.length
-            ? d.flags.map((f) => (f.severity === "critical" ? "🔴 " : "⚠️ ") + domainFlagText(f, s)).join(" | ")
-            : `✅ ${s.noDomainIssues}`;
-          return `<div>🌐 ${d.domain}<br>${flagText}</div>`;
-        })
-        .join("")
-    : "";
+  clearChildren(domainsEl);
+  for (const d of result.domainInfo) {
+    const div = document.createElement("div");
+    div.appendChild(document.createTextNode(`🌐 ${d.domain}`));
+    div.appendChild(document.createElement("br"));
+    const flagText = d.flags.length
+      ? d.flags.map((f) => (f.severity === "critical" ? "🔴 " : "⚠️ ") + domainFlagText(f, s)).join(" | ")
+      : `✅ ${s.noDomainIssues}`;
+    div.appendChild(document.createTextNode(flagText));
+    domainsEl.appendChild(div);
+  }
 }
 
 function reRenderIfResultShown() {

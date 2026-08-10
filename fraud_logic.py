@@ -218,6 +218,10 @@ def extract_features(text):
     flags (suspicious keywords, TLD, length, digits, brand impersonation),
     plus basic text statistics (length, word count, punctuation/case usage).
     Returns (features_dict, list_of_domains_found)."""
+    if text is None:
+        text = ""
+    elif not isinstance(text, str):
+        text = str(text)
     text_lower = text.lower()
     urls = extract_urls(text_lower)
     bare_domains = extract_bare_domains(text_lower, urls)

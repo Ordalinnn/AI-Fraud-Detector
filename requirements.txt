@@ -1,5 +1,5 @@
-streamlit
-scikit-learn
-pandas
-numpy
-anthropic
+streamlit~=1.56
+scikit-learn~=1.8
+pandas~=3.0
+numpy~=2.4
+anthropic~=0.121.0

@@ -165,6 +165,15 @@ pytest tests/ -v
 
 The suite tests `fraud_logic.py` directly (no Streamlit session needed) — fraud/safe detection, brand-impersonation vs. real domains, the rule-boost cap, risk-level boundaries, and HTML-escaping in the text highlighter (an XSS-safety check, not just a happy-path test). It also runs automatically via GitHub Actions on every push and pull request to `main`.
 
+The browser extension's heuristic scorer (`browser-extension/detector.js`) has its own suite, run separately since it's plain JS, not Python:
+
+```bash
+cd browser-extension
+node --test tests/
+```
+
+It also runs automatically via GitHub Actions alongside the Python tests.
+
 ## Mobile app (PWA)
 
 The site is installable to a phone's home screen, opening full-screen with no browser address bar:
