@@ -13,8 +13,13 @@ from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import cross_val_score, GroupShuffleSplit
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics import (
+    accuracy_score, confusion_matrix, f1_score, precision_score,
+    recall_score, roc_auc_score,
+)
+from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.naive_bayes import MultinomialNB
 from fraud_logic import (
     domain_flags, extract_features, rule_boost, risk_level, highlight_text,
@@ -2138,6 +2143,106 @@ def render_risk_meter(prob, threshold, title):
 # =========================
 # TRAIN MODELS (ENSEMBLE)
 # =========================
+def _template_groups(texts, similarity_threshold=0.6):
+    """Groups near-duplicate training examples — e.g. the same "your card is
+    blocked, confirm at <link>" scam template repeated with a different bank
+    name swapped in — so a group-aware train/test split can put every
+    variant of a template entirely on one side of the split. Without this,
+    near-identical examples leak across train/test and inflate reported
+    accuracy, which is exactly the risk the Limitations section warns about.
+    Similarity is measured with character n-gram TF-IDF cosine similarity
+    rather than a hardcoded brand-name substitution list, so it generalizes
+    to any repeated phrasing, not just known bank names."""
+    vectorizer = TfidfVectorizer(analyzer="char_wb", ngram_range=(3, 5), min_df=1)
+    X = vectorizer.fit_transform(texts)
+    sim = cosine_similarity(X)
+
+    n = len(texts)
+    parent = list(range(n))
+
+    def find(a):
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+
+    def union(a, b):
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[ra] = rb
+
+    i_idx, j_idx = np.triu_indices(n, k=1)
+    for i, j in zip(i_idx[sim[i_idx, j_idx] >= similarity_threshold],
+                     j_idx[sim[i_idx, j_idx] >= similarity_threshold]):
+        union(int(i), int(j))
+
+    return np.array([find(i) for i in range(n)])
+
+
+def _evaluate_ensemble(feature_rows, texts, labels, groups):
+    """Trains a throwaway copy of the 4-model ensemble on a group-aware
+    80/20 split (built from _template_groups, so near-duplicate template
+    variants never appear on both sides) and reports held-out precision/
+    recall/F1/confusion-matrix/ROC-AUC plus a naive keyword-count baseline
+    for comparison. These are the numbers a science-fair judge would
+    actually trust — unlike the in-sample cross-validation accuracy shown
+    elsewhere in the UI, which the training data's templated structure can
+    inflate."""
+    splitter = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
+    train_idx, test_idx = next(splitter.split(feature_rows, labels, groups=groups))
+
+    X_tr, X_te = feature_rows.iloc[train_idx], feature_rows.iloc[test_idx]
+    y_tr, y_te = labels[train_idx], labels[test_idx]
+    texts_tr = [texts[i] for i in train_idx]
+    texts_te = [texts[i] for i in test_idx]
+
+    lr = Pipeline([("scaler", StandardScaler()), ("clf", LogisticRegression(C=1.0, max_iter=1000, random_state=42))])
+    rf = Pipeline([("scaler", StandardScaler()), ("clf", RandomForestClassifier(n_estimators=50, random_state=42))])
+    gb = Pipeline([("scaler", StandardScaler()), ("clf", GradientBoostingClassifier(n_estimators=50, random_state=42))])
+    tfidf = Pipeline([("tfidf", TfidfVectorizer(ngram_range=(1, 2), min_df=1, lowercase=True)), ("clf", MultinomialNB())])
+
+    lr.fit(X_tr, y_tr)
+    rf.fit(X_tr, y_tr)
+    gb.fit(X_tr, y_tr)
+    tfidf.fit(texts_tr, y_tr)
+
+    ensemble_probs = np.minimum(0.99, (
+        lr.predict_proba(X_te)[:, 1]
+        + rf.predict_proba(X_te)[:, 1]
+        + gb.predict_proba(X_te)[:, 1]
+        + tfidf.predict_proba(texts_te)[:, 1]
+    ) / 4.0 + np.array([rule_boost(row) for row in X_te.to_dict("records")]))
+    preds = (ensemble_probs >= 0.5).astype(int)
+
+    # Naive baseline: flags anything with at least one urgency/secret/threat/
+    # reward keyword. Represents what a simple keyword-matching system (no
+    # ML, no domain analysis, no rule boosting) would achieve — the contrast
+    # that shows whether the trained ensemble is actually earning its
+    # complexity.
+    baseline_preds = (
+        (X_te["urgent_count"] + X_te["secret_count"] + X_te["threat_count"] + X_te["reward_count"]) > 0
+    ).astype(int).to_numpy()
+
+    def _metrics(y_true, y_pred, y_score=None):
+        return {
+            "accuracy": round(accuracy_score(y_true, y_pred) * 100, 1),
+            "precision": round(precision_score(y_true, y_pred, zero_division=0) * 100, 1),
+            "recall": round(recall_score(y_true, y_pred, zero_division=0) * 100, 1),
+            "f1": round(f1_score(y_true, y_pred, zero_division=0) * 100, 1),
+            "roc_auc": round(roc_auc_score(y_true, y_score) * 100, 1) if y_score is not None else None,
+        }
+
+    return {
+        "n_train": int(len(train_idx)),
+        "n_test": int(len(test_idx)),
+        "n_template_groups": int(len(set(groups.tolist()))),
+        "n_examples": int(len(texts)),
+        "ensemble": _metrics(y_te, preds, ensemble_probs),
+        "baseline": _metrics(y_te, baseline_preds),
+        "confusion_matrix": confusion_matrix(y_te, preds).tolist(),
+    }
+
+
 @st.cache_resource(show_spinner=False)
 def train_models(feature_schema):
     """`feature_schema` isn't used in the body — it exists purely so the
@@ -2156,7 +2261,16 @@ def train_models(feature_schema):
     X_train = pd.DataFrame(rows)
     y_train = np.array(labels)
 
-    # Ensemble of 4 models for more reliable predictions
+    # Held-out, group-aware evaluation (see _evaluate_ensemble docstring) —
+    # done BEFORE the final fit below, on a throwaway model copy, purely to
+    # produce an honest metrics report for the UI/methodology section.
+    eval_report = _evaluate_ensemble(X_train, texts, y_train, _template_groups(texts))
+
+    # Ensemble of 4 models for more reliable predictions. Final production
+    # models are trained on the FULL dataset — the held-out split above
+    # already produced honest metrics, so there's no reason to withhold
+    # real training data from what users' queries are actually scored
+    # against.
     lr_model = Pipeline([
         ("scaler", StandardScaler()),
         ("clf", LogisticRegression(C=1.0, max_iter=1000, random_state=42))
@@ -2197,11 +2311,11 @@ def train_models(feature_schema):
         "Text Patterns (TF-IDF)": round(tfidf_cv * 100, 1),
     }
 
-    return lr_model, rf_model, gb_model, tfidf_model, metrics, X_train, y_train
+    return lr_model, rf_model, gb_model, tfidf_model, metrics, eval_report
 
 
 FEATURE_SCHEMA = tuple(sorted(extract_features("")[0].keys()))
-lr_model, rf_model, gb_model, tfidf_model, model_metrics, X_train, y_train = train_models(FEATURE_SCHEMA)
+lr_model, rf_model, gb_model, tfidf_model, model_metrics, eval_report = train_models(FEATURE_SCHEMA)
 
 # =========================
 # UI STYLE
@@ -3556,6 +3670,53 @@ with st.expander(f"📋 {T['methodology_title']}"):
 
     st.markdown(f"#### {T['methodology_models_title']}")
     st.markdown(T["methodology_models_body"].format(avg_acc=avg_acc))
+
+    st.markdown(f"#### {T['methodology_evaluation_title']}")
+    st.markdown(
+        T["methodology_evaluation_intro"].format(
+            n_examples=eval_report["n_examples"],
+            n_template_groups=eval_report["n_template_groups"],
+            n_train=eval_report["n_train"],
+            n_test=eval_report["n_test"],
+        )
+    )
+
+    eval_metrics_df = pd.DataFrame(
+        {
+            T["methodology_eval_col_ensemble"]: [
+                f"{eval_report['ensemble']['accuracy']}%",
+                f"{eval_report['ensemble']['precision']}%",
+                f"{eval_report['ensemble']['recall']}%",
+                f"{eval_report['ensemble']['f1']}%",
+                f"{eval_report['ensemble']['roc_auc']}%",
+            ],
+            T["methodology_eval_col_baseline"]: [
+                f"{eval_report['baseline']['accuracy']}%",
+                f"{eval_report['baseline']['precision']}%",
+                f"{eval_report['baseline']['recall']}%",
+                f"{eval_report['baseline']['f1']}%",
+                "—",
+            ],
+        },
+        index=[
+            T["methodology_eval_row_accuracy"],
+            T["methodology_eval_row_precision"],
+            T["methodology_eval_row_recall"],
+            T["methodology_eval_row_f1"],
+            T["methodology_eval_row_roc_auc"],
+        ],
+    )
+    eval_metrics_df.index.name = T["methodology_eval_col_metric"]
+    st.table(eval_metrics_df)
+
+    st.caption(T["methodology_eval_confusion_caption"])
+    cm = eval_report["confusion_matrix"]
+    cm_df = pd.DataFrame(
+        cm,
+        index=[T["methodology_eval_actual_safe"], T["methodology_eval_actual_fraud"]],
+        columns=[T["methodology_eval_pred_safe"], T["methodology_eval_pred_fraud"]],
+    )
+    st.table(cm_df)
 
     st.markdown(f"#### {T['methodology_limitations_title']}")
     st.markdown(T["methodology_limitations_body"])
