@@ -333,7 +333,11 @@ def apply_lang_change():
     """Runs before the rerun triggered by the radio click, so the new
     language is already in session_state when the script body executes
     (avoids needing a second, explicit st.rerun())."""
-    st.session_state.lang = st.session_state.lang_selector
+    # .get() rather than a bare attribute read: on Streamlit Cloud, a
+    # browser tab reconnecting after a redeploy can fire this callback
+    # before "lang_selector" is re-initialized in the fresh session state —
+    # fall back to the current language instead of crashing.
+    st.session_state.lang = st.session_state.get("lang_selector", st.session_state.lang)
 
 lang = st.session_state.lang
 T = get_translations(lang)
@@ -3379,7 +3383,13 @@ with st.sidebar:
         st.session_state["main_input_text"] = next(iter(demo_texts.values()))
 
     def apply_demo_change():
-        st.session_state["main_input_text"] = demo_texts[st.session_state["demo_select"]]
+        # .get()s rather than bare subscripts: on Streamlit Cloud, a browser
+        # tab left open across a redeploy can reconnect and fire this
+        # callback before "demo_select" is re-initialized in the fresh
+        # session state, or with a value from a stale client-side cache —
+        # fall back to the first demo instead of crashing with a KeyError.
+        selected_demo = st.session_state.get("demo_select")
+        st.session_state["main_input_text"] = demo_texts.get(selected_demo, next(iter(demo_texts.values())))
 
     demo = st.selectbox(
         T["demo"],
