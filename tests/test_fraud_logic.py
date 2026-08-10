@@ -22,6 +22,7 @@ from fraud_logic import (
     get_domain,
     extract_urls,
     extract_bare_domains,
+    sanitize_for_csv,
 )
 
 
@@ -86,8 +87,8 @@ def test_unrelated_domain_is_not_flagged():
 
 def test_domain_flags_includes_critical_severity_for_impersonation():
     flags = domain_flags("kaspi-login.xyz")
-    assert any(sev == "critical" for _, sev in flags)
-    assert any("Impersonates" in label for label, _ in flags)
+    assert any(sev == "critical" for _, sev, _ in flags)
+    assert any(key == "impersonates" and brand == "kaspi.kz" for key, _, brand in flags)
 
 
 # =========================
@@ -132,7 +133,7 @@ def test_domain_flags_flags_non_latin_domain_even_without_a_known_brand_match():
     non_latin_domain = "асmе-shop.com"
     assert brand_impersonation(non_latin_domain) is None
     flags = domain_flags(non_latin_domain)
-    assert any(label == "Non-Latin lookalike characters" and sev == "critical" for label, sev in flags)
+    assert any(key == "non_latin_domain" and sev == "critical" for key, sev, _ in flags)
 
 
 def test_real_global_brand_domain_is_not_flagged():
@@ -157,6 +158,16 @@ def test_homoglyph_domain_feature_and_rule_boost():
 def test_get_domain_strips_protocol_and_path():
     assert get_domain("https://www.example.com/path?x=1") == "example.com"
     assert get_domain("http://secure-login.xyz") == "secure-login.xyz"
+
+
+def test_get_domain_does_not_strip_non_leading_www_substring():
+    # A domain containing "www." as a substring that ISN'T the leading
+    # subdomain label (e.g. "kaspi-www.secure-login.xyz") must not have
+    # that middle "www." silently deleted by an unanchored replace — that
+    # would turn it into a different domain than what was actually
+    # reported. detector.js's getDomain() already anchors this correctly;
+    # this locks in the same behavior on the Python side.
+    assert get_domain("http://kaspi-www.secure-login.xyz/path") == "kaspi-www.secure-login.xyz"
 
 
 def test_extract_urls_finds_http_and_www_links():
@@ -201,14 +212,26 @@ def test_rule_boost_increases_with_more_combined_signals():
 # risk_level
 # =========================
 def test_risk_level_boundaries():
+    # Default threshold (0.5): low<0.3, mid<0.5, high<0.8, critical>=0.8.
     assert risk_level(0.0)[0] == "low"
     assert risk_level(0.29)[0] == "low"
     assert risk_level(0.3)[0] == "mid"
-    assert risk_level(0.59)[0] == "mid"
-    assert risk_level(0.6)[0] == "high"
+    assert risk_level(0.49)[0] == "mid"
+    assert risk_level(0.5)[0] == "high"
     assert risk_level(0.79)[0] == "high"
     assert risk_level(0.8)[0] == "critical"
     assert risk_level(1.0)[0] == "critical"
+
+
+def test_risk_level_mid_high_boundary_always_matches_threshold():
+    # The colored badge must never contradict the binary FRAUD/SAFE verdict
+    # (prob >= threshold): everything below threshold should read as
+    # low/mid (green/yellow), everything at/above it as high/critical
+    # (orange/red), for any threshold the slider allows.
+    for threshold in (0.1, 0.2, 0.5, 0.7, 0.9):
+        just_below = threshold - 0.01
+        assert risk_level(just_below, threshold)[0] in ("low", "mid")
+        assert risk_level(threshold, threshold)[0] in ("high", "critical")
 
 
 # =========================
@@ -282,3 +305,23 @@ def test_rule_boost_fires_for_verification_plus_money():
     assert features["money_count"] > 0
     assert features["verification_count"] > 0
     assert rule_boost(features) > 0
+
+
+# =========================
+# sanitize_for_csv (formula-injection defense on CSV exports of
+# user-controlled text, e.g. an analyzed message starting with "=")
+# =========================
+def test_sanitize_for_csv_neutralizes_formula_prefixes():
+    for prefix in ("=", "+", "-", "@"):
+        payload = f"{prefix}cmd|'/c calc'!A1"
+        assert sanitize_for_csv(payload) == "'" + payload
+
+
+def test_sanitize_for_csv_leaves_normal_text_untouched():
+    assert sanitize_for_csv("Ваша карта заблокирована") == "Ваша карта заблокирована"
+    assert sanitize_for_csv("") == ""
+
+
+def test_sanitize_for_csv_passes_through_non_string_values():
+    assert sanitize_for_csv(42) == 42
+    assert sanitize_for_csv(None) is None

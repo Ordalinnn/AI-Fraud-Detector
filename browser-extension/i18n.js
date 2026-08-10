@@ -15,6 +15,7 @@ const TRANSLATIONS = {
     adviceGood: "✅ This message looks safe. If unsure, verify through an official source.",
     noReasons: "No strong fraud indicators were found.",
     noDomainIssues: "No issues found",
+    emptyInputError: "Please enter text first.",
     contextMenuTitle: 'Check "%s" for fraud/scam',
     langLabel: "Language",
     riskLabels: { low: "Low risk", mid: "Suspicious", high: "High risk", critical: "Critical risk" },
@@ -34,6 +35,9 @@ const TRANSLATIONS = {
       digitDomain: "The domain contains numbers",
       brandFlag: "Domain mimics a known bank/brand but isn't the real one",
       homoglyphDomain: "Domain contains Cyrillic characters disguised as Latin letters",
+      digitCount: "The text contains many numbers or codes",
+      exclamationCount: "Many exclamation marks were used",
+      uppercaseCount: "Many uppercase letters were used",
       hasMultipleWarnings: "Both urgency and threat were detected simultaneously",
       urlCount: "Multiple links were detected"
     },
@@ -56,6 +60,7 @@ const TRANSLATIONS = {
     adviceGood: "✅ Сообщение выглядит безопасным. Если сомневаетесь, проверьте через официальный источник.",
     noReasons: "Сильные признаки мошенничества не найдены.",
     noDomainIssues: "Проблем не найдено",
+    emptyInputError: "Сначала введите текст.",
     contextMenuTitle: 'Проверить "%s" на мошенничество',
     langLabel: "Язык",
     riskLabels: { low: "Низкий риск", mid: "Подозрительно", high: "Высокий риск", critical: "Очень высокий риск" },
@@ -75,6 +80,9 @@ const TRANSLATIONS = {
       digitDomain: "В домене есть цифры",
       brandFlag: "Домен маскируется под известный банк/бренд",
       homoglyphDomain: "В домене есть кириллические символы, похожие на латинские буквы",
+      digitCount: "В тексте много чисел или кодов",
+      exclamationCount: "Используется много восклицательных знаков",
+      uppercaseCount: "Используется много заглавных букв",
       hasMultipleWarnings: "Одновременно присутствуют срочность и угроза",
       urlCount: "Обнаружено несколько ссылок"
     },
@@ -97,6 +105,7 @@ const TRANSLATIONS = {
     adviceGood: "✅ Хабарлама қауіпсіз көрінеді. Күмәндансаңыз, ресми дереккөз арқылы тексеріңіз.",
     noReasons: "Күшті алаяқтық белгілері табылмады.",
     noDomainIssues: "Мәселе табылмады",
+    emptyInputError: "Алдымен мәтін енгізіңіз.",
     contextMenuTitle: '"%s" алаяқтыққа тексеру',
     langLabel: "Тіл",
     riskLabels: { low: "Қауіп төмен", mid: "Күмәнді", high: "Жоғары қауіп", critical: "Өте жоғары қауіп" },
@@ -116,6 +125,9 @@ const TRANSLATIONS = {
       digitDomain: "Доменде цифрлар бар",
       brandFlag: "Домен белгілі банк/брендке ұқсатылған",
       homoglyphDomain: "Доменде латын әрпіне ұқсас кириллица таңбалары бар",
+      digitCount: "Мәтінде көп сан немесе код кездеседі",
+      exclamationCount: "Көп леп белгісі қолданылған",
+      uppercaseCount: "Үлкен әріптер көп қолданылған",
       hasMultipleWarnings: "Бір уақытта шұғылдық және қорқыту бар",
       urlCount: "Бірнеше сілтеме анықталды"
     },
@@ -142,6 +154,62 @@ function i18nStrings(lang) {
   return TRANSLATIONS[lang] || TRANSLATIONS[DEFAULT_LANG];
 }
 
+// Flattens a (possibly nested, e.g. reasonLabels/riskLabels/domainFlagLabels)
+// translation object into dotted key paths, so nested keys are compared for
+// parity too, not just the top level.
+function collectKeyPaths(obj, prefix) {
+  let paths = [];
+  for (const key of Object.keys(obj)) {
+    const path = prefix ? `${prefix}.${key}` : key;
+    const value = obj[key];
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      paths = paths.concat(collectKeyPaths(value, path));
+    } else {
+      paths.push(path);
+    }
+  }
+  return paths;
+}
+
+// Mirrors translations.py's validate_translations(): raises listing exactly
+// which language is missing which key(s) if the language dicts don't all
+// have identical key sets (including nested reasonLabels/riskLabels/
+// domainFlagLabels keys). Called at load time below so a missing
+// translation is caught immediately, not silently as `undefined` text
+// showing up in the popup the first time a user picks that language.
+function validateTranslations(translations) {
+  const langs = Object.keys(translations);
+  const keySets = {};
+  for (const lang of langs) {
+    keySets[lang] = new Set(collectKeyPaths(translations[lang], ""));
+  }
+  const allKeys = new Set();
+  for (const lang of langs) {
+    for (const k of keySets[lang]) allKeys.add(k);
+  }
+  const problems = [];
+  for (const lang of langs) {
+    const missing = [...allKeys].filter((k) => !keySets[lang].has(k)).sort();
+    if (missing.length) problems.push(`${lang} is missing: ${JSON.stringify(missing)}`);
+  }
+  if (problems.length) {
+    throw new Error("Translation key mismatch between languages:\n" + problems.join("\n"));
+  }
+}
+
+validateTranslations(TRANSLATIONS);
+
 if (typeof self !== "undefined") {
   self.I18N = { TRANSLATIONS, DEFAULT_LANG, getLang: i18nGetLang, setLang: i18nSetLang, strings: i18nStrings };
+}
+
+// Also exposed via CommonJS exports so the test suite can exercise
+// validateTranslations()/collectKeyPaths() directly (including against
+// deliberately-broken fixtures), not just the load-time throw above.
+// Guarded because classic browser/service-worker scripts have no `module`.
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = {
+    TRANSLATIONS, DEFAULT_LANG, getLang: i18nGetLang, setLang: i18nSetLang,
+    strings: i18nStrings, validateTranslations, collectKeyPaths
+  };
 }

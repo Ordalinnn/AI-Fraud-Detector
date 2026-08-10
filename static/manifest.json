@@ -1,7 +1,11 @@
 {
+  "id": "/",
   "name": "AI Fraud Detector",
   "short_name": "FraudDetector",
   "description": "AI prototype for detecting fraud in SMS, messages, and call transcripts.",
+  "lang": "ru",
+  "dir": "ltr",
+  "categories": ["security", "utilities"],
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -9,9 +13,9 @@
   "theme_color": "#2563eb",
   "orientation": "portrait-primary",
   "icons": [
-    { "src": "icon.png?v=3", "sizes": "192x192", "type": "image/png" },
-    { "src": "icon.png?v=3", "sizes": "512x512", "type": "image/png" },
-    { "src": "icon.png?v=3", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
-    { "src": "icon.png?v=3", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "icon.png?v=4", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon.png?v=4", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon.png?v=4", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon.png?v=4", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

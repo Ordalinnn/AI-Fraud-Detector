@@ -37,7 +37,9 @@ chrome.contextMenus.onClicked.addListener((info) => {
 
     const message = `${result.pct}%\n${result.isFraud ? s.adviceBad : s.adviceGood}`;
 
-    chrome.notifications.create({
+    // Fixed id: a second right-click check replaces the previous notification
+    // in place instead of stacking a new one in the notification tray.
+    chrome.notifications.create("fraud-check-result", {
       type: "basic",
       iconUrl: "icons/icon128.png",
       title: `${result.emoji} ${s.riskLabels[result.levelKey]}`,

@@ -3,7 +3,8 @@
   "name": "AI Fraud Detector",
   "short_name": "FraudDetector",
   "description": "Checks selected text or pasted messages for scam/fraud indicators, entirely on your device — nothing is sent to a server.",
-  "version": "1.2.0",
+  "version": "1.3.0",
+  "minimum_chrome_version": "88",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
@@ -11,6 +12,7 @@
   },
   "action": {
     "default_popup": "popup.html",
+    "default_title": "AI Fraud Detector",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
@@ -20,5 +22,17 @@
   "background": {
     "service_worker": "background.js"
   },
-  "permissions": ["contextMenus", "notifications", "storage"]
+  "permissions": ["contextMenus", "notifications", "storage"],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+F",
+        "mac": "Command+Shift+F"
+      },
+      "description": "Open AI Fraud Detector"
+    }
+  }
 }

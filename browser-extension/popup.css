@@ -9,6 +9,12 @@ body {
   color: #0f172a;
 }
 
+/* Hides the whole popup until the saved language is loaded and applied, so
+   the user never sees a flash of English text before it's swapped for their
+   actual saved language (ru/kz). Removed by popup.js right after the first
+   applyStaticText() call. */
+body.loading { visibility: hidden; }
+
 header {
   display: flex;
   align-items: center;
@@ -82,8 +88,11 @@ button:hover { opacity: 0.92; }
   line-height: 1.4;
 }
 
-.reasons { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
-.reasons span {
+.reasons {
+  display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 6px; padding: 0;
+  list-style: none;
+}
+.reasons li {
   background: #eef2ff;
   color: #3730a3;
   border: 1px solid #c7d2fe;
@@ -93,8 +102,19 @@ button:hover { opacity: 0.92; }
   font-weight: 700;
 }
 
-.domains { font-size: 11px; color: #475569; }
-.domains div { margin-bottom: 4px; }
+.domains { font-size: 11px; color: #475569; margin: 0; padding: 0; list-style: none; }
+.domains li { margin-bottom: 4px; }
+
+.validation-msg {
+  color: #991b1b;
+  background: #fee2e2;
+  border-radius: 8px;
+  padding: 6px 9px;
+  font-size: 11px;
+  font-weight: 700;
+  margin-top: 6px;
+}
+.validation-msg.hidden { display: none; }
 
 footer {
   margin-top: 12px;

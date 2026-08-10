@@ -148,8 +148,14 @@ def extract_bare_domains(text_lower, urls):
     return BARE_DOMAIN_PATTERN.findall(masked)
 
 def get_domain(url):
-    """Strips the protocol/www prefix and any path, leaving just the bare domain (e.g. "kaspi-login.xyz")."""
-    url = url.replace("https://", "").replace("http://", "").replace("www.", "")
+    """Strips the protocol/www prefix and any path, leaving just the bare domain (e.g. "kaspi-login.xyz").
+
+    Anchored (^) so a "www." that isn't actually the leading subdomain — e.g.
+    the "www." inside "kaspi-www.secure-login.xyz" — isn't silently deleted,
+    which would turn it into a different domain than what was actually
+    reported. Mirrors detector.js's getDomain(), which uses the same anchors."""
+    url = re.sub(r"^https?://", "", url)
+    url = re.sub(r"^www\.", "", url)
     return url.split("/")[0]
 
 def count_matches(text, words):
@@ -187,25 +193,30 @@ def brand_impersonation(domain):
     return None
 
 def domain_flags(d):
-    """Shared list of (label, severity) flags for a single domain, used both
-    for feature extraction and for the Domain analysis display."""
+    """Shared list of (label_key, severity, brand) flags for a single domain,
+    used both for feature extraction and for the Domain analysis display.
+    label_key is looked up in the UI's translation dict by the caller (with
+    `brand` filled into a "{brand}" placeholder for "impersonates") — this
+    module has no notion of language, mirroring detector.js's
+    domainFlags()/labelKey pattern so the website and browser extension
+    show identical wording for the same domain."""
     flags = []
     impersonated = brand_impersonation(d)
     if impersonated:
-        flags.append((f"Impersonates {impersonated}", "critical"))
+        flags.append(("impersonates", "critical", impersonated))
     elif not d.isascii():
         # No known brand matched, but non-Latin characters in a domain are
         # themselves a classic IDN homograph phishing signal even when the
         # impersonated brand isn't in KNOWN_BRANDS.
-        flags.append(("Non-Latin lookalike characters", "critical"))
+        flags.append(("non_latin_domain", "critical", None))
     if any(w in d for w in suspicious_domain_words):
-        flags.append(("Suspicious keyword", "warn"))
+        flags.append(("suspicious_keyword", "warn", None))
     if len(d) > 20:
-        flags.append(("Long domain", "warn"))
+        flags.append(("long_domain", "warn", None))
     if any(d.endswith(z) for z in suspicious_zones):
-        flags.append(("Suspicious TLD", "critical"))
+        flags.append(("suspicious_tld", "critical", None))
     if any(ch.isdigit() for ch in d):
-        flags.append(("Contains digits", "warn"))
+        flags.append(("contains_digits", "warn", None))
     return flags
 
 # =========================
@@ -284,10 +295,12 @@ def extract_features(text):
 # =========================
 # RULE-BASED SCORE BOOST
 # =========================
+RULE_BOOST_CAP = 0.30
+
 def rule_boost(features):
     """
     Rule-based boost for realistic scam patterns.
-    Capped at 0.30 to prevent runaway scores on safe messages.
+    Capped at RULE_BOOST_CAP to prevent runaway scores on safe messages.
     """
     boost = 0.0
     if features["has_link"] and features["secret_count"]:
@@ -314,20 +327,29 @@ def rule_boost(features):
         boost += 0.08
     if features["url_count"] > 1:
         boost += 0.05
-    return min(boost, 0.30)
+    return min(boost, RULE_BOOST_CAP)
 
 # =========================
 # RISK LEVEL
 # =========================
-def risk_level(prob):
+def risk_level(prob, threshold=0.5):
     """Returns (level_key, css_class, emoji). level_key is looked up in the
     UI's translation dict by the caller — this module has no notion of
-    language."""
-    if prob < 0.3:
+    language.
+
+    The "mid"/"high" boundary is pinned to `threshold` (not a fixed 0.6) so
+    the colored risk badge can never contradict the binary FRAUD/SAFE
+    verdict, which is itself `prob >= threshold`: everything below
+    threshold reads as green/yellow (low/mid), everything at or above it
+    reads as orange/red (high/critical). At the default threshold of 0.5
+    this reduces to low<0.3, mid<0.5, high<0.8, critical>=0.8."""
+    low_cut = threshold * 0.6
+    high_cut = threshold + (1 - threshold) * 0.6
+    if prob < low_cut:
         return "low", "risk-low", "🟢"
-    if prob < 0.6:
+    if prob < threshold:
         return "mid", "risk-mid", "🟡"
-    if prob < 0.8:
+    if prob < high_cut:
         return "high", "risk-high", "🟠"
     return "critical", "risk-critical", "🔴"
 
@@ -384,3 +406,22 @@ def highlight_text(text):
         pieces.append(html.escape(text[cursor:]))
 
     return "".join(pieces).replace("\n", "<br>")
+
+# =========================
+# CSV EXPORT SAFETY
+# =========================
+_FORMULA_LEAD_CHARS = ("=", "+", "-", "@", "\t", "\r")
+
+def sanitize_for_csv(value):
+    """Neutralizes CSV/spreadsheet formula injection: if a cell's text starts
+    with a character Excel/Sheets treats as a formula prefix (=, +, -, @, or
+    a leading tab/carriage-return), prefix it with a straight quote so it's
+    opened as literal text instead of executed. Analyzed message text ends
+    up in exported CSVs (batch results, history) and is entirely
+    user-controlled, so this must run on every free-text cell before
+    DataFrame.to_csv()."""
+    if not isinstance(value, str):
+        return value
+    if value.startswith(_FORMULA_LEAD_CHARS):
+        return "'" + value
+    return value

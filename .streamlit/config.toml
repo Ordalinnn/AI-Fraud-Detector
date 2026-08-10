@@ -1,6 +1,12 @@
 [server]
 enableStaticServing = true
 
+[browser]
+# Disables Streamlit's own phone-home usage-stats collection, consistent
+# with this app's privacy claims (nothing leaves your device except the
+# opt-in Deep AI Analysis call).
+gatherUsageStats = false
+
 [client]
 # Hides Streamlit's own in-app hamburger menu (Deploy button, GitHub link,
 # About/Settings/"Record a screencast", etc.) so only your own UI shows.

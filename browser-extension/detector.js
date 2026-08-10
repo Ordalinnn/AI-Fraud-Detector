@@ -1,13 +1,21 @@
 // Self-contained fraud/scam heuristic scorer for the browser extension.
 //
 // This mirrors the keyword/domain rule logic from the main AI Fraud Detector
-// Streamlit app (app.py), but does NOT use the trained ML ensemble (Logistic
-// Regression / Random Forest / Gradient Boosting) — scikit-learn models
-// can't run inside a browser extension. Instead, the feature weights below
-// are a hand-tuned substitute for what the ensemble would output, combined
-// with the same rule-based "boost" logic used in the main app. Treat this
-// as a lighter, offline approximation of the full web app, not a 1:1 port
-// of its accuracy.
+// Streamlit app (app.py), but does NOT run the full trained ML ensemble
+// (Logistic Regression + Random Forest + Gradient Boosting + TF-IDF/NB) —
+// scikit-learn models can't run inside a browser extension. The base score
+// is a blend of two things: a hand-tuned rule-weighted sum (heuristicBaseScore),
+// and the real LogisticRegression member's coefficients ported as a plain
+// dot-product + sigmoid (lrScore — see LR_* constants below, regenerated via
+// scripts/extract_lr_coefficients.py). The LR component is deliberately
+// given a MINORITY weight (see LR_BLEND_WEIGHT): trained in isolation
+// (without the other 3 ensemble members averaging it out), it scores some
+// perfectly ordinary short conversational messages surprisingly high — e.g.
+// an isolated evaluation found it assigns ~0.98 fraud probability to a
+// plain "how are you, see you tomorrow at 9" greeting, a dataset-distribution
+// artifact rather than a real signal. Full rule_boost() logic is also
+// ported unchanged. Treat this whole thing as a lighter, offline
+// approximation of the full web app, not a 1:1 port of its accuracy.
 //
 // Runs entirely locally: no network request is made, so message text never
 // leaves the user's device.
@@ -104,6 +112,10 @@ function levenshtein(a, b) {
 
 function countMatches(textLower, words) {
   return words.reduce((n, w) => n + (textLower.includes(w) ? 1 : 0), 0);
+}
+
+function isUpperChar(ch) {
+  return ch !== ch.toLowerCase() && ch === ch.toUpperCase();
 }
 
 function extractUrls(textLower) {
@@ -206,6 +218,20 @@ function extractFeatures(text) {
   const urgentCount = countMatches(textLower, WORD_LISTS.urgent);
   const threatCount = countMatches(textLower, WORD_LISTS.threat);
 
+  // Basic text statistics — mirrors fraud_logic.extract_features()'s
+  // digit_count/exclamation_count/uppercase_count/text_length/word_count/
+  // avg_word_length. uppercaseCount is measured against the ORIGINAL
+  // (non-lowercased) text, same as the Python version.
+  const words = textLower.split(/\s+/).filter((w) => w.length > 0);
+  const digitCount = (textLower.match(/\d/g) || []).length;
+  const exclamationCount = (textLower.match(/!/g) || []).length;
+  const uppercaseCount = Array.from(text).filter(isUpperChar).length;
+  const textLength = Array.from(text).length;
+  const wordCount = words.length;
+  const avgWordLength = wordCount
+    ? Math.round((words.reduce((sum, w) => sum + Array.from(w).length, 0) / wordCount) * 100) / 100
+    : 0;
+
   return {
     hasLink: linkCount > 0 ? 1 : 0,
     urgentCount,
@@ -222,6 +248,12 @@ function extractFeatures(text) {
     digitDomain,
     brandFlag,
     homoglyphDomain,
+    digitCount,
+    exclamationCount,
+    uppercaseCount,
+    textLength,
+    wordCount,
+    avgWordLength,
     urlCount: linkCount,
     hasMultipleWarnings: urgentCount > 0 && threatCount > 0 ? 1 : 0,
     domains
@@ -245,8 +277,54 @@ function heuristicBaseScore(f) {
   score += f.digitDomain ? 0.05 : 0;
   score += f.brandFlag ? 0.15 : 0;
   score += f.homoglyphDomain ? 0.15 : 0;
+  // Weights below are informed by the coefficients a LogisticRegression
+  // trained on the real app.py dataset actually learned for these features
+  // (digitCount, uppercaseCount, wordCount, avgWordLength all had
+  // meaningfully positive coefficients — several bigger than threatCount's).
+  // wordCount and textLength are highly collinear (both just measure
+  // message verbosity), so only wordCount is scored to avoid double
+  // counting the same signal. exclamationCount is intentionally excluded:
+  // the trained model learned an ~0 coefficient for it (co-occurs with
+  // urgentCount, which already carries the signal) — still tracked in the
+  // feature object for parity/explainability, just not scored here.
+  score += Math.min(f.digitCount * 0.01, 0.08);
+  score += Math.min(f.uppercaseCount * 0.01, 0.08);
+  score += Math.min(f.wordCount * 0.002, 0.08);
+  score += Math.min(f.avgWordLength * 0.01, 0.08);
   return Math.min(score, 0.95);
 }
+
+// StandardScaler + LogisticRegression(C=1.0, max_iter=1000, random_state=42)
+// coefficients, trained on app.py's full training dataset via the exact
+// same extractFeatures()/extract_features() vector used below. Regenerate
+// with `python scripts/extract_lr_coefficients.py` from the repo root
+// whenever fraud_logic.extract_features() changes shape or app.py's
+// training dataset changes, and paste the output back in here.
+const LR_FEATURE_ORDER = ["hasLink", "urgentCount", "secretCount", "moneyCount", "threatCount", "identityCount", "rewardCount", "pressureCount", "verificationCount", "suspiciousDomain", "longDomain", "suspiciousZone", "digitDomain", "brandFlag", "homoglyphDomain", "digitCount", "exclamationCount", "uppercaseCount", "textLength", "wordCount", "avgWordLength", "urlCount", "hasMultipleWarnings"];
+const LR_MEAN = [0.017345, 0.157617, 0.071644, 0.441176, 0.061086, 0.031674, 0.048265, 0.014329, 0.047511, 0.002262, 0.0, 0.001508, 0.0, 0.000754, 0.0, 0.095023, 0.0, 0.00905, 65.760935, 10.09276, 5.818077, 0.017345, 0.010558];
+const LR_SCALE = [0.130555, 0.374587, 0.285647, 0.650392, 0.239488, 0.175131, 0.227967, 0.118842, 0.216246, 0.047511, 1.0, 0.038807, 1.0, 0.027451, 1.0, 0.497374, 1.0, 0.164522, 15.038643, 2.92356, 1.163335, 0.130555, 0.102209];
+const LR_COEF = [-0.448267, 1.453043, 0.689823, 0.471641, 0.336216, 0.494019, 0.346125, 0.75348, 0.230036, 0.300533, 0.0, 0.156384, 0.0, 0.142334, 0.0, 0.429622, 0.0, 0.427079, 0.825451, 1.148422, 0.801198, -0.448267, 0.21409];
+const LR_INTERCEPT = 0.340179;
+
+function sigmoid(z) {
+  return 1 / (1 + Math.exp(-z));
+}
+
+function lrScore(f) {
+  let z = LR_INTERCEPT;
+  for (let i = 0; i < LR_FEATURE_ORDER.length; i++) {
+    const x = f[LR_FEATURE_ORDER[i]];
+    z += ((x - LR_MEAN[i]) / LR_SCALE[i]) * LR_COEF[i];
+  }
+  return sigmoid(z);
+}
+
+// Minority weight for the ported LR component in the blended base score
+// (see the file header comment for why: evaluated on its own, the LR model
+// over-scores some plain conversational messages that never appear near
+// its training templates). Meaningfully influences the result without
+// being able to single-handedly flip a message the heuristic scores as safe.
+const LR_BLEND_WEIGHT = 0.2;
 
 function ruleBoost(f) {
   let boost = 0;
@@ -267,11 +345,16 @@ function ruleBoost(f) {
 
 // Reason keys, in display order. popup.js/background.js resolve each to
 // the current UI language's text via I18N.strings(lang).reasonLabels.
+// wordCount/textLength/avgWordLength are deliberately excluded (mirrors
+// fraud_logic.explain()'s `irrelevant` set): they're near-always non-zero
+// for any message, so surfacing them as "reasons" would be noise rather
+// than a meaningful signal.
 const EXPLAIN_KEYS = [
   "hasLink", "urgentCount", "secretCount", "moneyCount", "threatCount",
   "identityCount", "rewardCount", "pressureCount", "verificationCount",
   "suspiciousDomain", "longDomain", "suspiciousZone", "digitDomain",
-  "brandFlag", "homoglyphDomain", "hasMultipleWarnings", "urlCount"
+  "brandFlag", "homoglyphDomain", "digitCount", "exclamationCount",
+  "uppercaseCount", "hasMultipleWarnings", "urlCount"
 ];
 
 function explain(f) {
@@ -294,7 +377,7 @@ function riskStyle(prob) {
 
 function analyzeText(text) {
   const f = extractFeatures(text);
-  const base = heuristicBaseScore(f);
+  const base = (1 - LR_BLEND_WEIGHT) * heuristicBaseScore(f) + LR_BLEND_WEIGHT * lrScore(f);
   const boost = ruleBoost(f);
   const prob = Math.min(0.99, base + boost);
   const style = riskStyle(prob);
@@ -314,4 +397,16 @@ function analyzeText(text) {
 // for maximum compatibility with Manifest V3 service workers).
 if (typeof self !== "undefined") {
   self.FraudDetector = { analyzeText };
+}
+
+// Also exposed via CommonJS exports (Node's `require`) so the test suite
+// can exercise internal helpers directly instead of only indirectly through
+// analyzeText(). Guarded because classic browser/service-worker scripts have
+// no `module` global.
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = {
+    analyzeText, extractFeatures, lrScore, heuristicBaseScore, ruleBoost,
+    brandImpersonation, domainFlags, getDomain, levenshtein, riskStyle,
+    extractUrls, extractBareDomains
+  };
 }

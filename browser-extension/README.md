@@ -17,14 +17,24 @@ entirely on your device — no server, no network request, no data collection.
 
 ## How it detects fraud
 
-This extension does **not** use the trained ML ensemble (Logistic Regression /
-Random Forest / Gradient Boosting) from the main Streamlit web app — those
-models require Python/scikit-learn, which can't run in a browser extension.
+This extension does **not** run the full trained ML ensemble (Logistic
+Regression + Random Forest + Gradient Boosting + TF-IDF/Naive Bayes) from the
+main Streamlit web app as-is — those models require Python/scikit-learn,
+which can't run in a browser extension.
 
-Instead, `detector.js` ports the same keyword/domain heuristics (urgency,
-secrecy, money, threat, reward, pressure words; suspicious domains and TLDs;
+`detector.js` ports the same keyword/domain heuristics (urgency, secrecy,
+money, threat, reward, pressure words; suspicious domains and TLDs;
 known-brand impersonation) and combines them with hand-tuned weights and the
-same rule-based "boost" logic used in the main app. It's a lighter, offline
+same rule-based "boost" logic used in the main app. It also blends in the
+real Logistic Regression ensemble member's trained coefficients — a
+StandardScaler + LogisticRegression pipeline reduces to a plain dot product
+and sigmoid, so it's cheap to port and doesn't need scikit-learn at runtime
+(see `scripts/extract_lr_coefficients.py`, which regenerates the embedded
+coefficients from `app.py`'s real training data). That component is given a
+deliberately minority weight, since evaluated on its own — without the other
+3 ensemble members averaging it out — it over-scores some plain
+conversational messages. Random Forest, Gradient Boosting, and the TF-IDF/NB
+member aren't portable this way, so this remains a lighter, offline
 approximation — not a 1:1 match of the full web app's accuracy — but it needs
 no server and never sends your text anywhere.
 
@@ -48,4 +58,6 @@ no server and never sends your text anywhere.
   notifications, both in the currently selected language.
 - `popup.html` / `popup.css` / `popup.js` — the toolbar popup UI, including
   the language switcher.
-- `icons/` — extension icons (reused from the main app's logo).
+- `icons/` — extension icons at their declared 16/48/128px sizes, generated
+  from the same square master icon as the main app's PWA icon
+  (`static/icon.png`) via `scripts/generate_icons.py`.

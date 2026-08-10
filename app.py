@@ -1,6 +1,10 @@
+import html
 import io
 import json
+import logging
 import os
+import threading
+import uuid
 import zipfile
 import numpy as np
 import pandas as pd
@@ -23,8 +27,12 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.naive_bayes import MultinomialNB
 from fraud_logic import (
     domain_flags, extract_features, rule_boost, risk_level, highlight_text,
+    sanitize_for_csv,
 )
 from translations import LANG_OPTIONS, OLD_LANG_MAP, DEFAULT_LANG, get_translations
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logger = logging.getLogger("ai_fraud_detector")
 
 # =========================
 # PAGE CONFIG
@@ -35,6 +43,13 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# Real SMS/chat messages and call transcripts are rarely more than a couple
+# thousand characters; this caps pathological pastes (e.g. an entire
+# document dropped in by mistake) that would otherwise slow down feature
+# extraction/model inference and, for the Deep Analysis feature, burn
+# unnecessary Anthropic API tokens.
+MAX_INPUT_CHARS = 8000
 
 # =========================
 # PWA SUPPORT (installable "Add to Home Screen" on mobile)
@@ -74,7 +89,7 @@ st.set_page_config(
 # forces a fresh fetch instead of relying on the user to clear their cache.
 # If you change static/manifest.json or static/icon.png, bump this AND the
 # matching "?v=" inside static/manifest.json's own icon entries.
-PWA_ASSET_VERSION = "3"
+PWA_ASSET_VERSION = "4"
 
 components.html("""
 <script>
@@ -167,51 +182,76 @@ def build_extension_zip() -> bytes:
     return buf.getvalue()
 
 # =========================
-# HISTORY PERSISTENCE
+# HISTORY & FEEDBACK PERSISTENCE
 # =========================
-HISTORY_FILE = Path("history.json")
+# history.json used to be a single file shared by every visitor to this
+# Streamlit instance. On a multi-user deployment (one server process
+# serving many concurrent browser sessions, e.g. Streamlit Community Cloud)
+# that meant every session's analyzed messages — often pasted bank/personal
+# text people are actively worried about — showed up in every OTHER
+# session's History tab. History is now scoped to a random per-session id
+# stored in st.session_state, so one visitor's data is never visible to
+# another. feedback.json stays a single shared file by design (its whole
+# purpose is aggregating labeled examples across users for future dataset
+# improvement, and — unlike history — it's never displayed back to any
+# user), but appends now go through a lock + read-modify-write against the
+# live file instead of persisting a session-local copy of the whole list,
+# so two concurrent submissions can no longer silently overwrite each
+# other. All writes are atomic (temp file + os.replace) so a crash
+# mid-write can't leave a corrupted, unparseable JSON file behind.
+DATA_DIR = Path("session_data")
+FEEDBACK_FILE = Path("feedback.json")
+_feedback_lock = threading.Lock()
+
+def _session_id():
+    """A random id generated once per browser session (not per rerun),
+    used to give each visitor their own history file."""
+    if "session_id" not in st.session_state:
+        st.session_state["session_id"] = uuid.uuid4().hex
+    return st.session_state["session_id"]
+
+def _history_file():
+    return DATA_DIR / f"history_{_session_id()}.json"
+
+def _load_json(path):
+    if path.exists():
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            logger.warning("Failed to read/parse %s, treating as empty", path, exc_info=True)
+            return []
+    return []
+
+def _atomic_write_json(path, data):
+    """Writes via a temp file + os.replace so a reader (or a crash) never
+    observes a half-written file."""
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = path.with_name(path.name + f".{uuid.uuid4().hex}.tmp")
+        tmp_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        os.replace(tmp_path, path)
+    except OSError:
+        logger.warning("Failed to write %s", path, exc_info=True)
 
 def load_history():
-    """Loads past analysis results from history.json (created on first
-    analysis) so the History tab survives an app restart, not just a
-    Streamlit rerun. Returns an empty list if the file doesn't exist or
-    is corrupted."""
-    if HISTORY_FILE.exists():
-        try:
-            return json.loads(HISTORY_FILE.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            return []
-    return []
+    """Loads this browser session's own past analysis results, so the
+    History tab survives an app restart/rerun without ever showing another
+    visitor's data."""
+    return _load_json(_history_file())
 
 def save_history(history):
-    """Writes the full history list back to history.json. Called after
-    every analysis and after clearing history. Never stored in git
-    (see .gitignore) since it can contain pasted message content."""
-    try:
-        HISTORY_FILE.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
-    except OSError:
-        pass
+    """Writes this session's full history list back to its own file.
+    Called after every analysis and after clearing history."""
+    _atomic_write_json(_history_file(), history)
 
-FEEDBACK_FILE = Path("feedback.json")
-
-def load_feedback():
-    """Loads user-submitted "was this correct?" feedback from feedback.json,
-    used only to track potential mislabeled predictions for future dataset
-    improvements — not read back into the UI anywhere."""
-    if FEEDBACK_FILE.exists():
-        try:
-            return json.loads(FEEDBACK_FILE.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            return []
-    return []
-
-def save_feedback(feedback):
-    """Writes the full feedback list back to feedback.json. Also never
-    committed to git — see .gitignore."""
-    try:
-        FEEDBACK_FILE.write_text(json.dumps(feedback, ensure_ascii=False, indent=2), encoding="utf-8")
-    except OSError:
-        pass
+def append_feedback_entry(entry):
+    """Appends one "was this correct?" entry to the shared feedback.json
+    under a lock, re-reading the file first so a concurrent submission from
+    another session in between isn't lost."""
+    with _feedback_lock:
+        current = _load_json(FEEDBACK_FILE)
+        current.append(entry)
+        _atomic_write_json(FEEDBACK_FILE, current)
 
 # =========================
 # DEEP ANALYSIS (optional, external — sends text to the Anthropic API)
@@ -224,6 +264,13 @@ def save_feedback(feedback):
 # (never commit that file — it's already in .gitignore) or the
 # ANTHROPIC_API_KEY environment variable for non-Streamlit-Cloud hosts.
 DEEP_ANALYSIS_MODEL = "claude-haiku-4-5-20251001"
+# A per-session cooldown (not a hard rate limit — this is a single-instance
+# prototype with no shared request store) so a user can't burn through API
+# quota by mashing the button; each click still costs a real Anthropic API call.
+DEEP_ANALYSIS_COOLDOWN_SECONDS = 15
+# Without an explicit timeout a hung network connection could leave the
+# Streamlit script (and the user's spinner) stuck indefinitely.
+DEEP_ANALYSIS_TIMEOUT_SECONDS = 30.0
 
 def get_anthropic_api_key():
     """Reads the API key from Streamlit secrets first, then the
@@ -253,7 +300,7 @@ def run_deep_analysis(text, lang_name):
     if not api_key:
         raise RuntimeError("no_api_key")
 
-    client = anthropic.Anthropic(api_key=api_key)
+    client = anthropic.Anthropic(api_key=api_key, timeout=DEEP_ANALYSIS_TIMEOUT_SECONDS)
     prompt = (
         f"You are a fraud-detection assistant. Analyze the following message for signs "
         f"of a scam. Respond in {lang_name}, in 3-5 concise sentences: name the specific "
@@ -2116,10 +2163,19 @@ def explain(features):
         if v > 0 and k not in irrelevant and f"feat_{k}" in T
     ]
 
-def risk_style(prob):
+def feature_label(name):
+    """Resolves a raw internal feature key (e.g. "urgent_count") to its
+    human-readable, translated label (e.g. "Urgency words") for display in
+    the feature-contribution/importance/vector tables — non-technical users
+    shouldn't have to decode snake_case internals to understand what moved
+    the score. Falls back to the raw key for any feature without a
+    dedicated feat_* translation."""
+    return T.get(f"feat_{name}", name)
+
+def risk_style(prob, threshold=0.5):
     """Thin wrapper over fraud_logic.risk_level() that resolves the level
     key to the current UI language's translated label."""
-    level_key, css_class, emoji = risk_level(prob)
+    level_key, css_class, emoji = risk_level(prob, threshold)
     return T[level_key], css_class, emoji
 
 def render_risk_meter(prob, threshold, title):
@@ -2143,6 +2199,34 @@ def render_risk_meter(prob, threshold, title):
 # =========================
 # TRAIN MODELS (ENSEMBLE)
 # =========================
+# Shared hyperparameters for the 4-model ensemble. Defined once and used by
+# both _evaluate_ensemble() (throwaway copy, for honest held-out metrics)
+# and train_models() (the real production models) so the two can never
+# silently drift apart — previously each hardcoded its own copies of these
+# numbers, so a tuning change to one and not the other would leave the
+# reported eval metrics describing a different model than the one users
+# are actually scored against.
+MODEL_RANDOM_STATE = 42
+LR_C = 1.0
+LR_MAX_ITER = 1000
+RF_N_ESTIMATORS = 50
+GB_N_ESTIMATORS = 50
+TFIDF_NGRAM_RANGE = (1, 2)
+TFIDF_MIN_DF = 1
+CV_FOLDS = 3  # 3-fold: dataset is small, keeps startup fast
+EVAL_TEST_SIZE = 0.2
+
+def _build_ensemble_pipelines():
+    """Fresh, untrained (lr, rf, gb, tfidf) pipelines using the shared
+    hyperparameters above. Called separately by _evaluate_ensemble() and
+    train_models() since each needs its own instances to fit on different
+    data (held-out split vs. full dataset)."""
+    lr = Pipeline([("scaler", StandardScaler()), ("clf", LogisticRegression(C=LR_C, max_iter=LR_MAX_ITER, random_state=MODEL_RANDOM_STATE))])
+    rf = Pipeline([("scaler", StandardScaler()), ("clf", RandomForestClassifier(n_estimators=RF_N_ESTIMATORS, random_state=MODEL_RANDOM_STATE))])
+    gb = Pipeline([("scaler", StandardScaler()), ("clf", GradientBoostingClassifier(n_estimators=GB_N_ESTIMATORS, random_state=MODEL_RANDOM_STATE))])
+    tfidf = Pipeline([("tfidf", TfidfVectorizer(ngram_range=TFIDF_NGRAM_RANGE, min_df=TFIDF_MIN_DF, lowercase=True)), ("clf", MultinomialNB())])
+    return lr, rf, gb, tfidf
+
 def _template_groups(texts, similarity_threshold=0.6):
     """Groups near-duplicate training examples — e.g. the same "your card is
     blocked, confirm at <link>" scam template repeated with a different bank
@@ -2188,7 +2272,7 @@ def _evaluate_ensemble(feature_rows, texts, labels, groups):
     actually trust — unlike the in-sample cross-validation accuracy shown
     elsewhere in the UI, which the training data's templated structure can
     inflate."""
-    splitter = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
+    splitter = GroupShuffleSplit(n_splits=1, test_size=EVAL_TEST_SIZE, random_state=MODEL_RANDOM_STATE)
     train_idx, test_idx = next(splitter.split(feature_rows, labels, groups=groups))
 
     X_tr, X_te = feature_rows.iloc[train_idx], feature_rows.iloc[test_idx]
@@ -2196,10 +2280,7 @@ def _evaluate_ensemble(feature_rows, texts, labels, groups):
     texts_tr = [texts[i] for i in train_idx]
     texts_te = [texts[i] for i in test_idx]
 
-    lr = Pipeline([("scaler", StandardScaler()), ("clf", LogisticRegression(C=1.0, max_iter=1000, random_state=42))])
-    rf = Pipeline([("scaler", StandardScaler()), ("clf", RandomForestClassifier(n_estimators=50, random_state=42))])
-    gb = Pipeline([("scaler", StandardScaler()), ("clf", GradientBoostingClassifier(n_estimators=50, random_state=42))])
-    tfidf = Pipeline([("tfidf", TfidfVectorizer(ngram_range=(1, 2), min_df=1, lowercase=True)), ("clf", MultinomialNB())])
+    lr, rf, gb, tfidf = _build_ensemble_pipelines()
 
     lr.fit(X_tr, y_tr)
     rf.fit(X_tr, y_tr)
@@ -2271,18 +2352,7 @@ def train_models(feature_schema):
     # already produced honest metrics, so there's no reason to withhold
     # real training data from what users' queries are actually scored
     # against.
-    lr_model = Pipeline([
-        ("scaler", StandardScaler()),
-        ("clf", LogisticRegression(C=1.0, max_iter=1000, random_state=42))
-    ])
-    rf_model = Pipeline([
-        ("scaler", StandardScaler()),
-        ("clf", RandomForestClassifier(n_estimators=50, random_state=42))
-    ])
-    gb_model = Pipeline([
-        ("scaler", StandardScaler()),
-        ("clf", GradientBoostingClassifier(n_estimators=50, random_state=42))
-    ])
+    lr_model, rf_model, gb_model, tfidf_model = _build_ensemble_pipelines()
 
     lr_model.fit(X_train, y_train)
     rf_model.fit(X_train, y_train)
@@ -2292,17 +2362,13 @@ def train_models(feature_schema):
     # training text (word/bigram frequencies) instead of only scoring against
     # the hand-curated keyword lists above — this is what lets the system
     # catch scam phrasing that isn't in any of those lists.
-    tfidf_model = Pipeline([
-        ("tfidf", TfidfVectorizer(ngram_range=(1, 2), min_df=1, lowercase=True)),
-        ("clf", MultinomialNB())
-    ])
     tfidf_model.fit(texts, y_train)
 
-    # Cross-validation accuracy for each model (3-fold: dataset is small, keeps startup fast)
-    lr_cv = cross_val_score(lr_model, X_train, y_train, cv=3, scoring="accuracy").mean()
-    rf_cv = cross_val_score(rf_model, X_train, y_train, cv=3, scoring="accuracy").mean()
-    gb_cv = cross_val_score(gb_model, X_train, y_train, cv=3, scoring="accuracy").mean()
-    tfidf_cv = cross_val_score(tfidf_model, texts, y_train, cv=3, scoring="accuracy").mean()
+    # Cross-validation accuracy for each model
+    lr_cv = cross_val_score(lr_model, X_train, y_train, cv=CV_FOLDS, scoring="accuracy").mean()
+    rf_cv = cross_val_score(rf_model, X_train, y_train, cv=CV_FOLDS, scoring="accuracy").mean()
+    gb_cv = cross_val_score(gb_model, X_train, y_train, cv=CV_FOLDS, scoring="accuracy").mean()
+    tfidf_cv = cross_val_score(tfidf_model, texts, y_train, cv=CV_FOLDS, scoring="accuracy").mean()
 
     metrics = {
         "Logistic Regression": round(lr_cv * 100, 1),
@@ -2316,6 +2382,29 @@ def train_models(feature_schema):
 
 FEATURE_SCHEMA = tuple(sorted(extract_features("")[0].keys()))
 lr_model, rf_model, gb_model, tfidf_model, model_metrics, eval_report = train_models(FEATURE_SCHEMA)
+
+
+def ensemble_predict(feats_list, texts):
+    """Runs the trained 4-model ensemble + rule boost on a batch of one or
+    more messages. `feats_list` and `texts` must be the same length and in
+    the same order. This is the single source of truth for the scoring
+    formula (average of 4 model probabilities + capped rule boost) — it
+    used to be copy-pasted three times (held-out evaluation, batch CSV
+    analysis, single-message analysis) and had to be kept in sync by hand.
+    Returns a dict of numpy arrays, one entry per model plus "raw" (pre-boost
+    average) and "final" (post-boost, capped at 0.99)."""
+    X = pd.DataFrame(feats_list)
+    lr_p = lr_model.predict_proba(X)[:, 1]
+    rf_p = rf_model.predict_proba(X)[:, 1]
+    gb_p = gb_model.predict_proba(X)[:, 1]
+    tfidf_p = tfidf_model.predict_proba(texts)[:, 1]
+    raw_p = (lr_p + rf_p + gb_p + tfidf_p) / 4.0
+    boosts = np.array([rule_boost(f) for f in feats_list])
+    final_p = np.minimum(0.99, raw_p + boosts)
+    return {
+        "lr": lr_p, "rf": rf_p, "gb": gb_p, "tfidf": tfidf_p,
+        "raw": raw_p, "boost": boosts, "final": final_p,
+    }
 
 # =========================
 # UI STYLE
@@ -2954,7 +3043,7 @@ textarea {
 # =========================
 with st.sidebar:
     if LOGO_HTML:
-        st.markdown(f'<img src="{LOGO_HTML}" class="sidebar-logo">', unsafe_allow_html=True)
+        st.markdown(f'<img src="{LOGO_HTML}" class="sidebar-logo" alt="AI Fraud Detector logo">', unsafe_allow_html=True)
     st.markdown(f"## {T['title']}")
     st.caption("Smart fraud detection prototype")
 
@@ -3007,6 +3096,19 @@ with st.sidebar:
         "Investment Scam": "Гарантированный доход 30% в неделю! Переведите деньги на инвестиционный счет и сообщите код подтверждения для активации."
     }
 
+    demo_labels = {
+        "Fraud SMS": T["demo_fraud_sms"],
+        "Fraud Call": T["demo_fraud_call"],
+        "Safe Message": T["demo_safe_message"],
+        "Fake Delivery": T["demo_fake_delivery"],
+        "Fake Prize": T["demo_fake_prize"],
+        "Relative Scam": T["demo_relative_scam"],
+        "Fake Job Offer": T["demo_fake_job_offer"],
+        "Marketplace Prepayment Scam": T["demo_marketplace_scam"],
+        "Fake Utility Debt": T["demo_fake_utility_debt"],
+        "Investment Scam": T["demo_investment_scam"],
+    }
+
     if "main_input_text" not in st.session_state:
         st.session_state["main_input_text"] = next(iter(demo_texts.values()))
 
@@ -3018,6 +3120,7 @@ with st.sidebar:
         list(demo_texts.keys()),
         key="demo_select",
         on_change=apply_demo_change,
+        format_func=lambda k: demo_labels.get(k, k),
     )
 
     st.divider()
@@ -3033,14 +3136,14 @@ with st.sidebar:
 
     st.divider()
     with st.expander(f"🛠️ {T['dev_stack']}"):
-        for item in ["Ensemble (LR + RF + GB + TF-IDF/NB)", "Feature Engineering", "Domain Analysis",
-                     "Explainable AI", "Rule-based Risk Boost", "Real-life Scam Scenarios"]:
+        for item in [T["dev_stack_ensemble"], T["dev_stack_feature_eng"], T["badge_domain_analysis"],
+                     T["badge_explainable_ai"], T["dev_stack_risk_boost"], T["dev_stack_scam_scenarios"]]:
             st.markdown(f"• {item}")
 
 # =========================
 # HERO
 # =========================
-logo_block = f'<img src="{LOGO_HTML}" class="site-logo">' if LOGO_HTML else '<div style="font-size:58px">🔐</div>'
+logo_block = f'<img src="{LOGO_HTML}" class="site-logo" alt="AI Fraud Detector logo">' if LOGO_HTML else '<div style="font-size:58px">🔐</div>'
 
 st.markdown(f"""
 <div class="hero">
@@ -3049,20 +3152,20 @@ st.markdown(f"""
             <div class="logo-row">
                 {logo_block}
                 <div>
-                    <div class="hero-kicker">⚡ AI-powered safety scanner</div>
+                    <div class="hero-kicker">{T['hero_kicker']}</div>
                     <div class="logo-title"><span>AI</span> FRAUD<br>DETECTOR</div>
                 </div>
             </div>
             <div class="hero-subtitle">{T['subtitle']}</div>
-            <span class="badge">Ensemble ML</span>
-            <span class="badge">Domain Analysis</span>
-            <span class="badge">Explainable AI</span>
-            <span class="badge">Risk Report</span>
+            <span class="badge">{T['badge_ensemble_ml']}</span>
+            <span class="badge">{T['badge_domain_analysis']}</span>
+            <span class="badge">{T['badge_explainable_ai']}</span>
+            <span class="badge">{T['badge_risk_report']}</span>
         </div>
         <div class="hero-panel">
-            <div class="hero-panel-title">Prototype readiness</div>
-            <div class="hero-panel-value">Demo-ready</div>
-            <div class="hero-panel-small">Analyzes text, links, pressure words, secret-code requests and suspicious domains using an ensemble of 4 ML models.</div>
+            <div class="hero-panel-title">{T['hero_panel_title']}</div>
+            <div class="hero-panel-value">{T['hero_panel_value']}</div>
+            <div class="hero-panel-small">{T['hero_panel_desc']}</div>
         </div>
     </div>
 </div>
@@ -3169,7 +3272,8 @@ with left:
                 input_text = st.text_area(
                     T["input_label"],
                     key="main_input_text",
-                    height=210
+                    height=210,
+                    max_chars=MAX_INPUT_CHARS
                 )
 
             # FIX: Show live character/word count below textarea
@@ -3188,16 +3292,16 @@ with right:
     st.markdown(f"""
     <div class="glass-card feature-list">
         <div class="section-title">⚙️ {T['features']}</div>
-        <p>🧾 Text analysis</p>
-        <p>🌐 Domain analysis</p>
-        <p>🧠 Ensemble ML (LR+RF+GB)</p>
-        <p>🔍 Explainable result</p>
-        <p>🖍️ Highlighted trigger words</p>
-        <p>📈 Risk gauge & model charts</p>
-        <p>📊 Batch CSV analysis</p>
-        <p>📥 Downloadable report & history</p>
-        <p>🚨 Real scam scenarios</p>
-        <p>⚡ Rule-based risk boost</p>
+        <p>🧾 {T['flist_text_analysis']}</p>
+        <p>🌐 {T['flist_domain_analysis']}</p>
+        <p>🧠 {T['flist_ensemble_ml']}</p>
+        <p>🔍 {T['flist_explainable_result']}</p>
+        <p>🖍️ {T['flist_highlighted_words']}</p>
+        <p>📈 {T['flist_risk_gauge']}</p>
+        <p>📊 {T['flist_batch_csv']}</p>
+        <p>📥 {T['flist_downloadable_report']}</p>
+        <p>🚨 {T['flist_real_scam_scenarios']}</p>
+        <p>⚡ {T['flist_rule_risk_boost']}</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -3206,8 +3310,6 @@ with right:
 # =========================
 if "history" not in st.session_state:
     st.session_state.history = load_history()
-if "feedback" not in st.session_state:
-    st.session_state.feedback = load_feedback()
 
 # =========================
 # BATCH ANALYSIS
@@ -3216,70 +3318,75 @@ if mode == "batch" and batch_go:
     if not batch_file:
         st.warning(T["batch_no_file"])
     else:
+        batch_df = None
         try:
             batch_df = pd.read_csv(batch_file)
         except Exception:
-            batch_file.seek(0)
-            batch_df = pd.read_csv(batch_file, sep=";")
+            try:
+                batch_file.seek(0)
+                batch_df = pd.read_csv(batch_file, sep=";")
+            except Exception:
+                # Neither comma nor semicolon parsing worked — likely not a
+                # CSV at all (wrong file type, corrupted upload, bad
+                # encoding). Show a friendly warning instead of letting the
+                # exception bubble up as an unhandled Streamlit traceback.
+                logger.warning("Failed to parse uploaded batch CSV '%s'", getattr(batch_file, "name", "<unknown>"), exc_info=True)
+                st.error(T["batch_parse_error"])
 
-        col = batch_column.strip()
-        if col not in batch_df.columns:
-            st.warning(T["batch_no_column"])
-        else:
-            texts = [t for t in batch_df[col].astype(str).fillna("") if t.strip()]
-            if not texts:
-                st.warning(T["batch_no_column"])
+        if batch_df is not None:
+            col = batch_column.strip()
+            if col not in batch_df.columns:
+                st.warning(T["batch_column_not_found"].format(
+                    requested=col, available=", ".join(map(str, batch_df.columns))
+                ))
             else:
-                # Vectorized: extract all feature rows once, then a single
-                # batch predict_proba call per model instead of one call per row.
-                feats_list = [extract_features(t)[0] for t in texts]
-                X_batch = pd.DataFrame(feats_list)
+                texts = [t for t in batch_df[col].astype(str).fillna("") if t.strip()]
+                if not texts:
+                    st.warning(T["batch_no_column"])
+                else:
+                    # Vectorized: extract all feature rows once, then a single
+                    # batch predict_proba call per model instead of one call per row.
+                    feats_list = [extract_features(t)[0] for t in texts]
+                    probs = ensemble_predict(feats_list, texts)["final"]
 
-                lr_p = lr_model.predict_proba(X_batch)[:, 1]
-                rf_p = rf_model.predict_proba(X_batch)[:, 1]
-                gb_p = gb_model.predict_proba(X_batch)[:, 1]
-                tfidf_p = tfidf_model.predict_proba(texts)[:, 1]
-                raw_p = (lr_p + rf_p + gb_p + tfidf_p) / 4.0
-                boosts = np.array([rule_boost(f) for f in feats_list])
-                probs = np.minimum(0.99, raw_p + boosts)
+                    results = []
+                    for t, p in zip(texts, probs):
+                        risk_lbl, _, em = risk_style(p, threshold)
+                        verdict = "FRAUD" if p >= threshold else "SAFE"
+                        results.append({
+                            "Text": t[:100] + ("..." if len(t) > 100 else ""),
+                            "Risk %": round(p * 100, 1),
+                            "Level": risk_lbl,
+                            "Verdict": f"{em} {verdict}",
+                        })
 
-                results = []
-                for t, p in zip(texts, probs):
-                    risk_lbl, _, em = risk_style(p)
-                    verdict = "FRAUD" if p >= threshold else "SAFE"
-                    results.append({
-                        "Text": t[:100] + ("..." if len(t) > 100 else ""),
-                        "Risk %": round(p * 100, 1),
-                        "Level": risk_lbl,
-                        "Verdict": f"{em} {verdict}",
-                    })
+                    st.markdown(f'<div class="section-title">📊 {T["batch_results"]}</div>', unsafe_allow_html=True)
+                    results_df = pd.DataFrame(results)
+                    st.dataframe(results_df, use_container_width=True, hide_index=True)
+                    csv_safe_results_df = results_df.assign(Text=results_df["Text"].apply(sanitize_for_csv))
 
-                st.markdown(f'<div class="section-title">📊 {T["batch_results"]}</div>', unsafe_allow_html=True)
-                results_df = pd.DataFrame(results)
-                st.dataframe(results_df, use_container_width=True, hide_index=True)
+                    fraud_n = sum(1 for r in results if "FRAUD" in r["Verdict"])
+                    safe_n = len(results) - fraud_n
 
-                fraud_n = sum(1 for r in results if "FRAUD" in r["Verdict"])
-                safe_n = len(results) - fraud_n
-
-                bc1, bc2 = st.columns([1, 1])
-                with bc1:
-                    st.markdown(f"**{T['batch_summary']}**")
-                    sm1, sm2 = st.columns(2)
-                    sm1.metric(T["fraud_count"], fraud_n)
-                    sm2.metric(T["safe_count"], safe_n)
-                    st.download_button(
-                        T["download_csv_results"],
-                        results_df.to_csv(index=False).encode("utf-8"),
-                        file_name=f"batch_fraud_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                        mime="text/csv",
-                        use_container_width=True,
-                    )
-                with bc2:
-                    summary_df = pd.DataFrame(
-                        {"Count": [fraud_n, safe_n]},
-                        index=[T["fraud_count"], T["safe_count"]],
-                    )
-                    st.bar_chart(summary_df, height=220)
+                    bc1, bc2 = st.columns([1, 1])
+                    with bc1:
+                        st.markdown(f"**{T['batch_summary']}**")
+                        sm1, sm2 = st.columns(2)
+                        sm1.metric(T["fraud_count"], fraud_n)
+                        sm2.metric(T["safe_count"], safe_n)
+                        st.download_button(
+                            T["download_csv_results"],
+                            csv_safe_results_df.to_csv(index=False).encode("utf-8"),
+                            file_name=f"batch_fraud_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                            mime="text/csv",
+                            use_container_width=True,
+                        )
+                    with bc2:
+                        summary_df = pd.DataFrame(
+                            {"Count": [fraud_n, safe_n]},
+                            index=[T["fraud_count"], T["safe_count"]],
+                        )
+                        st.bar_chart(summary_df, height=220)
 
 # =========================
 # ANALYSIS
@@ -3292,16 +3399,15 @@ if mode != "batch" and analyze:
         X_input = pd.DataFrame([features])
 
         # Ensemble prediction — average probabilities from all 4 models
-        lr_prob = float(lr_model.predict_proba(X_input)[0][1])
-        rf_prob = float(rf_model.predict_proba(X_input)[0][1])
-        gb_prob = float(gb_model.predict_proba(X_input)[0][1])
-        tfidf_prob = float(tfidf_model.predict_proba([input_text])[0][1])
-        raw_prob = (lr_prob + rf_prob + gb_prob + tfidf_prob) / 4.0
-
-        boost = rule_boost(features)
-        prob = min(0.99, raw_prob + boost)
+        scores = ensemble_predict([features], [input_text])
+        lr_prob = float(scores["lr"][0])
+        rf_prob = float(scores["rf"][0])
+        gb_prob = float(scores["gb"][0])
+        tfidf_prob = float(scores["tfidf"][0])
+        raw_prob = float(scores["raw"][0])
+        prob = float(scores["final"][0])
         pred = int(prob >= threshold)
-        risk_label, risk_class, emoji = risk_style(prob)
+        risk_label, risk_class, emoji = risk_style(prob, threshold)
         explanations = explain(features)
 
         # A fresh analysis invalidates any deep-analysis result from a
@@ -3324,7 +3430,7 @@ if mode != "batch" and analyze:
             "gb_prob": gb_prob,
             "tfidf_prob": tfidf_prob,
             "raw_prob": raw_prob,
-            "boost": boost,
+            "boost": float(scores["boost"][0]),
             "prob": prob,
             "pred": pred,
             "threshold": threshold,
@@ -3380,25 +3486,23 @@ if mode != "batch" and "last_result" in st.session_state:
         f"**{T['feedback_thanks'] if already_gave_feedback else T['feedback_prompt']}**"
     )
     if fb1.button(T["feedback_yes"], use_container_width=True, disabled=bool(already_gave_feedback), key="fb_yes"):
-        st.session_state.feedback.append({
+        append_feedback_entry({
             "Time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "Text": r["input_text"][:200],
             "Predicted": "FRAUD" if r["pred"] == 1 else "SAFE",
             "Risk %": round(r["prob"] * 100, 1),
             "UserSaysCorrect": True,
         })
-        save_feedback(st.session_state.feedback)
         st.session_state["feedback_given"] = True
         st.rerun()
     if fb2.button(T["feedback_no"], use_container_width=True, disabled=bool(already_gave_feedback), key="fb_no"):
-        st.session_state.feedback.append({
+        append_feedback_entry({
             "Time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "Text": r["input_text"][:200],
             "Predicted": "FRAUD" if r["pred"] == 1 else "SAFE",
             "Risk %": round(r["prob"] * 100, 1),
             "UserSaysCorrect": False,
         })
-        save_feedback(st.session_state.feedback)
         st.session_state["feedback_given"] = True
         st.rerun()
 
@@ -3448,11 +3552,18 @@ if mode != "batch" and "last_result" in st.session_state:
         if r["domains"]:
             for d in r["domains"]:
                 flags = domain_flags(d)
-                flag_str = " | ".join(
-                    ("🔴 " if sev == "critical" else "⚠️ ") + label for label, sev in flags
-                ) if flags else "✅ No issues found"
+                if flags:
+                    flag_str = " | ".join(
+                        ("🔴 " if sev == "critical" else "⚠️ ")
+                        + html.escape(
+                            T[f"domain_flag_{key}"].format(brand=brand) if brand else T[f"domain_flag_{key}"]
+                        )
+                        for key, sev, brand in flags
+                    )
+                else:
+                    flag_str = T["domain_no_issues"]
                 st.markdown(
-                    f'<div class="domain-box">🌐 {d}<br><small style="color:#94a3b8">{flag_str}</small></div>',
+                    f'<div class="domain-box">🌐 {html.escape(d)}<br><small style="color:#94a3b8">{flag_str}</small></div>',
                     unsafe_allow_html=True
                 )
         else:
@@ -3463,11 +3574,11 @@ if mode != "batch" and "last_result" in st.session_state:
         feature_names = list(X_input.columns)
         contrib = []
         for name, value, w in zip(feature_names, X_input.iloc[0], coef):
-            contrib.append([name, round(float(value), 3), round(float(w), 3), round(float(value) * round(float(w), 3), 3)])
+            contrib.append([feature_label(name), round(float(value), 3), round(float(w), 3), round(float(value) * round(float(w), 3), 3)])
 
-        contrib_df = pd.DataFrame(contrib, columns=["Feature", "Value", "Weight", "Contribution"])
+        contrib_df = pd.DataFrame(contrib, columns=[T["feature_col"], T["value_col"], T["weight_col"], T["contribution_col"]])
         st.dataframe(
-            contrib_df.sort_values("Contribution", ascending=False),
+            contrib_df.sort_values(T["contribution_col"], ascending=False),
             use_container_width=True,
             hide_index=True
         )
@@ -3475,9 +3586,9 @@ if mode != "batch" and "last_result" in st.session_state:
         st.subheader(T["feature_importance"])
         rf_importances = rf_model.named_steps["clf"].feature_importances_
         imp_df = pd.DataFrame({
-            "Feature": feature_names,
-            "Importance": [round(float(i), 4) for i in rf_importances]
-        }).sort_values("Importance", ascending=False)
+            T["feature_col"]: [feature_label(name) for name in feature_names],
+            T["importance_col"]: [round(float(i), 4) for i in rf_importances]
+        }).sort_values(T["importance_col"], ascending=False)
         st.dataframe(imp_df, use_container_width=True, hide_index=True)
 
         # Words the TF-IDF/Naive Bayes model learned directly from the
@@ -3510,7 +3621,8 @@ if mode != "batch" and "last_result" in st.session_state:
     with tab2:
         st.subheader(T["vector"])
         display_df = X_input.T.reset_index()
-        display_df.columns = ["Feature", "Value"]
+        display_df.columns = [T["feature_col"], T["value_col"]]
+        display_df[T["feature_col"]] = display_df[T["feature_col"]].apply(feature_label)
         st.dataframe(display_df, use_container_width=True, hide_index=True)
 
         st.subheader(T["text_stats"])
@@ -3605,9 +3717,10 @@ SECURITY ADVICE:
                 hide_index=True
             )
             hc1, hc2 = st.columns(2)
+            csv_safe_history_df = history_df.assign(Text=history_df["Text"].apply(sanitize_for_csv))
             hc1.download_button(
                 T["download_history"],
-                history_df.to_csv(index=False).encode("utf-8"),
+                csv_safe_history_df.to_csv(index=False).encode("utf-8"),
                 file_name=f"fraud_history_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                 mime="text/csv",
                 use_container_width=True,
@@ -3622,29 +3735,41 @@ SECURITY ADVICE:
     # =========================
     # DEEP ANALYSIS (optional, opt-in per click — sends text to Claude)
     # =========================
-    # Only rendered at all when a key is actually configured, so the
-    # section is fully invisible rather than a dead-end "not set up"
-    # button when nobody's configured ANTHROPIC_API_KEY. Reappears on its
-    # own, with no code changes, the moment a key is added.
-    if get_anthropic_api_key():
-        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-        st.markdown(f'<div class="section-title">{T["deep_analysis_title"]}</div>', unsafe_allow_html=True)
-        st.markdown(T["deep_analysis_intro"])
-        st.caption(T["deep_analysis_privacy_note"])
+    # Always rendered, matching the documented behavior in README.md: when
+    # no ANTHROPIC_API_KEY is configured, the section explains that plainly
+    # instead of a dead-end button — rather than disappearing entirely,
+    # which left users wondering if the feature existed at all.
+    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+    st.markdown(f'<div class="section-title">{T["deep_analysis_title"]}</div>', unsafe_allow_html=True)
+    st.markdown(T["deep_analysis_intro"])
+    st.caption(T["deep_analysis_privacy_note"])
 
-        if st.button(T["deep_analysis_button"], key="deep_analysis_btn"):
+    if not get_anthropic_api_key():
+        st.info(T["deep_analysis_not_configured"])
+    else:
+        last_click = st.session_state.get("deep_analysis_last_click")
+        cooldown_remaining = 0.0
+        if last_click is not None:
+            elapsed = (datetime.now() - last_click).total_seconds()
+            cooldown_remaining = max(0.0, DEEP_ANALYSIS_COOLDOWN_SECONDS - elapsed)
+
+        if st.button(T["deep_analysis_button"], key="deep_analysis_btn", disabled=cooldown_remaining > 0):
+            st.session_state["deep_analysis_last_click"] = datetime.now()
             lang_name = {"🇰🇿 KZ": "Kazakh", "🇷🇺 RU": "Russian", "🇬🇧 EN": "English"}.get(lang, "English")
             with st.spinner(T["deep_analysis_loading"]):
                 try:
                     st.session_state["deep_analysis_result"] = run_deep_analysis(r["input_text"], lang_name)
                 except Exception:
+                    logger.warning("Deep analysis (Claude) call failed", exc_info=True)
                     st.session_state["deep_analysis_result"] = None
                     st.error(T["deep_analysis_error"])
+        elif cooldown_remaining > 0:
+            st.caption(T["deep_analysis_cooldown"].format(seconds=int(cooldown_remaining) + 1))
 
         if st.session_state.get("deep_analysis_result"):
             st.markdown(f"**{T['deep_analysis_result_title']}**")
             st.info(st.session_state["deep_analysis_result"])
-        st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # =========================
 # HOW IT WORKS
@@ -3724,4 +3849,4 @@ with st.expander(f"📋 {T['methodology_title']}"):
     st.markdown(f"#### {T['methodology_ethics_title']}")
     st.markdown(T["methodology_ethics_body"])
 
-st.markdown(f'<div class="footer">{T["footer"]} · Ensemble ML · {datetime.now().year}</div>', unsafe_allow_html=True)
+st.markdown(f'<div class="footer">{T["footer"]} · {T["badge_ensemble_ml"]} · {datetime.now().year}</div>', unsafe_allow_html=True)

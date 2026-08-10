@@ -1,4 +1,5 @@
 # Local analysis history and feedback (may contain pasted message content)
+session_data/
 history.json
 feedback.json
 
@@ -10,3 +11,9 @@ venv/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

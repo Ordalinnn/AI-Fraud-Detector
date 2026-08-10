@@ -5,7 +5,7 @@
   <title>AI Fraud Detector</title>
   <link rel="stylesheet" href="popup.css">
 </head>
-<body>
+<body class="loading">
   <header>
     <img src="icons/icon48.png" alt="">
     <div class="headerText">
@@ -20,13 +20,14 @@
   </header>
 
   <textarea id="input" placeholder="Paste a suspicious SMS, message, or call transcript…"></textarea>
+  <div id="validationMsg" class="validation-msg hidden" role="alert"></div>
   <button id="analyzeBtn">🚀 Analyze</button>
 
-  <div id="result" class="result hidden">
+  <div id="result" class="result hidden" role="status" aria-live="polite">
     <div id="riskBanner" class="risk-banner"></div>
     <div id="advice" class="advice"></div>
-    <div id="reasons" class="reasons"></div>
-    <div id="domains" class="domains"></div>
+    <ul id="reasons" class="reasons"></ul>
+    <ul id="domains" class="domains"></ul>
   </div>
 
   <footer id="footerText">Lightweight rule-based prototype — not a certified security tool.</footer>

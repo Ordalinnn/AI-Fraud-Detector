@@ -1,5 +1,6 @@
 {
   "name": "ai-fraud-detector-extension",
+  "version": "1.3.0",
   "private": true,
   "description": "Browser extension for AI Fraud Detector — tests only, no build step needed to load the extension itself.",
   "scripts": {
