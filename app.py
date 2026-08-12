@@ -3497,59 +3497,73 @@ components.html("""
 <script>
 (function () {
 try {
-    const topWin = window.top;
-    const topDoc = topWin.document;
+    // NOTE: this deliberately uses window.parent, NOT window.top (unlike the
+    // PWA script above). window.parent reaches the actual rendered Streamlit
+    // app page (where .hero lives) exactly one frame up from this component.
+    // window.top overshoots past it: on Streamlit Community Cloud the app is
+    // wrapped in the platform's OWN outer page (a bare "Manage app" shell)
+    // above the real app page, so window.top lands on that wrapper instead -
+    // confirmed live, it has no .hero, so the effect silently never
+    // initialized there even though it worked in every local test (locally
+    // there's no such wrapper, so parent and top happen to be the same
+    // document, which is how this went unnoticed). The PWA script above
+    // correctly wants the true outermost document instead, since that's
+    // what the browser actually reads for the tab's favicon/manifest - these
+    // two scripts have different targets on purpose, don't "fix" this back
+    // to match it.
+    const appWin = window.parent;
+    const appDoc = appWin.document;
     const CANVAS_ID = 'fd-particle-canvas';
 
     // Clean up everything left over from the previous Streamlit rerun before
-    // doing anything else - window.top is a persistent SPA page that never
-    // reloads between reruns, so old canvases/loops/listeners must be torn
-    // down explicitly or they silently pile up forever.
-    const oldCanvas = topDoc.getElementById(CANVAS_ID);
+    // doing anything else - the app page is part of a persistent SPA that
+    // never reloads between reruns, so old canvases/loops/listeners must be
+    // torn down explicitly or they silently pile up forever.
+    const oldCanvas = appDoc.getElementById(CANVAS_ID);
     if (oldCanvas) oldCanvas.remove();
-    if (topWin.__fdRafId) {
-        topWin.cancelAnimationFrame(topWin.__fdRafId);
-        topWin.__fdRafId = null;
+    if (appWin.__fdRafId) {
+        appWin.cancelAnimationFrame(appWin.__fdRafId);
+        appWin.__fdRafId = null;
     }
-    if (topWin.__fdResizeHandler) {
-        topWin.removeEventListener('resize', topWin.__fdResizeHandler);
-        topWin.__fdResizeHandler = null;
+    if (appWin.__fdResizeHandler) {
+        appWin.removeEventListener('resize', appWin.__fdResizeHandler);
+        appWin.__fdResizeHandler = null;
     }
-    if (topWin.__fdHeroObserver) {
-        topWin.__fdHeroObserver.disconnect();
-        topWin.__fdHeroObserver = null;
+    if (appWin.__fdHeroObserver) {
+        appWin.__fdHeroObserver.disconnect();
+        appWin.__fdHeroObserver = null;
     }
 
-    // Wait for .hero to exist in window.top's DOM before drawing anything.
+    // Wait for .hero to exist in the app page's DOM before drawing anything.
     // A fixed short retry budget isn't enough on a slow connection or a
     // Streamlit Community Cloud app waking from sleep (hydration can take
     // well over a couple of seconds) - use a MutationObserver so we react
     // the instant it appears, with a generous timeout as a backstop.
     function waitForHero(callback, timeoutMs) {
-        const existing = topDoc.querySelector('.hero');
+        const existing = appDoc.querySelector('.hero');
         if (existing) { callback(existing); return; }
 
-        const observer = new topWin.MutationObserver(function () {
-            const hero = topDoc.querySelector('.hero');
+        const observer = new appWin.MutationObserver(function () {
+            const hero = appDoc.querySelector('.hero');
             if (hero) {
                 observer.disconnect();
-                topWin.__fdHeroObserver = null;
+                appWin.__fdHeroObserver = null;
                 callback(hero);
             }
         });
-        topWin.__fdHeroObserver = observer;
-        observer.observe(topDoc.documentElement || topDoc.body, { childList: true, subtree: true });
+        appWin.__fdHeroObserver = observer;
+        observer.observe(appDoc.documentElement || appDoc.body, { childList: true, subtree: true });
 
-        topWin.setTimeout(function () {
-            if (topWin.__fdHeroObserver === observer) {
+        appWin.setTimeout(function () {
+            if (appWin.__fdHeroObserver === observer) {
                 observer.disconnect();
-                topWin.__fdHeroObserver = null;
+                appWin.__fdHeroObserver = null;
             }
         }, timeoutMs);
     }
 
     function init(hero) {
-        const canvas = topDoc.createElement('canvas');
+        const canvas = appDoc.createElement('canvas');
         canvas.id = CANVAS_ID;
         canvas.style.position = 'absolute';
         canvas.style.top = '0';
@@ -3564,9 +3578,9 @@ try {
         hero.insertBefore(canvas, hero.firstChild);
 
         const ctx = canvas.getContext('2d');
-        const dpr = Math.min(topWin.devicePixelRatio || 1, 2);
-        const reduceMotion = !!(topWin.matchMedia &&
-            topWin.matchMedia('(prefers-reduced-motion: reduce)').matches);
+        const dpr = Math.min(appWin.devicePixelRatio || 1, 2);
+        const reduceMotion = !!(appWin.matchMedia &&
+            appWin.matchMedia('(prefers-reduced-motion: reduce)').matches);
         const LINK_DIST = 150;
 
         let width = 0, height = 0, particles = [];
@@ -3597,11 +3611,11 @@ try {
         resize();
         makeParticles();
 
-        topWin.__fdResizeHandler = function () {
+        appWin.__fdResizeHandler = function () {
             resize();
             makeParticles();
         };
-        topWin.addEventListener('resize', topWin.__fdResizeHandler);
+        appWin.addEventListener('resize', appWin.__fdResizeHandler);
 
         function draw(fadeMul) {
             ctx.clearRect(0, 0, width, height);
@@ -3652,7 +3666,7 @@ try {
             }
             const fadeMul = Math.min(1, (Date.now() - start) / 1000);
             draw(fadeMul);
-            topWin.__fdRafId = topWin.requestAnimationFrame(step);
+            appWin.__fdRafId = appWin.requestAnimationFrame(step);
         }
 
         step();
