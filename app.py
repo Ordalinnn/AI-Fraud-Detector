@@ -3448,6 +3448,156 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # =========================
+# HERO PARTICLE EFFECT (ambient "wow" background)
+# =========================
+components.html("""
+<script>
+(function () {
+    const topWin = window.top;
+    const topDoc = topWin.document;
+    const CANVAS_ID = 'fd-particle-canvas';
+
+    // Clean up everything left over from the previous Streamlit rerun before
+    // doing anything else - window.top is a persistent SPA page that never
+    // reloads between reruns, so old canvases/loops/listeners must be torn
+    // down explicitly or they silently pile up forever.
+    const oldCanvas = topDoc.getElementById(CANVAS_ID);
+    if (oldCanvas) oldCanvas.remove();
+    if (topWin.__fdRafId) {
+        topWin.cancelAnimationFrame(topWin.__fdRafId);
+        topWin.__fdRafId = null;
+    }
+    if (topWin.__fdResizeHandler) {
+        topWin.removeEventListener('resize', topWin.__fdResizeHandler);
+        topWin.__fdResizeHandler = null;
+    }
+
+    function init(attemptsLeft) {
+        const hero = topDoc.querySelector('.hero');
+        if (!hero) {
+            // Hero markdown may not have been painted into window.top yet -
+            // retry briefly instead of silently giving up.
+            if (attemptsLeft > 0) {
+                topWin.setTimeout(function () { init(attemptsLeft - 1); }, 120);
+            }
+            return;
+        }
+
+        const canvas = topDoc.createElement('canvas');
+        canvas.id = CANVAS_ID;
+        canvas.style.position = 'absolute';
+        canvas.style.top = '0';
+        canvas.style.left = '0';
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+        canvas.style.display = 'block';
+        canvas.style.pointerEvents = 'none';
+        // No z-index needed: .hero-grid is also position:relative with an
+        // auto z-index, so plain DOM order decides paint order. Inserting
+        // the canvas as the first child keeps it behind all hero content.
+        hero.insertBefore(canvas, hero.firstChild);
+
+        const ctx = canvas.getContext('2d');
+        const dpr = Math.min(topWin.devicePixelRatio || 1, 2);
+        const reduceMotion = !!(topWin.matchMedia &&
+            topWin.matchMedia('(prefers-reduced-motion: reduce)').matches);
+        const LINK_DIST = 130;
+
+        let width = 0, height = 0, particles = [];
+
+        function resize() {
+            width = hero.clientWidth;
+            height = hero.clientHeight;
+            canvas.width = Math.max(1, Math.round(width * dpr));
+            canvas.height = Math.max(1, Math.round(height * dpr));
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        }
+
+        function makeParticles() {
+            const count = Math.max(18, Math.min(45, Math.round((width * height) / 16000)));
+            particles = [];
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x: Math.random() * width,
+                    y: Math.random() * height,
+                    vx: (Math.random() - 0.5) * 0.34,
+                    vy: (Math.random() - 0.5) * 0.34,
+                    r: Math.random() * 1.5 + 1,
+                    phase: Math.random() * Math.PI * 2
+                });
+            }
+        }
+
+        resize();
+        makeParticles();
+
+        topWin.__fdResizeHandler = function () {
+            resize();
+            makeParticles();
+        };
+        topWin.addEventListener('resize', topWin.__fdResizeHandler);
+
+        function draw(fadeMul) {
+            ctx.clearRect(0, 0, width, height);
+            const t = Date.now() / 1000;
+
+            for (let i = 0; i < particles.length; i++) {
+                const p = particles[i];
+                for (let j = i + 1; j < particles.length; j++) {
+                    const q = particles[j];
+                    const dx = p.x - q.x, dy = p.y - q.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < LINK_DIST) {
+                        const a = 0.22 * (1 - dist / LINK_DIST) * fadeMul;
+                        ctx.strokeStyle = 'rgba(94,234,212,' + a + ')';
+                        ctx.lineWidth = 1;
+                        ctx.beginPath();
+                        ctx.moveTo(p.x, p.y);
+                        ctx.lineTo(q.x, q.y);
+                        ctx.stroke();
+                    }
+                }
+            }
+
+            for (let i = 0; i < particles.length; i++) {
+                const p = particles[i];
+                const twinkle = 0.65 + 0.35 * Math.sin(t * 1.6 + p.phase);
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255,255,255,' + (0.85 * twinkle * fadeMul) + ')';
+                ctx.fill();
+            }
+        }
+
+        if (reduceMotion) {
+            draw(1);
+            return;
+        }
+
+        const start = Date.now();
+
+        function step() {
+            for (let i = 0; i < particles.length; i++) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                if (p.x <= 0 || p.x >= width) { p.vx *= -1; p.x = Math.max(0, Math.min(width, p.x)); }
+                if (p.y <= 0 || p.y >= height) { p.vy *= -1; p.y = Math.max(0, Math.min(height, p.y)); }
+            }
+            const fadeMul = Math.min(1, (Date.now() - start) / 1000);
+            draw(fadeMul);
+            topWin.__fdRafId = topWin.requestAnimationFrame(step);
+        }
+
+        step();
+    }
+
+    init(20);
+})();
+</script>
+""", height=0, width=0)
+
+# =========================
 # INSTALL INSTRUCTIONS (toggled by the sidebar button)
 # =========================
 if st.session_state.get("show_install_instructions"):
