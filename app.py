@@ -3496,6 +3496,7 @@ st.markdown(f"""
 components.html("""
 <script>
 (function () {
+try {
     const topWin = window.top;
     const topDoc = topWin.document;
     const CANVAS_ID = 'fd-particle-canvas';
@@ -3514,18 +3515,40 @@ components.html("""
         topWin.removeEventListener('resize', topWin.__fdResizeHandler);
         topWin.__fdResizeHandler = null;
     }
+    if (topWin.__fdHeroObserver) {
+        topWin.__fdHeroObserver.disconnect();
+        topWin.__fdHeroObserver = null;
+    }
 
-    function init(attemptsLeft) {
-        const hero = topDoc.querySelector('.hero');
-        if (!hero) {
-            // Hero markdown may not have been painted into window.top yet -
-            // retry briefly instead of silently giving up.
-            if (attemptsLeft > 0) {
-                topWin.setTimeout(function () { init(attemptsLeft - 1); }, 120);
+    // Wait for .hero to exist in window.top's DOM before drawing anything.
+    // A fixed short retry budget isn't enough on a slow connection or a
+    // Streamlit Community Cloud app waking from sleep (hydration can take
+    // well over a couple of seconds) - use a MutationObserver so we react
+    // the instant it appears, with a generous timeout as a backstop.
+    function waitForHero(callback, timeoutMs) {
+        const existing = topDoc.querySelector('.hero');
+        if (existing) { callback(existing); return; }
+
+        const observer = new topWin.MutationObserver(function () {
+            const hero = topDoc.querySelector('.hero');
+            if (hero) {
+                observer.disconnect();
+                topWin.__fdHeroObserver = null;
+                callback(hero);
             }
-            return;
-        }
+        });
+        topWin.__fdHeroObserver = observer;
+        observer.observe(topDoc.documentElement || topDoc.body, { childList: true, subtree: true });
 
+        topWin.setTimeout(function () {
+            if (topWin.__fdHeroObserver === observer) {
+                observer.disconnect();
+                topWin.__fdHeroObserver = null;
+            }
+        }, timeoutMs);
+    }
+
+    function init(hero) {
         const canvas = topDoc.createElement('canvas');
         canvas.id = CANVAS_ID;
         canvas.style.position = 'absolute';
@@ -3635,7 +3658,10 @@ components.html("""
         step();
     }
 
-    init(20);
+    waitForHero(init, 15000);
+} catch (err) {
+    console.error('[fd-particles] init failed:', err);
+}
 })();
 </script>
 """, height=0, width=0)
