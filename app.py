@@ -34,12 +34,27 @@ from translations import LANG_OPTIONS, OLD_LANG_MAP, DEFAULT_LANG, get_translati
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("ai_fraud_detector")
 
+# Anchor every relative file path (logo, icons, browser-extension source,
+# session data) to this script's own directory rather than the process's
+# current working directory. "streamlit run /abs/path/app.py" does NOT
+# guarantee cwd == this file's folder — it depends on how/from where the
+# process was launched (differs across local dev launchers, Docker WORKDIR,
+# systemd services, etc.). A bare relative path like Path("logo.png") silently
+# resolves to nothing (not an error) when cwd is wrong, degrading the hero
+# logo to a plain emoji fallback with no visible error. BASE_DIR makes path
+# resolution independent of launch context.
+BASE_DIR = Path(__file__).resolve().parent
+
 # =========================
 # PAGE CONFIG
 # =========================
 st.set_page_config(
     page_title="AI Fraud Detector",
-    page_icon="🔐",
+    # The real branded favicon (static/icon.png) is injected into window.top's
+    # <head> by the PWA script below. Using it here too (rather than a generic
+    # emoji) means the very first paint already shows the correct icon instead
+    # of a placeholder that gets swapped a moment later.
+    page_icon=str(BASE_DIR / "static" / "icon.png"),
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -119,13 +134,33 @@ components.html("""
     setLink('alternate icon', 'app/static/icon.png', 'image/png');
     setLink('apple-touch-icon', 'app/static/icon.png');
 
-    topDoc.querySelectorAll('meta[name="theme-color"]').forEach(function (el) {
-        el.remove();
-    });
-    const meta = topDoc.createElement('meta');
-    meta.name = 'theme-color';
-    meta.content = '#1e3a8a';
-    topDoc.head.appendChild(meta);
+    function setMeta(selector, attrs) {
+        topDoc.querySelectorAll(selector).forEach(function (el) { el.remove(); });
+        const meta = topDoc.createElement('meta');
+        Object.keys(attrs).forEach(function (key) { meta.setAttribute(key, attrs[key]); });
+        topDoc.head.appendChild(meta);
+    }
+
+    setMeta('meta[name="theme-color"]', { name: 'theme-color', content: '#1e3a8a' });
+
+    // Link-preview metadata (Slack/WhatsApp/Twitter/iMessage unfurls, search
+    // snippets) so the very first impression of this site - the shared-link
+    // card, before anyone even opens it - looks intentional and branded
+    // instead of a bare/generic title.
+    const SITE_TITLE = 'AI Fraud Detector';
+    const SITE_DESC = 'AI prototype for detecting fraud in SMS, messages, and call transcripts.';
+    const SITE_IMAGE = resolvedUrl('app/static/icon.png');
+
+    setMeta('meta[name="description"]', { name: 'description', content: SITE_DESC });
+    setMeta('meta[property="og:type"]', { property: 'og:type', content: 'website' });
+    setMeta('meta[property="og:url"]', { property: 'og:url', content: baseHref });
+    setMeta('meta[property="og:title"]', { property: 'og:title', content: SITE_TITLE });
+    setMeta('meta[property="og:description"]', { property: 'og:description', content: SITE_DESC });
+    setMeta('meta[property="og:image"]', { property: 'og:image', content: SITE_IMAGE });
+    setMeta('meta[name="twitter:card"]', { name: 'twitter:card', content: 'summary' });
+    setMeta('meta[name="twitter:title"]', { name: 'twitter:title', content: SITE_TITLE });
+    setMeta('meta[name="twitter:description"]', { name: 'twitter:description', content: SITE_DESC });
+    setMeta('meta[name="twitter:image"]', { name: 'twitter:image', content: SITE_IMAGE });
 
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register(resolvedUrl('app/static/sw.js')).catch(function () {});
@@ -148,7 +183,7 @@ def image_to_base64(path: str) -> str:
         return ""
     return base64.b64encode(file_path.read_bytes()).decode()
 
-LOGO_B64 = image_to_base64("logo.png")
+LOGO_B64 = image_to_base64(str(BASE_DIR / "logo.png"))
 LOGO_HTML = f"data:image/png;base64,{LOGO_B64}" if LOGO_B64 else ""
 
 # =========================
@@ -158,7 +193,7 @@ LOGO_HTML = f"data:image/png;base64,{LOGO_B64}" if LOGO_B64 else ""
 # from the site instead of needing a GitHub account/visit. Built from the
 # folder on disk (not a prebuilt artifact committed to the repo) so it can
 # never drift out of sync with the actual extension source.
-EXTENSION_DIR = Path("browser-extension")
+EXTENSION_DIR = BASE_DIR / "browser-extension"
 EXTENSION_EXCLUDED_DIRS = {"tests", "node_modules"}
 EXTENSION_EXCLUDED_FILES = {"package.json", "package-lock.json"}
 
@@ -199,6 +234,14 @@ def build_extension_zip() -> bytes:
 # so two concurrent submissions can no longer silently overwrite each
 # other. All writes are atomic (temp file + os.replace) so a crash
 # mid-write can't leave a corrupted, unparseable JSON file behind.
+#
+# Deliberately CWD-relative (NOT BASE_DIR-anchored like the static assets
+# above) since this is writable runtime data, not read-only files shipped
+# with the repo: the test suite sandboxes it via monkeypatch.chdir(tmp_path)
+# (see tests/test_app_streamlit.py's isolated_cwd fixture) so tests never
+# touch the real session_data/feedback.json, and pinning it to the process's
+# working directory the same way lets an operator control where data is
+# persisted (e.g. a mounted volume) without editing code.
 DATA_DIR = Path("session_data")
 FEEDBACK_FILE = Path("feedback.json")
 _feedback_lock = threading.Lock()
