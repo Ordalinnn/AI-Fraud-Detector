@@ -3544,7 +3544,7 @@ components.html("""
         const dpr = Math.min(topWin.devicePixelRatio || 1, 2);
         const reduceMotion = !!(topWin.matchMedia &&
             topWin.matchMedia('(prefers-reduced-motion: reduce)').matches);
-        const LINK_DIST = 130;
+        const LINK_DIST = 150;
 
         let width = 0, height = 0, particles = [];
 
@@ -3565,7 +3565,7 @@ components.html("""
                     y: Math.random() * height,
                     vx: (Math.random() - 0.5) * 0.34,
                     vy: (Math.random() - 0.5) * 0.34,
-                    r: Math.random() * 1.5 + 1,
+                    r: Math.random() * 1.6 + 1.3,
                     phase: Math.random() * Math.PI * 2
                 });
             }
@@ -3591,9 +3591,9 @@ components.html("""
                     const dx = p.x - q.x, dy = p.y - q.y;
                     const dist = Math.sqrt(dx * dx + dy * dy);
                     if (dist < LINK_DIST) {
-                        const a = 0.22 * (1 - dist / LINK_DIST) * fadeMul;
+                        const a = 0.42 * (1 - dist / LINK_DIST) * fadeMul;
                         ctx.strokeStyle = 'rgba(94,234,212,' + a + ')';
-                        ctx.lineWidth = 1;
+                        ctx.lineWidth = 1.4;
                         ctx.beginPath();
                         ctx.moveTo(p.x, p.y);
                         ctx.lineTo(q.x, q.y);
