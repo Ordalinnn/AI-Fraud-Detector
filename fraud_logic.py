@@ -48,6 +48,22 @@ loan_words = [
     "выручи", "перекинь", "закинь", "borrow", "lend me", "spot me",
 ]
 
+# Emotionally-manipulative "click this link to vote/support someone you
+# know" pretext - a real, actively-reported Kazakhstan/Russia WhatsApp/
+# Telegram account-hijack vector (see finratings.kz) distinct from
+# loan_words above: loan_words covers the *already-hijacked* account being
+# used to ask a contact for money; this covers how the account gets
+# hijacked in the first place. The message looks like it's from a contact
+# and asks you to click a link and "vote" for a relative in a contest - the
+# linked page then asks for your phone number and the SMS code that
+# arrives next, which is actually your own account's login code. Contains
+# none of the money/urgent/secret wording the other lists look for, which
+# is exactly why this pattern went undetected before this list was added.
+vote_link_words = [
+    "проголосу", "голосование", "дауыс бер", "конкурс",
+    "vote for", "please vote", "support my", "cast your vote",
+]
+
 # Message-text language for fake "verification service" scams — e.g. a fake
 # marketplace buyer asking a seller to pay a bogus registry/certificate site
 # before a deal (see the check-tech-base.ru style scam). Distinct from
@@ -175,9 +191,28 @@ def get_domain(url):
     return url.split("/")[0]
 
 def count_matches(text, words):
-    """Counts how many entries from `words` appear anywhere in `text` (case-insensitive substring match)."""
+    """Counts how many entries from `words` appear in `text` (case-insensitive,
+    left-word-boundary match): a match must start at the beginning of a word.
+
+    This is NOT plain substring matching (what this function used to do) -
+    that let short whole words like "now" (in urgent_words) or "pin" (in
+    secret_words) spuriously match *inside* unrelated words: "now" inside
+    "know"/"known"/"snow", "pin" inside "shopping"/"opinion"/"spin". A real
+    example this silently broke: "Let me know if 7pm still works for you"
+    scored as containing an urgent call-to-action purely because "know"
+    contains "now".
+
+    Deliberately NOT right-boundary-anchored, i.e. this is prefix matching
+    from a word start, not whole-word matching - several entries are
+    intentional word *stems* covering Russian/Kazakh conjugation/suffix
+    forms without listing every inflection (see the comments above
+    money_words/loan_words/verification_service_words/threat_words): "оплат"
+    must still match "оплатите"/"оплата", "займ" must still match "займы".
+    Left-anchoring alone fixes the bug above, since both accidental matches
+    happened mid-word (preceded by another letter), never at a word start.
+    """
     text = text.lower()
-    return sum(1 for w in words if w in text)
+    return sum(1 for w in words if re.search(r"\b" + re.escape(w.lower()), text))
 
 def brand_impersonation(domain):
     """Returns the brand being impersonated if the domain contains a known
@@ -285,6 +320,7 @@ def extract_features(text):
         "secret_count": count_matches(text_lower, secret_words),
         "money_count": count_matches(text_lower, money_words),
         "loan_count": count_matches(text_lower, loan_words),
+        "vote_link_count": count_matches(text_lower, vote_link_words),
         "threat_count": count_matches(text_lower, threat_words),
         "identity_count": count_matches(text_lower, identity_words),
         "reward_count": count_matches(text_lower, reward_words),
@@ -326,6 +362,8 @@ def rule_boost(features):
         boost += 0.12
     if features["loan_count"] and features["urgent_count"]:
         boost += 0.12
+    if features["vote_link_count"] and features["has_link"]:
+        boost += 0.10
     if features["secret_count"] and features["money_count"]:
         boost += 0.15
     if features["threat_count"] and features["has_link"]:

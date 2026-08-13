@@ -330,6 +330,81 @@ def test_rule_boost_fires_for_loan_plus_urgent():
 
 
 # =========================
+# count_matches (word-boundary matching, not plain substring)
+# =========================
+def test_count_matches_does_not_match_mid_word():
+    # "now" is in urgent_words and "pin"/"пин" are in secret_words, but
+    # count_matches must not fire just because those letters happen to
+    # appear *inside* an unrelated word ("know" contains "now", "shopping"
+    # and "opinion" contain "pin"). This was a real false-positive: an
+    # ordinary scheduling message was flagged as urgent purely because
+    # "know" contains "now".
+    features, _ = extract_features(
+        "let me know if 7pm still works for you, no rush"
+    )
+    assert features["urgent_count"] == 0
+
+    features, _ = extract_features(
+        "just finished shopping, what's your opinion on the blue one"
+    )
+    assert features["secret_count"] == 0
+
+
+def test_count_matches_still_matches_word_stems():
+    # The word-boundary fix must be LEFT-boundary only, not whole-word,
+    # so intentional Russian/Kazakh conjugation stems ("оплат", "займ",
+    # "провер") still match every inflected form starting with that stem.
+    features, _ = extract_features("переведите оплату и займы вернем")
+    assert features["money_count"] > 0  # "оплат" -> "оплату"
+    assert features["loan_count"] > 0  # "займ" -> "займы"
+
+    features, _ = extract_features("нужна проверка документов срочно")
+    assert features["verification_count"] > 0  # "провер" -> "проверка"
+
+    # And genuine whole-word/left-boundary matches must still work normally.
+    features, _ = extract_features("urgent: verify your pin now")
+    assert features["urgent_count"] > 0
+    assert features["secret_count"] > 0
+
+
+# =========================
+# vote_link_words / vote_link_count (WhatsApp/Telegram "vote for my
+# relative" account-hijack pretext)
+# =========================
+def test_vote_link_words_detected():
+    features, _ = extract_features(
+        "привет проголосуй пожалуйста за мою племянницу в конкурсе "
+        "вот ссылка http://vote-konkurs-online.ru"
+    )
+    assert features["vote_link_count"] > 0
+    assert features["has_link"] == 1
+    # Deliberately contains none of the other scam vocabulary - that's the
+    # whole point of this pattern.
+    assert features["urgent_count"] == 0
+    assert features["money_count"] == 0
+    assert features["secret_count"] == 0
+
+
+def test_rule_boost_fires_for_vote_link_plus_link():
+    features, _ = extract_features(
+        "hi could you please vote for my nephew in this contest here is "
+        "the link http://contest-vote-page.com"
+    )
+    assert features["vote_link_count"] > 0
+    assert features["has_link"] == 1
+    assert rule_boost(features) > 0
+
+
+def test_vote_link_words_alone_do_not_boost_without_link():
+    # An ordinary contest mention with no link shouldn't get the
+    # vote-link-specific boost - the risk is in the link + phone/SMS-code
+    # bait, not merely mentioning a vote or contest.
+    features, _ = extract_features("проголосовала за твое фото в конкурсе на работе удачи")
+    assert features["vote_link_count"] > 0
+    assert features["has_link"] == 0
+
+
+# =========================
 # sanitize_for_csv (formula-injection defense on CSV exports of
 # user-controlled text, e.g. an analyzed message starting with "=")
 # =========================

@@ -2263,6 +2263,77 @@ data = [
     ["lend me a few bucks for movie tickets, I'll pay you back when I see you", 0],
     ["мама попросила немного в долг на продукты как обычно", 0],
     ["mom asked to borrow a little for groceries like she always does", 0],
+
+    # FRAUD: the "vote for my relative in a contest" link - a real,
+    # actively-reported Kazakhstan/Russia WhatsApp/Telegram account-hijack
+    # vector (finratings.kz) distinct from the loan-request hijack above -
+    # the message looks like it's from a contact and asks you to click a
+    # link and "vote", but the linked page asks for your phone number and
+    # the SMS code that arrives next, which is actually your own account's
+    # login code. Contains no money/urgent/secret wording at all, which is
+    # exactly why it was missed before this block was added.
+    ["привет проголосуй пожалуйста за мою племянницу в конкурсе вот ссылка http://vote-konkurs-online.ru она очень старалась", 1],
+    ["извини что пишу вдруг ты сможешь проголосовать за дочку в конкурсе рисунков перейди по ссылке http://golos-za-dochku.ru и подтверди номер телефона", 1],
+    ["привет не могла бы ты поддержать сына в конкурсе талантов вот сайт для голосования http://podderzhka-syna.kz там нужно ввести номер и код из смс", 1],
+    ["hi could you please vote for my nephew in this contest here is the link http://contest-vote-page.com just enter your phone number to confirm your vote", 1],
+    ["hey sorry to bother you can you support my daughter in the online contest link is http://vote-share-page.net it asks for your phone and a code to count the vote", 1],
+    ["сәлем конкурста жиеніме дауыс беріп жіберші міне сілтеме http://dauys-ber-konkurs.kz", 1],
+
+    # SAFE: matching everyday counterparts to the vote-link hijack above -
+    # ordinary contest-sharing with no request to enter a phone number or
+    # SMS code, either from an obviously official source or just a casual
+    # no-rush share between friends.
+    ["проголосуйте за нашу школьную команду в конкурсе от акимата ссылка на официальном сайте города регистрация не требуется", 0],
+    ["please vote for our school team in the city contest the link is on the official city website no sign up needed", 0],
+    ["кинула тебе ссылку на конкурс детских рисунков от библиотеки если будет время глянь и лайкни торопиться не надо", 0],
+    ["sent you the link to the library kids art contest whenever you have a minute feel free to take a look no rush at all", 0],
+    ["проголосовала за твое фото в конкурсе на работе удачи", 0],
+    ["voted for your photo in the office contest today good luck", 0],
+
+    # SAFE: ordinary "boring" everyday texts with little or no keyword
+    # signal at all (no urgency/money/secret/threat wording, no links) -
+    # added after live testing on real messages found these scoring 65-81%
+    # FRAUD purely from weak structural features (digit_count/
+    # uppercase_count/avg_word_length) with literally zero keyword-list
+    # matches, because the training set had too few safe examples in that
+    # specific "short, a couple digits, a capital letter or two, nothing
+    # else" region of feature space for LR/RF/GB to learn it's normal.
+    # Covers scheduling chat, courier ETA notices, and genuine service
+    # receipts/confirmations - the three categories that were misfiring.
+    ["hey are we still on for dinner saturday let me know if 7pm still works for you", 0],
+    ["привет мы еще встречаемся в субботу на ужин напиши подходит ли тебе 7 вечера", 0],
+    ["здравствуйте курьер сдэк буду через 20 минут домофон не работает встретите меня у подъезда", 0],
+    ["hi this is your delivery driver I'll be there in about 15 minutes could you meet me by the gate", 0],
+    ["your netflix subscription renewed today 15.99 was charged to your card ending in 4242 view your invoice anytime in the app", 0],
+    ["ваша подписка на кинопоиск продлена сегодня списано 399 рублей с карты квитанцию можно посмотреть в приложении", 0],
+    ["напоминаю что встреча перенесена на 3 число в 14 00 в том же кабинете", 0],
+    ["just a reminder the meeting got moved to the 3rd at 2pm same room as always", 0],
+    ["получила твою посылку сегодня утром спасибо что предупредила заранее", 0],
+    ["got your package this morning thanks for giving me a heads up beforehand", 0],
+    ["во сколько завтра открывается поликлиника хочу записаться на 9 утра", 0],
+    ["what time does the clinic open tomorrow I want to book the 9am slot", 0],
+    ["скинь мне пожалуйста фото с дня рождения когда будет время", 0],
+    ["send me the photos from the birthday whenever you get a chance", 0],
+    ["заказ 4521 готов к выдаче можно забрать после 18 00 в пункте выдачи", 0],
+    ["order 4521 is ready for pickup you can collect it after 6pm at the pickup point", 0],
+
+    # SAFE: courier/delivery messages that mention a door or gate entry code
+    # as an ordinary logistics detail (not a secret to protect, just a
+    # number to get into the building) - added after live testing found this
+    # exact phrasing combination (digits + "code" + "door"/"gate" in a
+    # delivery context) still landing right at the decision boundary even
+    # after the broader Block B examples above, because logistic regression
+    # alone was still assigning it ~99% confidence purely from digit_count/
+    # uppercase_count while random forest correctly saw it as ~10% - the
+    # plain average of the four models let that one overconfident model
+    # dominate. More paired examples in this specific sub-pocket is the
+    # same low-risk fix already used throughout this dataset.
+    ["this is your courier I'll be at the building in about 10 minutes the front door code isn't working so please come down", 0],
+    ["курьер буду через 10 минут код на двери подъезда не работает выйдите пожалуйста встретить", 0],
+    ["delivery guy here at gate 3 the entry code isn't going through could you let me in", 0],
+    ["водитель уже на месте домофон барахлит наберите код 1420 или спуститесь встретить", 0],
+    ["hi it's your driver running about 12 minutes late the buzzer code seems broken so just come down when you can", 0],
+    ["курьер сдэк я у ворот номер 2 код не сработал позвоните мне пожалуйста", 0],
 ]
 
 # =========================
@@ -2318,12 +2389,24 @@ def load_feedback_examples():
 training_data = data + load_feedback_examples()
 
 def explain(features):
-    # Only explain features that are relevant (non-zero and meaningful)
+    # Only explain features that are relevant (non-zero and meaningful).
+    # digit_count/exclamation_count/uppercase_count are raw character
+    # counts, not keyword-list matches - "> 0" is too low a bar for them:
+    # virtually every message has >=1 uppercase letter just from starting
+    # a sentence, and most ordinary messages mention at least one number
+    # (a price, a time, an amount to borrow), which contradicts their own
+    # translated wording ("many numbers", "many capital letters" - see
+    # feat_digit_count/feat_uppercase_count/feat_exclamation_count in
+    # translations.py). Every other count feature matches a specific word
+    # from a curated list, where even one match (e.g. one loan-request
+    # phrase) is meaningful on its own, so those keep the "> 0" bar.
     irrelevant = {"text_length", "word_count", "avg_word_length"}
+    min_thresholds = {"digit_count": 8, "exclamation_count": 2, "uppercase_count": 5}
     return [
         T[f"feat_{k}"]
         for k, v in features.items()
         if v > 0 and k not in irrelevant and f"feat_{k}" in T
+        and v >= min_thresholds.get(k, 1)
     ]
 
 def feature_label(name):
