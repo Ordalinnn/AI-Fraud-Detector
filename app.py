@@ -2232,6 +2232,37 @@ data = [
     ["брат попросил немного в долг с обычного номера и разговор продолжил предыдущую тему без спешки", 0],
     ["my brother asked to borrow some money from his usual number and the conversation picked up naturally with no rush", 0],
     ["досым әдеттегі нөмірінен жазып ақша сұрады асықпай сөйлестік және ертесіне қайтарды", 0],
+
+    # SAFE: additional diverse everyday borrowing/lending phrasing, added
+    # after live testing showed casual English "can you lend me some
+    # money" / "pay you back" phrasing was still being flagged FRAUD even
+    # with zero urgency present - the 4 English examples in the block
+    # above weren't enough to counterbalance how much of the wider English
+    # dataset already associates money+borrow wording with fraud from
+    # other scam categories. Covers small everyday amounts (taxi, lunch,
+    # utilities, gas, movie tickets, groceries), an explicit "no rush"
+    # framing, a repayment confirmation, a long-standing friendship, and a
+    # payday loan between coworkers - all ordinary, all safe.
+    ["можешь занять немного на такси до дома отдам завтра на работе", 0],
+    ["can you spot me for the cab home, I'll pay you back at work tomorrow", 0],
+    ["не хватает пары тысяч на обед займешь до вечера", 0],
+    ["i'm a couple bucks short for lunch, can you lend me some, i'll get you back tonight", 0],
+    ["не могли бы одолжить немного на коммуналку до зарплаты как в прошлый раз", 0],
+    ["could you lend me a bit for the utilities until payday, same as last time", 0],
+    ["спасибо что одолжил на бензин уже перевел все обратно", 0],
+    ["thanks for letting me borrow some gas money, already sent it all back", 0],
+    ["мы столько лет дружим конечно помогла когда попросили занять на ремонт машины", 0],
+    ["we've been friends for years, so of course I helped when they asked to borrow money for the car repair", 0],
+    ["вернула тебе часть займа который брала в прошлом месяце как договаривались", 0],
+    ["paid you back part of the loan I borrowed last month, just like we agreed", 0],
+    ["коллега попросил занять до получки все в рамках обычного разговора", 0],
+    ["a coworker asked to borrow some money until payday during our normal chat", 0],
+    ["можешь занять немного никакой спешки верну через пару недель", 0],
+    ["can you lend me a little, no rush at all, I'll pay you back in a couple weeks", 0],
+    ["займи на билеты в кино верну как увидимся", 0],
+    ["lend me a few bucks for movie tickets, I'll pay you back when I see you", 0],
+    ["мама попросила немного в долг на продукты как обычно", 0],
+    ["mom asked to borrow a little for groceries like she always does", 0],
 ]
 
 # =========================
