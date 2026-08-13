@@ -425,3 +425,75 @@ def sanitize_for_csv(value):
     if value.startswith(_FORMULA_LEAD_CHARS):
         return "'" + value
     return value
+
+# =========================
+# FEEDBACK -> TRAINING DATA
+# =========================
+def derive_feedback_training_examples(entries, core_texts, max_per_session=20, max_examples=300):
+    """Converts "was this correct?" feedback entries (see app.py's
+    append_feedback_entry / FEEDBACK-DERIVED TRAINING DATA section) into
+    (text, label) training pairs.
+
+    `entries` is the raw list loaded from feedback.json - dicts with Text/
+    Predicted/UserSaysCorrect/Session keys. `core_texts` is a set of
+    lowercased, stripped texts already in the hand-labeled core dataset,
+    used to skip feedback that wouldn't add anything new.
+
+    Feedback is treated as weak/unverified signal, never as ground truth:
+    a real scammer has a direct incentive to spam "this was wrong" on
+    true-positive detections of their own template, to teach a model that
+    retrains on it to wave that template through. So this function:
+      - caps how many entries any single session can contribute
+        (max_per_session), so one visitor can't dominate the result
+      - caps the total number of examples returned (max_examples), so
+        crowd-submitted data can't outweigh the curated core dataset
+      - drops any message that received contradictory feedback (some
+        sessions say it was correctly flagged, others say it wasn't)
+        entirely, rather than guessing which side is right
+      - skips anything already present in core_texts
+
+    Entries are processed most-recent-last-in/first-out (i.e. `entries` is
+    expected in original chronological order, as stored in feedback.json;
+    this function walks it in reverse), so that when max_examples trims the
+    result, it's the oldest signal that gets dropped, not the newest.
+    """
+    if not entries:
+        return []
+
+    per_session_count = {}
+    text_labels = {}    # normalized text -> set of derived labels seen
+    text_original = {}  # normalized text -> original-cased text to train on
+
+    for entry in reversed(entries):
+        if not isinstance(entry, dict):
+            continue
+        text = str(entry.get("Text", "")).strip()
+        predicted = entry.get("Predicted")
+        correct = entry.get("UserSaysCorrect")
+        session = entry.get("Session", "")
+
+        if not (3 <= len(text) <= 200):
+            continue
+        if predicted not in ("FRAUD", "SAFE") or not isinstance(correct, bool):
+            continue
+
+        normalized = text.lower()
+        if normalized in core_texts:
+            continue
+
+        if session:
+            per_session_count[session] = per_session_count.get(session, 0) + 1
+            if per_session_count[session] > max_per_session:
+                continue
+
+        predicted_label = 1 if predicted == "FRAUD" else 0
+        derived_label = predicted_label if correct else 1 - predicted_label
+        text_labels.setdefault(normalized, set()).add(derived_label)
+        text_original.setdefault(normalized, text)
+
+    examples = [
+        [text_original[norm], next(iter(labels))]
+        for norm, labels in text_labels.items()
+        if len(labels) == 1  # drop contradictory feedback outright
+    ]
+    return examples[:max_examples]

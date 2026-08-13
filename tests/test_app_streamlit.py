@@ -102,3 +102,35 @@ def test_feedback_button_appends_to_shared_feedback_file(isolated_cwd):
     entries = json.loads(feedback_path.read_text(encoding="utf-8"))
     assert entries[-1]["Text"] == "feedback wiring check message"
     assert entries[-1]["UserSaysCorrect"] is True
+    assert entries[-1]["Session"] == at.session_state["session_id"]
+
+
+def test_pre_existing_feedback_is_folded_into_training_data_on_next_run(isolated_cwd):
+    # Simulates a prior visitor's feedback already sitting in feedback.json
+    # (e.g. from before this server process last restarted). A fresh app
+    # run must train on it without raising - this is the main integration
+    # risk load_feedback_examples()/training_data adds (wrong field names,
+    # JSON shape mismatch, ordering bugs at module-load time, etc.) that the
+    # pure-function tests in test_fraud_logic.py can't catch on their own,
+    # since they never actually run it through train_models().
+    (isolated_cwd / "feedback.json").write_text(json.dumps([
+        {
+            "Time": "2026-01-01 00:00:00",
+            "Text": "a brand new scam phrasing not in the core dataset",
+            "Predicted": "SAFE",
+            "Risk %": 12.0,
+            "UserSaysCorrect": False,
+            "Session": "prior-visitor-session",
+        }
+    ]), encoding="utf-8")
+
+    at = AppTest.from_file(APP_PATH, default_timeout=90)
+    at.run()
+    assert not at.exception, at.exception
+
+    # feedback.json is a private, shared-across-users log (see the
+    # HISTORY & FEEDBACK PERSISTENCE comment in app.py) - folding it into
+    # training data must never cause a past submission's raw text to be
+    # rendered back into anyone's page.
+    rendered = "\n".join(md.value for md in at.markdown)
+    assert "a brand new scam phrasing not in the core dataset" not in rendered

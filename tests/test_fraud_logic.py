@@ -23,6 +23,7 @@ from fraud_logic import (
     extract_urls,
     extract_bare_domains,
     sanitize_for_csv,
+    derive_feedback_training_examples,
 )
 
 
@@ -325,3 +326,95 @@ def test_sanitize_for_csv_leaves_normal_text_untouched():
 def test_sanitize_for_csv_passes_through_non_string_values():
     assert sanitize_for_csv(42) == 42
     assert sanitize_for_csv(None) is None
+
+
+# =========================
+# derive_feedback_training_examples (feedback.json -> training pairs; see
+# the FEEDBACK-DERIVED TRAINING DATA section in app.py for why this treats
+# feedback as weak/unverified signal rather than ground truth - a real
+# scammer has a direct incentive to spam "this was wrong" on true-positive
+# detections of their own template)
+# =========================
+def _fb_entry(text, predicted, correct, session="s1"):
+    return {"Text": text, "Predicted": predicted, "UserSaysCorrect": correct, "Session": session}
+
+
+def test_derive_feedback_examples_empty_input_returns_empty_list():
+    assert derive_feedback_training_examples([], set()) == []
+
+
+def test_derive_feedback_examples_uses_prediction_as_label_when_marked_correct():
+    entries = [_fb_entry("free money click here now", "FRAUD", True)]
+    examples = derive_feedback_training_examples(entries, core_texts=set())
+    assert examples == [["free money click here now", 1]]
+
+
+def test_derive_feedback_examples_flips_label_when_marked_incorrect():
+    # Model called it FRAUD but the user says that was wrong, so the
+    # correct label is actually safe (0), not fraud (1).
+    entries = [_fb_entry("meeting moved to 3pm tomorrow", "FRAUD", False)]
+    examples = derive_feedback_training_examples(entries, core_texts=set())
+    assert examples == [["meeting moved to 3pm tomorrow", 0]]
+
+
+def test_derive_feedback_examples_drops_contradictory_feedback():
+    # Two different sessions disagree on the same message - too ambiguous
+    # to trust either way, so it must not appear in the output at all.
+    entries = [
+        _fb_entry("urgent verify your account now", "FRAUD", True, session="s1"),
+        _fb_entry("urgent verify your account now", "FRAUD", False, session="s2"),
+    ]
+    examples = derive_feedback_training_examples(entries, core_texts=set())
+    assert examples == []
+
+
+def test_derive_feedback_examples_skips_core_dataset_duplicates():
+    entries = [_fb_entry("Already In Core Dataset", "FRAUD", True)]
+    examples = derive_feedback_training_examples(entries, core_texts={"already in core dataset"})
+    assert examples == []
+
+
+def test_derive_feedback_examples_caps_per_session_contributions():
+    # Same session submits 3 distinct messages but is only allowed to
+    # contribute 2 - the 2 most recent (last in the input list) should
+    # win, not the oldest.
+    entries = [
+        _fb_entry("session message one", "SAFE", True, session="s1"),
+        _fb_entry("session message two", "SAFE", True, session="s1"),
+        _fb_entry("session message three", "SAFE", True, session="s1"),
+    ]
+    examples = derive_feedback_training_examples(entries, core_texts=set(), max_per_session=2)
+    texts = {e[0] for e in examples}
+    assert texts == {"session message two", "session message three"}
+
+
+def test_derive_feedback_examples_caps_total_examples():
+    entries = [
+        _fb_entry("alpha message", "SAFE", True, session="s1"),
+        _fb_entry("bravo message", "SAFE", True, session="s2"),
+        _fb_entry("charlie message", "SAFE", True, session="s3"),
+    ]
+    examples = derive_feedback_training_examples(entries, core_texts=set(), max_examples=2)
+    # Most-recent-first: "charlie" and "bravo" should survive; "alpha" (the
+    # oldest) is the one trimmed off.
+    assert {e[0] for e in examples} == {"charlie message", "bravo message"}
+
+
+def test_derive_feedback_examples_handles_legacy_entries_without_session():
+    # feedback.json entries written before the Session field existed should
+    # still be usable, just not subject to the per-session cap.
+    entries = [{"Text": "legacy feedback entry", "Predicted": "SAFE", "UserSaysCorrect": True}]
+    examples = derive_feedback_training_examples(entries, core_texts=set())
+    assert examples == [["legacy feedback entry", 0]]
+
+
+def test_derive_feedback_examples_ignores_malformed_entries():
+    entries = [
+        "not a dict",
+        {"Text": "", "Predicted": "FRAUD", "UserSaysCorrect": True},               # empty text
+        {"Text": "sample message", "Predicted": "MAYBE", "UserSaysCorrect": True},  # bad Predicted value
+        {"Text": "sample message", "Predicted": "FRAUD", "UserSaysCorrect": "yes"}, # non-bool correct
+        {"Text": "x" * 500, "Predicted": "FRAUD", "UserSaysCorrect": True},         # too long
+        {"Predicted": "FRAUD", "UserSaysCorrect": True},                           # missing Text
+    ]
+    assert derive_feedback_training_examples(entries, core_texts=set()) == []

@@ -27,7 +27,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.naive_bayes import MultinomialNB
 from fraud_logic import (
     domain_flags, extract_features, rule_boost, risk_level, highlight_text,
-    sanitize_for_csv,
+    sanitize_for_csv, derive_feedback_training_examples,
 )
 from translations import LANG_OPTIONS, OLD_LANG_MAP, DEFAULT_LANG, get_translations
 
@@ -2201,6 +2201,58 @@ data = [
     ["чек қолжетімді https://kaspi.kz/receipt сілтемесі арқылы", 0],
 ]
 
+# =========================
+# FEEDBACK-DERIVED TRAINING DATA
+# =========================
+# Folds prior "was this correct?" feedback (see append_feedback_entry above)
+# back into the training set, so the model actually improves between
+# deploys instead of feedback.json being a write-only log nobody reads.
+#
+# This is deliberately NOT live/online learning. training_data below is
+# built once at module load, and train_models() is wrapped in
+# @st.cache_resource, so the combined dataset only takes effect once when a
+# fresh server process starts up (a redeploy, a manual reboot, or Community
+# Cloud waking from sleep) - never mid-process from a single click. An
+# anonymous visitor clicking "no, wrong" cannot retrain the model that is
+# actively serving other users in that same moment.
+#
+# That distinction matters specifically for a fraud detector: a real
+# scammer has a direct incentive to spam "this was wrong" on true-positive
+# detections of their own template, to teach the model to wave it through.
+# So feedback is treated as weak/unverified signal, never as ground truth:
+#   - capped per browser session (FEEDBACK_MAX_PER_SESSION) so one visitor
+#     re-submitting the same or many messages can't dominate the retrain
+#   - capped in total (FEEDBACK_MAX_EXAMPLES) so the ~1,300 hand-labeled
+#     core examples above always outweigh crowd-submitted ones
+#   - a message that got contradictory feedback (some sessions say it was
+#     correctly flagged, others say it wasn't) is dropped entirely rather
+#     than guessed at
+#   - exact duplicates of a core `data` entry are skipped - nothing new to
+#     learn there
+# None of this makes the feedback trustworthy, just bounded. A human should
+# still skim feedback.json occasionally - this doesn't replace that, it
+# just means good signal in there stops being wasted between reviews.
+FEEDBACK_MAX_PER_SESSION = 20
+FEEDBACK_MAX_EXAMPLES = 300  # stays a minority vs. the ~1,300 core examples
+
+def load_feedback_examples():
+    """Reads feedback.json (if present) and converts it into (text, label)
+    training pairs via derive_feedback_training_examples() in
+    fraud_logic.py (kept there, not here, so it's plain-Python-testable
+    without a Streamlit script context - see test_fraud_logic.py). See the
+    module comment above for why this is capped/filtered instead of
+    trusted outright."""
+    entries = _load_json(FEEDBACK_FILE)
+    core_texts = {text.strip().lower() for text, _ in data}
+    return derive_feedback_training_examples(
+        entries, core_texts, FEEDBACK_MAX_PER_SESSION, FEEDBACK_MAX_EXAMPLES
+    )
+
+# The dataset actually used for training: hand-labeled core + whatever
+# vetted feedback has accumulated since the last restart. train_models()
+# trains on this, not on `data` directly.
+training_data = data + load_feedback_examples()
+
 def explain(features):
     # Only explain features that are relevant (non-zero and meaningful)
     irrelevant = {"text_length", "word_count", "avg_word_length"}
@@ -2380,7 +2432,7 @@ def train_models(feature_schema):
     feature (like brand_flag) silently leaves a stale cached model with
     the wrong number of columns, causing a ValueError at predict time."""
     rows, labels, texts = [], [], []
-    for text, label in data:
+    for text, label in training_data:
         f, _ = extract_features(text)
         rows.append(f)
         labels.append(label)
@@ -3713,7 +3765,7 @@ with st.expander(f"🧭 {T['how_to_use']}", expanded=False):
     <div class="metrics-bar">
         <div class="metrics-row">
             <div class="metrics-item">
-                <div class="metrics-item-val">{len(data)}</div>
+                <div class="metrics-item-val">{len(training_data)}</div>
                 <div class="metrics-item-label">{T['stat_examples']}</div>
             </div>
             <div class="metrics-item">
@@ -4001,6 +4053,7 @@ if mode != "batch" and "last_result" in st.session_state:
             "Predicted": "FRAUD" if r["pred"] == 1 else "SAFE",
             "Risk %": round(r["prob"] * 100, 1),
             "UserSaysCorrect": True,
+            "Session": _session_id(),
         })
         st.session_state["feedback_given"] = True
         st.rerun()
@@ -4011,6 +4064,7 @@ if mode != "batch" and "last_result" in st.session_state:
             "Predicted": "FRAUD" if r["pred"] == 1 else "SAFE",
             "Risk %": round(r["prob"] * 100, 1),
             "UserSaysCorrect": False,
+            "Session": _session_id(),
         })
         st.session_state["feedback_given"] = True
         st.rerun()
