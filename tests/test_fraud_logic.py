@@ -308,6 +308,27 @@ def test_rule_boost_fires_for_verification_plus_money():
     assert rule_boost(features) > 0
 
 
+def test_loan_words_fire_independently_of_money_words():
+    # The hacked-WhatsApp/Telegram "lend me money" pattern deliberately
+    # avoids banking vocabulary ("card", "account", "bank") — it reads like
+    # an ordinary favor asked of a friend — so loan_count must fire on its
+    # own, without relying on money_count also being present.
+    features, _ = extract_features(
+        "hey it's me, can you spot me some cash, I'll get it back to you soon"
+    )
+    assert features["loan_count"] > 0
+    assert features["money_count"] == 0
+
+
+def test_rule_boost_fires_for_loan_plus_urgent():
+    features, _ = extract_features(
+        "извини что беспокою можешь занять денег очень срочно верну завтра"
+    )
+    assert features["loan_count"] > 0
+    assert features["urgent_count"] > 0
+    assert rule_boost(features) > 0
+
+
 # =========================
 # sanitize_for_csv (formula-injection defense on CSV exports of
 # user-controlled text, e.g. an analyzed message starting with "=")

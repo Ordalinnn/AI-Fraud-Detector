@@ -32,6 +32,22 @@ money_words = [
 # isn't handled by exact-word matching, so a shorter stem covers the family
 # of forms for free. Same reasoning for "pay" covering "pay"/"paying"/"repay".
 
+# Personal "lend/borrow me money" phrasing — distinct from money_words above,
+# which is generic banking vocabulary that a hacked-account loan request
+# often *doesn't* use at all (no "card"/"account"/"bank", just "can you lend
+# me some money, I'll pay you back"). This is the dominant pattern behind
+# the "hacked WhatsApp/Telegram, message a relative/friend asking to
+# urgently borrow money" scam widely reported in Kazakhstan and the wider
+# CIS region: the message comes from what looks like a real contact's own
+# account rather than a stranger, so the text itself (not the sender) is
+# often the only signal available to catch it. "займ"/"занять" deliberately
+# NOT shortened to "заня" — that shorter stem would also match unrelated
+# words like "занятость" (employment) and "занятия" (classes/lessons).
+loan_words = [
+    "займ", "занять", "одолж", "в долг", "взаймы", "до зарплаты",
+    "выручи", "перекинь", "закинь", "borrow", "lend me", "spot me",
+]
+
 # Message-text language for fake "verification service" scams — e.g. a fake
 # marketplace buyer asking a seller to pay a bogus registry/certificate site
 # before a deal (see the check-tech-base.ru style scam). Distinct from
@@ -224,11 +240,11 @@ def domain_flags(d):
 # =========================
 def extract_features(text):
     """Turns raw message text into the numeric feature vector the LR/RF/GB
-    models are trained on: counts of urgency/secrecy/money/threat/identity/
-    reward/pressure/verification-service words, link and domain-reputation
-    flags (suspicious keywords, TLD, length, digits, brand impersonation),
-    plus basic text statistics (length, word count, punctuation/case usage).
-    Returns (features_dict, list_of_domains_found)."""
+    models are trained on: counts of urgency/secrecy/money/loan-request/
+    threat/identity/reward/pressure/verification-service words, link and
+    domain-reputation flags (suspicious keywords, TLD, length, digits,
+    brand impersonation), plus basic text statistics (length, word count,
+    punctuation/case usage). Returns (features_dict, list_of_domains_found)."""
     if text is None:
         text = ""
     elif not isinstance(text, str):
@@ -268,6 +284,7 @@ def extract_features(text):
         "urgent_count": count_matches(text_lower, urgent_words),
         "secret_count": count_matches(text_lower, secret_words),
         "money_count": count_matches(text_lower, money_words),
+        "loan_count": count_matches(text_lower, loan_words),
         "threat_count": count_matches(text_lower, threat_words),
         "identity_count": count_matches(text_lower, identity_words),
         "reward_count": count_matches(text_lower, reward_words),
@@ -306,6 +323,8 @@ def rule_boost(features):
     if features["has_link"] and features["secret_count"]:
         boost += 0.15
     if features["urgent_count"] and features["money_count"]:
+        boost += 0.12
+    if features["loan_count"] and features["urgent_count"]:
         boost += 0.12
     if features["secret_count"] and features["money_count"]:
         boost += 0.15

@@ -1266,6 +1266,24 @@ data = [
     ["мама это я потеряла телефон пишу с нового номера срочно нужны деньги", 1],
     ["hi mum it's me i lost my phone this is my new number i urgently need some money", 1],
 
+    # FRAUD: Hacked/impersonated messenger account (WhatsApp/Telegram) asking
+    # a relative or friend to lend money — widely reported in Kazakhstan and
+    # the wider CIS region. Distinct from the "new number" variant above:
+    # here the message comes from what looks like the contact's own,
+    # already-familiar account (no "this is my new number" disclaimer
+    # needed), uses everyday borrow/lend phrasing rather than banking
+    # vocabulary, and steers the transfer through Kaspi Gold — the dominant
+    # peer-to-peer payment rail in Kazakhstan — rather than a bank card.
+    ["привет можешь одолжить немного денег очень срочно верну как только смогу", 1],
+    ["извини что беспокою можешь занять пятнадцать тысяч тенге до завтра скину номер карты", 1],
+    ["выручи деньгами до зарплаты закину каспи номер прямо сейчас скажу", 1],
+    ["срочно нужно перекинуть немного денег переведи пожалуйста на kaspi gold верну на днях", 1],
+    ["привет извини за поздний час нужно закинуть немного денег очень срочно объясню при встрече", 1],
+    ["здравствуйте это ваш родственник срочно нужна небольшая сумма в долг переведите на kaspi gold", 1],
+    ["can you spot me some money right now i'll pay you back tomorrow it's urgent", 1],
+    ["hey it's me can you lend me some money asap i'll send it back as soon as i can", 1],
+    ["сәлем бұл мен шұғыл ақша керек еді кейін бірден қайтарамын каспиге тастай аласың ба", 1],
+
     # FRAUD: LinkedIn recruiter payroll-setup scam — FTC-reported pattern
     # where a "recruiter" asks for bank details before a start date to
     # supposedly set up direct deposit
@@ -2199,6 +2217,21 @@ data = [
     ["your account statement is available at https://sberbank.ru/statements", 0],
     ["жеткізу мәртебесін көру үшін сілтемеге өтіңіз https://kazpost.kz/tracking", 0],
     ["чек қолжетімді https://kaspi.kz/receipt сілтемесі арқылы", 0],
+
+    # SAFE: matching everyday counterparts to the hacked-messenger loan-scam
+    # examples above - ordinary borrowing between people who already know
+    # each other, with no urgency pressure and no surprise change in contact
+    # channel, plus a legitimate bank loan notice so "займ" on its own isn't
+    # learned as an automatic fraud signal.
+    ["друг попросил занять немного денег на обед и вернул наличными в тот же день", 0],
+    ["a friend asked to borrow a little money for lunch and paid me back in cash the same day", 0],
+    ["брат брал займ в банке в прошлом месяце и уже все выплатил", 0],
+    ["my brother took out a bank loan last month and has already paid it off in full", 0],
+    ["банк одобрил ваш займ подробности доступны в приложении без необходимости переводить деньги кому-либо", 0],
+    ["the bank approved your loan details are available in the app with no need to send anyone money", 0],
+    ["брат попросил немного в долг с обычного номера и разговор продолжил предыдущую тему без спешки", 0],
+    ["my brother asked to borrow some money from his usual number and the conversation picked up naturally with no rush", 0],
+    ["досым әдеттегі нөмірінен жазып ақша сұрады асықпай сөйлестік және ертесіне қайтарды", 0],
 ]
 
 # =========================
