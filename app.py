@@ -9,7 +9,6 @@ import zipfile
 import numpy as np
 import pandas as pd
 import streamlit as st
-import streamlit.components.v1 as components
 from datetime import datetime
 from pathlib import Path
 import base64
@@ -66,13 +65,20 @@ st.set_page_config(
 # unnecessary Anthropic API tokens.
 MAX_INPUT_CHARS = 8000
 
+# This app runs as a single shared process (e.g. Streamlit Community Cloud),
+# so one visitor uploading a huge CSV would run extract_features() + 4-model
+# inference over every row and could stall the app for every other visitor.
+# Capping the batch size keeps worst-case batch latency bounded regardless
+# of how large a file gets uploaded.
+MAX_BATCH_ROWS = 500
+
 # =========================
 # PWA SUPPORT (installable "Add to Home Screen" on mobile)
 # =========================
 # Streamlit renders st.markdown into the page body, not the document <head>,
 # so a manifest link / theme-color meta / service worker registration can
-# only be added by reaching into the real top-level document from inside a
-# components.html iframe.
+# only be added by reaching into the real top-level document from inside an
+# st.iframe.
 #
 # IMPORTANT: use window.top, not window.parent. Streamlit Community Cloud
 # wraps the actual app in its OWN nested "streamlitApp" iframe inside the
@@ -106,7 +112,7 @@ MAX_INPUT_CHARS = 8000
 # matching "?v=" inside static/manifest.json's own icon entries.
 PWA_ASSET_VERSION = "4"
 
-components.html("""
+st.iframe("""
 <script>
 (function () {
     const topDoc = window.top.document;
@@ -167,7 +173,7 @@ components.html("""
     }
 })();
 </script>
-""".replace("__PWA_VERSION__", PWA_ASSET_VERSION), height=0, width=0)
+""".replace("__PWA_VERSION__", PWA_ASSET_VERSION), height=1, width=1)
 
 # =========================
 # LOGO HELPER
@@ -2397,11 +2403,14 @@ def explain(features):
     # (a price, a time, an amount to borrow), which contradicts their own
     # translated wording ("many numbers", "many capital letters" - see
     # feat_digit_count/feat_uppercase_count/feat_exclamation_count in
-    # translations.py). Every other count feature matches a specific word
-    # from a curated list, where even one match (e.g. one loan-request
-    # phrase) is meaningful on its own, so those keep the "> 0" bar.
+    # translations.py). url_count is the same kind of bug: its own label
+    # says "Multiple links were detected" (feat_url_count), which a single
+    # link would directly contradict, so it needs a >1 bar too. Every other
+    # count feature matches a specific word from a curated list, where even
+    # one match (e.g. one loan-request phrase) is meaningful on its own, so
+    # those keep the "> 0" bar.
     irrelevant = {"text_length", "word_count", "avg_word_length"}
-    min_thresholds = {"digit_count": 8, "exclamation_count": 2, "uppercase_count": 5}
+    min_thresholds = {"digit_count": 8, "exclamation_count": 2, "uppercase_count": 5, "url_count": 2}
     return [
         T[f"feat_{k}"]
         for k, v in features.items()
@@ -2727,11 +2736,25 @@ html, body, [class*="css"] {
     color: #64748b !important;
 }
 
-[data-testid="stExpander"] summary,
-[data-testid="stExpander"] summary p,
-[data-testid="stExpander"] svg {
+.main [data-testid="stExpander"] summary,
+.main [data-testid="stExpander"] summary p,
+.main [data-testid="stExpander"] svg,
+[data-testid="stMain"] [data-testid="stExpander"] summary,
+[data-testid="stMain"] [data-testid="stExpander"] summary p,
+[data-testid="stMain"] [data-testid="stExpander"] svg {
     color: #0f172a !important;
     fill: #0f172a !important;
+}
+
+/* Without this, the rule above's higher specificity would win over the
+   sidebar's general light-text rule (see [data-testid="stSidebar"] p, etc.
+   below) and render the "Dev Stack" expander's dark-navy header text on the
+   sidebar's own dark-navy background - unreadable at ~1:1 contrast. */
+[data-testid="stSidebar"] [data-testid="stExpander"] summary,
+[data-testid="stSidebar"] [data-testid="stExpander"] summary p,
+[data-testid="stSidebar"] [data-testid="stExpander"] svg {
+    color: #e5e7eb !important;
+    fill: #e5e7eb !important;
 }
 
 [data-testid="stExpander"] [data-testid="stMarkdownContainer"] p {
@@ -3185,7 +3208,10 @@ html, body, [class*="css"] {
     justify-content: space-between;
     margin-top: 8px;
     font-size: 11px;
-    color: #94a3b8;
+    /* #94a3b8 measured ~2.56:1 on the white meter card - fails WCAG AA's
+       4.5:1 minimum for normal-size text. #64748b keeps the same muted-gray
+       intent at ~4.76:1. */
+    color: #64748b;
     font-weight: 700;
 }
 
@@ -3283,7 +3309,10 @@ html, body, [class*="css"] {
     padding: 10px 14px;
     border-radius: 999px;
     background: #f0fdfa;
-    color: #0d9488;
+    /* #0d9488 measured ~3.59:1 on this chip's #f0fdfa background - fails
+       WCAG AA's 4.5:1 minimum for normal-size text. #0f766e (a darker shade
+       of the same teal) reaches ~5.25:1 while keeping the brand hue. */
+    color: #0f766e;
     font-weight: 750;
     margin: 6px;
     border: 1px solid #99f6e4;
@@ -3570,7 +3599,7 @@ with st.sidebar:
 
     st.divider()
 
-    if st.button(T["install_button"], use_container_width=True, key="install_toggle_btn"):
+    if st.button(T["install_button"], width="stretch", key="install_toggle_btn"):
         st.session_state["show_install_instructions"] = not st.session_state.get(
             "show_install_instructions", False
         )
@@ -3692,7 +3721,7 @@ st.markdown(f"""
 # =========================
 # HERO PARTICLE EFFECT (ambient "wow" background)
 # =========================
-components.html("""
+st.iframe("""
 <script>
 (function () {
 try {
@@ -3877,7 +3906,7 @@ try {
 }
 })();
 </script>
-""", height=0, width=0)
+""", height=1, width=1)
 
 # =========================
 # INSTALL INSTRUCTIONS (toggled by the sidebar button)
@@ -3960,7 +3989,7 @@ with left:
         with st.form("batch_form", clear_on_submit=False):
             batch_file = st.file_uploader(T["batch_upload"], type=["csv"], key="batch_file_uploader")
             batch_column = st.text_input(T["batch_column"], value="text", key="batch_column_input")
-            batch_go = st.form_submit_button(T["batch_run"], use_container_width=True)
+            batch_go = st.form_submit_button(T["batch_run"], width="stretch")
 
         analyze = False
         input_text = ""
@@ -3976,6 +4005,9 @@ with left:
 
             if uploaded:
                 input_text = uploaded.read().decode("utf-8", errors="ignore")
+                if len(input_text) > MAX_INPUT_CHARS:
+                    input_text = input_text[:MAX_INPUT_CHARS]
+                    st.warning(T["file_truncated"].format(max_chars=MAX_INPUT_CHARS))
                 st.success(T["file_uploaded"])
             else:
                 input_text = st.text_area(
@@ -3990,7 +4022,7 @@ with left:
             word_count_val = len(input_text.split()) if input_text.strip() else 0
             st.caption(f"📝 {T['char_count']}: {char_count} | {T['word_count']}: {word_count_val}")
 
-            analyze = st.form_submit_button(T["analyze"], use_container_width=True)
+            analyze = st.form_submit_button(T["analyze"], width="stretch")
 
         batch_go = False
         batch_file = None
@@ -4053,6 +4085,14 @@ if mode == "batch" and batch_go:
                 if not texts:
                     st.warning(T["batch_no_column"])
                 else:
+                    total_rows = len(texts)
+                    if total_rows > MAX_BATCH_ROWS:
+                        texts = texts[:MAX_BATCH_ROWS]
+                        st.warning(T["batch_truncated"].format(total=total_rows, shown=MAX_BATCH_ROWS))
+                    # Also cap each row's length so a handful of pathologically
+                    # long cells can't dominate feature-extraction time either.
+                    texts = [t[:MAX_INPUT_CHARS] for t in texts]
+
                     # Vectorized: extract all feature rows once, then a single
                     # batch predict_proba call per model instead of one call per row.
                     feats_list = [extract_features(t)[0] for t in texts]
@@ -4071,7 +4111,7 @@ if mode == "batch" and batch_go:
 
                     st.markdown(f'<div class="section-title">📊 {T["batch_results"]}</div>', unsafe_allow_html=True)
                     results_df = pd.DataFrame(results)
-                    st.dataframe(results_df, use_container_width=True, hide_index=True)
+                    st.dataframe(results_df, width="stretch", hide_index=True)
                     csv_safe_results_df = results_df.assign(Text=results_df["Text"].apply(sanitize_for_csv))
 
                     fraud_n = sum(1 for r in results if "FRAUD" in r["Verdict"])
@@ -4088,7 +4128,7 @@ if mode == "batch" and batch_go:
                             csv_safe_results_df.to_csv(index=False).encode("utf-8"),
                             file_name=f"batch_fraud_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                             mime="text/csv",
-                            use_container_width=True,
+                            width="stretch",
                         )
                     with bc2:
                         summary_df = pd.DataFrame(
@@ -4194,7 +4234,7 @@ if mode != "batch" and "last_result" in st.session_state:
     fb_label.markdown(
         f"**{T['feedback_thanks'] if already_gave_feedback else T['feedback_prompt']}**"
     )
-    if fb1.button(T["feedback_yes"], use_container_width=True, disabled=bool(already_gave_feedback), key="fb_yes"):
+    if fb1.button(T["feedback_yes"], width="stretch", disabled=bool(already_gave_feedback), key="fb_yes"):
         append_feedback_entry({
             "Time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "Text": r["input_text"][:200],
@@ -4205,7 +4245,7 @@ if mode != "batch" and "last_result" in st.session_state:
         })
         st.session_state["feedback_given"] = True
         st.rerun()
-    if fb2.button(T["feedback_no"], use_container_width=True, disabled=bool(already_gave_feedback), key="fb_no"):
+    if fb2.button(T["feedback_no"], width="stretch", disabled=bool(already_gave_feedback), key="fb_no"):
         append_feedback_entry({
             "Time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "Text": r["input_text"][:200],
@@ -4254,6 +4294,19 @@ if mode != "batch" and "last_result" in st.session_state:
             st.success(T["no_features"])
 
         st.subheader(T["highlighted"])
+        st.markdown(f"""
+        <div class="legend-title">{T['legend_hl_title']}</div>
+        <div class="legend-row">
+            <span class="legend-chip hl-urgent">⏰ {T['legend_hl_urgent']}</span>
+            <span class="legend-chip hl-secret">🔑 {T['legend_hl_secret']}</span>
+            <span class="legend-chip hl-money">💰 {T['legend_hl_money']}</span>
+            <span class="legend-chip hl-threat">⚠️ {T['legend_hl_threat']}</span>
+            <span class="legend-chip hl-reward">🎁 {T['legend_hl_reward']}</span>
+            <span class="legend-chip hl-pressure">🤫 {T['legend_hl_pressure']}</span>
+            <span class="legend-chip hl-identity">🪪 {T['legend_hl_identity']}</span>
+            <span class="legend-chip hl-link">🔗 {T['legend_hl_link']}</span>
+        </div>
+        """, unsafe_allow_html=True)
         st.markdown(
             f'<div class="highlight-box">{highlight_text(r["input_text"])}</div>',
             unsafe_allow_html=True
@@ -4290,7 +4343,7 @@ if mode != "batch" and "last_result" in st.session_state:
         contrib_df = pd.DataFrame(contrib, columns=[T["feature_col"], T["value_col"], T["weight_col"], T["contribution_col"]])
         st.dataframe(
             contrib_df.sort_values(T["contribution_col"], ascending=False),
-            use_container_width=True,
+            width="stretch",
             hide_index=True
         )
 
@@ -4300,7 +4353,7 @@ if mode != "batch" and "last_result" in st.session_state:
             T["feature_col"]: [feature_label(name) for name in feature_names],
             T["importance_col"]: [round(float(i), 4) for i in rf_importances]
         }).sort_values(T["importance_col"], ascending=False)
-        st.dataframe(imp_df, use_container_width=True, hide_index=True)
+        st.dataframe(imp_df, width="stretch", hide_index=True)
 
         # Words the TF-IDF/Naive Bayes model learned directly from the
         # training text — not from the hand-curated keyword lists above.
@@ -4334,7 +4387,7 @@ if mode != "batch" and "last_result" in st.session_state:
         display_df = X_input.T.reset_index()
         display_df.columns = [T["feature_col"], T["value_col"]]
         display_df[T["feature_col"]] = display_df[T["feature_col"]].apply(feature_label)
-        st.dataframe(display_df, use_container_width=True, hide_index=True)
+        st.dataframe(display_df, width="stretch", hide_index=True)
 
         st.subheader(T["text_stats"])
         ts1, ts2, ts3 = st.columns(3)
@@ -4409,14 +4462,14 @@ SECURITY ADVICE:
             T["download"],
             report,
             file_name=f"fraud_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
-            use_container_width=True
+            width="stretch"
         )
         dl2.download_button(
             T["download_json"],
             result_json,
             file_name=f"fraud_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
             mime="application/json",
-            use_container_width=True
+            width="stretch"
         )
 
     with tab4:
@@ -4424,7 +4477,7 @@ SECURITY ADVICE:
             history_df = pd.DataFrame(st.session_state.history)
             st.dataframe(
                 history_df,
-                use_container_width=True,
+                width="stretch",
                 hide_index=True
             )
             hc1, hc2 = st.columns(2)
@@ -4434,9 +4487,9 @@ SECURITY ADVICE:
                 csv_safe_history_df.to_csv(index=False).encode("utf-8"),
                 file_name=f"fraud_history_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                 mime="text/csv",
-                use_container_width=True,
+                width="stretch",
             )
-            if hc2.button(T["clear_history"], use_container_width=True):
+            if hc2.button(T["clear_history"], width="stretch"):
                 st.session_state.history = []
                 save_history([])
                 st.rerun()

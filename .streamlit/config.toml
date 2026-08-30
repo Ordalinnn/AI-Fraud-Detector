@@ -1,5 +1,11 @@
 [server]
 enableStaticServing = true
+# Default is 200MB, which is wildly more than any legitimate batch CSV or
+# .txt upload for this app needs (app.py itself caps batch analysis to
+# MAX_BATCH_ROWS rows and MAX_INPUT_CHARS per row/message). Capping this at
+# the platform level means an oversized upload is rejected immediately
+# instead of first being fully received by the shared server process.
+maxUploadSize = 5
 
 [browser]
 # Disables Streamlit's own phone-home usage-stats collection, consistent
@@ -17,7 +23,12 @@ toolbarMode = "minimal"
 
 [theme]
 base = "light"
-primaryColor = "#2563eb"
+# Matches --clr-cobalt in app.py's own CSS palette (:root, ~line 2668) so
+# native widgets Streamlit still styles itself (e.g. the threshold slider,
+# checkboxes/radios outside the sidebar's custom dark theme) share the same
+# blue as the rest of the app's navy/cobalt/teal brand gradient, instead of
+# a similar-but-not-quite-matching stock blue.
+primaryColor = "#1d4ed8"
 backgroundColor = "#f8fafc"
 secondaryBackgroundColor = "#eef2ff"
 textColor = "#0f172a"

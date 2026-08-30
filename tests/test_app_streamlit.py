@@ -21,6 +21,8 @@ from pathlib import Path
 import pytest
 from streamlit.testing.v1 import AppTest
 
+from translations import get_translations
+
 APP_PATH = str(Path(__file__).resolve().parent.parent / "app.py")
 
 
@@ -105,6 +107,64 @@ def test_feedback_button_appends_to_shared_feedback_file(isolated_cwd):
     assert entries[-1]["Session"] == at.session_state["session_id"]
 
 
+def test_batch_csv_over_row_cap_is_truncated_with_warning(isolated_cwd):
+    # This app runs as a single shared process, so an unbounded batch upload
+    # would run full feature extraction + 4-model inference over every row
+    # and could stall the app for every other visitor. MAX_BATCH_ROWS in
+    # app.py must actually cap processing, not just exist as an unused
+    # constant - this test drives a real oversized upload through the batch
+    # form and checks both the warning and the actual row count processed.
+    max_batch_rows = 500  # must match MAX_BATCH_ROWS in app.py
+    total_rows = max_batch_rows + 50
+
+    at = AppTest.from_file(APP_PATH, default_timeout=90)
+    at.run()
+    at.selectbox(key="mode_select").set_value("batch").run()
+    assert not at.exception, at.exception
+
+    lines = ["text"] + [f"row number {i} is a totally unique unremarkable line" for i in range(total_rows)]
+    csv_bytes = "\n".join(lines).encode("utf-8")
+    at.file_uploader(key="batch_file_uploader").set_value(("big.csv", csv_bytes, "text/csv"))
+
+    submit = [b for b in at.button if "batch_form" in b.key][0]
+    submit.click().run()
+    assert not at.exception, at.exception
+
+    warnings_text = "\n".join(w.value for w in at.warning)
+    assert str(max_batch_rows) in warnings_text
+    assert str(total_rows) in warnings_text
+
+    results_df = at.dataframe[0].value
+    assert len(results_df) == max_batch_rows
+
+
+def test_txt_upload_over_max_chars_is_truncated_with_warning(isolated_cwd):
+    # Mirrors the max_chars=MAX_INPUT_CHARS cap already enforced on the
+    # text_area widget, but for uploaded .txt files, which read the raw
+    # file content directly and previously had no length limit at all.
+    max_input_chars = 8000  # must match MAX_INPUT_CHARS in app.py
+    big_text = "A" * (max_input_chars + 500)
+
+    at = AppTest.from_file(APP_PATH, default_timeout=90)
+    at.run()
+    at.selectbox(key="mode_select").set_value("file").run()
+    assert not at.exception, at.exception
+
+    at.file_uploader(key="txt_file_uploader").set_value(("big.txt", big_text.encode("utf-8"), "text/plain"))
+    at.run()
+    assert not at.exception, at.exception
+
+    warnings_text = "\n".join(w.value for w in at.warning)
+    assert str(max_input_chars) in warnings_text
+
+    submit = [b for b in at.button if "analysis_form" in b.key][0]
+    submit.click().run()
+    assert not at.exception, at.exception
+
+    result = at.session_state["last_result"] if "last_result" in at.session_state else {}
+    assert result, "analysis should still succeed on the truncated text"
+
+
 def test_pre_existing_feedback_is_folded_into_training_data_on_next_run(isolated_cwd):
     # Simulates a prior visitor's feedback already sitting in feedback.json
     # (e.g. from before this server process last restarted). A fresh app
@@ -134,3 +194,27 @@ def test_pre_existing_feedback_is_folded_into_training_data_on_next_run(isolated
     # rendered back into anyone's page.
     rendered = "\n".join(md.value for md in at.markdown)
     assert "a brand new scam phrasing not in the core dataset" not in rendered
+
+
+def test_single_link_is_not_mislabeled_as_multiple_links(isolated_cwd):
+    # explain()'s min_thresholds must require url_count >= 2 before surfacing
+    # feat_url_count ("Multiple links were detected") - a message with
+    # exactly one link previously triggered this reason despite its own
+    # wording explicitly saying "multiple". Two links must still trigger it.
+    # Two separate AppTest instances are used (mirrors
+    # test_two_sessions_do_not_share_history) rather than resubmitting on one
+    # instance, since _submit_message's button lookup isn't guaranteed
+    # stable once a first result panel (with its own extra buttons) is on screen.
+    at1 = AppTest.from_file(APP_PATH, default_timeout=90)
+    at1.run()
+    _submit_message(at1, "here is one link to check http://example-one.com")
+    assert not at1.exception, at1.exception
+    lang = at1.session_state["last_result"]["lang"]
+    multi_link_label = get_translations(lang)["feat_url_count"]
+    assert multi_link_label not in at1.session_state["last_result"]["explanations"]
+
+    at2 = AppTest.from_file(APP_PATH, default_timeout=90)
+    at2.run()
+    _submit_message(at2, "check both http://example-one.com and http://example-two.com")
+    assert not at2.exception, at2.exception
+    assert multi_link_label in at2.session_state["last_result"]["explanations"]
