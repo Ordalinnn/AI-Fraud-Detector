@@ -5,11 +5,17 @@ function contextMenuTitleFor(lang) {
 }
 
 chrome.runtime.onInstalled.addListener(() => {
-  self.I18N.getLang((lang) => {
-    chrome.contextMenus.create({
-      id: "check-fraud-selection",
-      title: contextMenuTitleFor(lang),
-      contexts: ["selection"]
+  // onInstalled fires on every extension UPDATE, not just a fresh install,
+  // but Chrome persists registered context menu ids across updates. Without
+  // removeAll() first, create()'s second call with the same fixed id below
+  // fails with a "duplicate id" chrome.runtime.lastError on every update.
+  chrome.contextMenus.removeAll(() => {
+    self.I18N.getLang((lang) => {
+      chrome.contextMenus.create({
+        id: "check-fraud-selection",
+        title: contextMenuTitleFor(lang),
+        contexts: ["selection"]
+      });
     });
   });
 });

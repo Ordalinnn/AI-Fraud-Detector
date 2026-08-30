@@ -198,16 +198,29 @@ test("ruleBoost() is capped at 0.30 even when nearly every combo fires", () => {
   assert.equal(ruleBoost(f), 0.30);
 });
 
-test("riskStyle() boundaries match the documented 0.3/0.6/0.8 cutoffs", () => {
+test("riskStyle() boundaries match risk_level()'s threshold-relative 0.3/0.5/0.8 cutoffs", () => {
   const { riskStyle } = require("../detector.js");
   assert.equal(riskStyle(0).levelKey, "low");
   assert.equal(riskStyle(0.29).levelKey, "low");
   assert.equal(riskStyle(0.3).levelKey, "mid");
-  assert.equal(riskStyle(0.59).levelKey, "mid");
-  assert.equal(riskStyle(0.6).levelKey, "high");
+  assert.equal(riskStyle(0.49).levelKey, "mid");
+  assert.equal(riskStyle(0.5).levelKey, "high");
   assert.equal(riskStyle(0.79).levelKey, "high");
   assert.equal(riskStyle(0.8).levelKey, "critical");
   assert.equal(riskStyle(1.0).levelKey, "critical");
+});
+
+test("riskStyle() badge never contradicts the isFraud (prob >= 0.5) verdict", () => {
+  // Regression test for the bug this fixed: mid used to extend to 0.6, so a
+  // prob in [0.5, 0.6) showed a yellow "mid" badge next to an already-FRAUD
+  // verdict/advice text (analyzeText()'s isFraud is prob >= 0.5).
+  const { riskStyle } = require("../detector.js");
+  for (let i = 0; i <= 100; i++) {
+    const prob = i / 100;
+    const { levelKey } = riskStyle(prob);
+    const badgeSaysFraud = levelKey === "high" || levelKey === "critical";
+    assert.equal(badgeSaysFraud, prob >= 0.5, `prob=${prob} levelKey=${levelKey}`);
+  }
 });
 
 test("levenshtein() computes standard edit distance", () => {
@@ -215,4 +228,88 @@ test("levenshtein() computes standard edit distance", () => {
   assert.equal(levenshtein("kitten", "sitting"), 3);
   assert.equal(levenshtein("same", "same"), 0);
   assert.equal(levenshtein("", "abc"), 3);
+});
+
+// =========================
+// loanCount / voteLinkCount (WhatsApp/Telegram hacked-account scam patterns,
+// mirrors tests/test_fraud_logic.py's equivalents)
+// =========================
+test("loan-request phrasing is detected via loanCount", () => {
+  const { extractFeatures } = require("../detector.js");
+  const f = extractFeatures("привет, выручи до зарплаты, займи 20000 срочно");
+  assert.ok(f.loanCount > 0);
+});
+
+test("vote-link phrasing is detected via voteLinkCount, with none of the other scam vocabulary", () => {
+  const { extractFeatures } = require("../detector.js");
+  const f = extractFeatures(
+    "привет проголосуй пожалуйста за мою племянницу в конкурсе вот ссылка http://vote-konkurs-online.ru"
+  );
+  assert.ok(f.voteLinkCount > 0);
+  assert.equal(f.hasLink, 1);
+  assert.equal(f.secretCount, 0);
+  assert.equal(f.threatCount, 0);
+});
+
+test("ruleBoost() adds the loan+urgent and voteLink+hasLink combos", () => {
+  const { extractFeatures, ruleBoost } = require("../detector.js");
+  const loanUrgent = extractFeatures("срочно выручи, займи денег до зарплаты");
+  assert.ok(ruleBoost(loanUrgent) >= 0.12);
+
+  const voteWithLink = extractFeatures("проголосуй за меня http://vote-now.ru");
+  assert.ok(ruleBoost(voteWithLink) >= 0.10);
+});
+
+// =========================
+// countMatches() word-boundary matching, not plain substring (mirrors
+// test_fraud_logic.py's test_count_matches_does_not_match_mid_word /
+// test_count_matches_still_matches_word_stems)
+// =========================
+test("word-boundary fix: does not match mid-word ('now' inside 'know', 'pin' inside 'shopping'/'opinion')", () => {
+  const { extractFeatures } = require("../detector.js");
+  let f = extractFeatures("let me know if 7pm still works for you, no rush");
+  assert.equal(f.urgentCount, 0);
+
+  f = extractFeatures("just finished shopping, what's your opinion on the blue one");
+  assert.equal(f.secretCount, 0);
+});
+
+test("word-boundary fix: still matches left-anchored Cyrillic conjugation stems", () => {
+  const { extractFeatures } = require("../detector.js");
+  let f = extractFeatures("переведите оплату и займы вернем");
+  assert.ok(f.moneyCount > 0); // "оплат" -> "оплату"
+  assert.ok(f.loanCount > 0); // "займ" -> "займы"
+
+  f = extractFeatures("нужна проверка документов срочно");
+  assert.ok(f.verificationCount > 0); // "провер" -> "проверка"
+
+  f = extractFeatures("urgent: verify your pin now");
+  assert.ok(f.urgentCount > 0);
+  assert.ok(f.secretCount > 0);
+});
+
+// =========================
+// explain() MIN_THRESHOLDS (single-occurrence "many X" mislabeling fix,
+// mirrors app.py's explain() min_thresholds)
+// =========================
+test("explain() needs >1 for digit/exclamation/uppercase/url reasons, but >=1 for keyword-list reasons", () => {
+  const { analyzeText } = require("../detector.js");
+  const single = analyzeText("Check http://a.com, 1 code, OK!");
+  assert.ok(!single.reasons.includes("digitCount"));
+  assert.ok(!single.reasons.includes("exclamationCount"));
+  assert.ok(!single.reasons.includes("uppercaseCount"));
+  assert.ok(!single.reasons.includes("urlCount"));
+
+  const many = analyzeText("CODE 12345678 NOW!! ALSO SEE http://a.com AND http://b.com");
+  assert.ok(many.reasons.includes("digitCount"));
+  assert.ok(many.reasons.includes("exclamationCount"));
+  assert.ok(many.reasons.includes("uppercaseCount"));
+  assert.ok(many.reasons.includes("urlCount"));
+});
+
+test("LR_FEATURE_ORDER exactly matches extractFeatures()'s numeric keys (catches feature-shape drift like the loanCount/voteLinkCount gap this fixed)", () => {
+  const { extractFeatures, LR_FEATURE_ORDER } = require("../detector.js");
+  const f = extractFeatures("some ordinary text with http://a.com and займ");
+  const featureKeys = Object.keys(f).filter((k) => k !== "domains");
+  assert.deepEqual(featureKeys.slice().sort(), LR_FEATURE_ORDER.slice().sort());
 });

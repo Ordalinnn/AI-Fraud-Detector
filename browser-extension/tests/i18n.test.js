@@ -55,3 +55,12 @@ test("every language has the three risk-label keys used by detector.js's riskSty
     }
   }
 });
+
+test("every language has the loanCount/voteLinkCount reasonLabels for the WhatsApp/Telegram hijack scam patterns", () => {
+  for (const lang of Object.keys(TRANSLATIONS)) {
+    const labels = TRANSLATIONS[lang].reasonLabels;
+    for (const key of ["loanCount", "voteLinkCount"]) {
+      assert.ok(labels[key] && labels[key].length > 0, `${lang}.reasonLabels.${key} is missing`);
+    }
+  }
+});

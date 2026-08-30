@@ -39,6 +39,28 @@ const WORD_LISTS = {
   // "оплат" (not "оплата") is a stem: it also catches "оплатить"/
   // "оплатите"/"оплачивает" since matching is substring-based and doesn't
   // handle Russian verb conjugation otherwise. Same idea for "pay".
+  //
+  // Personal "lend/borrow me money" phrasing - distinct from money above,
+  // which is generic banking vocabulary a hacked-account loan request often
+  // *doesn't* use at all (no "card"/"account"/"bank", just "can you lend me
+  // some money, I'll pay you back"). This is the dominant pattern behind the
+  // "hacked WhatsApp/Telegram, message a relative/friend asking to urgently
+  // borrow money" scam widely reported in Kazakhstan/the wider CIS region.
+  loan: [
+    "займ", "занять", "одолж", "в долг", "взаймы", "до зарплаты",
+    "выручи", "перекинь", "закинь", "borrow", "lend me", "spot me"
+  ],
+  // Emotionally-manipulative "click this link to vote/support someone you
+  // know" pretext - a real, actively-reported Kazakhstan/Russia WhatsApp/
+  // Telegram account-hijack vector distinct from loan above: loan covers the
+  // *already-hijacked* account asking a contact for money; this covers how
+  // the account gets hijacked in the first place (the linked page asks for
+  // a phone number and the SMS code that arrives next, which is actually
+  // the victim's own account login code).
+  voteLink: [
+    "проголосу", "голосование", "дауыс бер", "конкурс",
+    "vote for", "please vote", "support my", "cast your vote"
+  ],
   verificationService: [
     "провер", "справк", "сертификат", "реестр", "registry",
     "verif", "certificate"
@@ -110,8 +132,37 @@ function levenshtein(a, b) {
   return prevRow[b.length];
 }
 
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// Counts how many entries from `words` appear in `textLower` as a match
+// starting at a word boundary - NOT plain substring matching (what this
+// function used to do), which let short whole words like "now" (in
+// WORD_LISTS.urgent) or "pin" (in WORD_LISTS.secret) spuriously match
+// *inside* unrelated words: "now" inside "know"/"known"/"snow", "pin"
+// inside "shopping"/"opinion"/"spin". Mirrors fraud_logic.count_matches()'s
+// fix for the exact same bug.
+//
+// Deliberately NOT a plain `\b`: JavaScript's regex `\b` only recognizes
+// ASCII `[A-Za-z0-9_]` as "word" characters, so it fails to see a boundary
+// between whitespace and a Cyrillic/Kazakh letter - and the vast majority
+// of every word list here is Cyrillic/Kazakh. `(?<![\p{L}\p{N}_])` is a
+// Unicode-aware negative lookbehind (via the `u` flag's \p{} property
+// escapes, ES2018+) that correctly treats any Unicode letter/number as a
+// "word" character, matching Python's `\b` (Unicode-aware by default).
+//
+// Also deliberately NOT right-boundary-anchored, i.e. this is prefix
+// matching from a word start, not whole-word matching - several entries are
+// intentional word *stems* covering Russian/Kazakh conjugation/suffix forms
+// (see the comments above WORD_LISTS.money/loan/verificationService/threat):
+// "оплат" must still match "оплатите"/"оплата", "займ" must still match
+// "займы".
 function countMatches(textLower, words) {
-  return words.reduce((n, w) => n + (textLower.includes(w) ? 1 : 0), 0);
+  return words.reduce((n, w) => {
+    const pattern = new RegExp("(?<![\\p{L}\\p{N}_])" + escapeRegExp(w.toLowerCase()), "u");
+    return n + (pattern.test(textLower) ? 1 : 0);
+  }, 0);
 }
 
 function isUpperChar(ch) {
@@ -216,6 +267,8 @@ function extractFeatures(text) {
   }
 
   const urgentCount = countMatches(textLower, WORD_LISTS.urgent);
+  const loanCount = countMatches(textLower, WORD_LISTS.loan);
+  const voteLinkCount = countMatches(textLower, WORD_LISTS.voteLink);
   const threatCount = countMatches(textLower, WORD_LISTS.threat);
 
   // Basic text statistics — mirrors fraud_logic.extract_features()'s
@@ -237,6 +290,8 @@ function extractFeatures(text) {
     urgentCount,
     secretCount: countMatches(textLower, WORD_LISTS.secret),
     moneyCount: countMatches(textLower, WORD_LISTS.money),
+    loanCount,
+    voteLinkCount,
     threatCount,
     identityCount: countMatches(textLower, WORD_LISTS.identity),
     rewardCount: countMatches(textLower, WORD_LISTS.reward),
@@ -266,6 +321,8 @@ function heuristicBaseScore(f) {
   score += Math.min(f.urgentCount * 0.06, 0.18);
   score += Math.min(f.secretCount * 0.15, 0.30);
   score += Math.min(f.moneyCount * 0.04, 0.12);
+  score += Math.min(f.loanCount * 0.08, 0.16);
+  score += Math.min(f.voteLinkCount * 0.08, 0.16);
   score += Math.min(f.threatCount * 0.08, 0.16);
   score += Math.min(f.identityCount * 0.10, 0.20);
   score += Math.min(f.rewardCount * 0.07, 0.14);
@@ -300,11 +357,11 @@ function heuristicBaseScore(f) {
 // with `python scripts/extract_lr_coefficients.py` from the repo root
 // whenever fraud_logic.extract_features() changes shape or app.py's
 // training dataset changes, and paste the output back in here.
-const LR_FEATURE_ORDER = ["hasLink", "urgentCount", "secretCount", "moneyCount", "threatCount", "identityCount", "rewardCount", "pressureCount", "verificationCount", "suspiciousDomain", "longDomain", "suspiciousZone", "digitDomain", "brandFlag", "homoglyphDomain", "digitCount", "exclamationCount", "uppercaseCount", "textLength", "wordCount", "avgWordLength", "urlCount", "hasMultipleWarnings"];
-const LR_MEAN = [0.017345, 0.157617, 0.071644, 0.441176, 0.061086, 0.031674, 0.048265, 0.014329, 0.047511, 0.002262, 0.0, 0.001508, 0.0, 0.000754, 0.0, 0.095023, 0.0, 0.00905, 65.760935, 10.09276, 5.818077, 0.017345, 0.010558];
-const LR_SCALE = [0.130555, 0.374587, 0.285647, 0.650392, 0.239488, 0.175131, 0.227967, 0.118842, 0.216246, 0.047511, 1.0, 0.038807, 1.0, 0.027451, 1.0, 0.497374, 1.0, 0.164522, 15.038643, 2.92356, 1.163335, 0.130555, 0.102209];
-const LR_COEF = [-0.448267, 1.453043, 0.689823, 0.471641, 0.336216, 0.494019, 0.346125, 0.75348, 0.230036, 0.300533, 0.0, 0.156384, 0.0, 0.142334, 0.0, 0.429622, 0.0, 0.427079, 0.825451, 1.148422, 0.801198, -0.448267, 0.21409];
-const LR_INTERCEPT = 0.340179;
+const LR_FEATURE_ORDER = ["hasLink", "urgentCount", "secretCount", "moneyCount", "loanCount", "voteLinkCount", "threatCount", "identityCount", "rewardCount", "pressureCount", "verificationCount", "suspiciousDomain", "longDomain", "suspiciousZone", "digitDomain", "brandFlag", "homoglyphDomain", "digitCount", "exclamationCount", "uppercaseCount", "textLength", "wordCount", "avgWordLength", "urlCount", "hasMultipleWarnings"];
+const LR_MEAN = [0.020744, 0.155222, 0.066524, 0.41917, 0.02432, 0.01073, 0.05794, 0.029328, 0.045064, 0.013591, 0.045064, 0.002146, 0.001431, 0.001431, 0.0, 0.000715, 0.0, 0.126609, 0.0, 0.015021, 66.691702, 10.33691, 5.766981, 0.020744, 0.010014];
+const LR_SCALE = [0.142526, 0.37378, 0.276413, 0.640975, 0.163065, 0.133295, 0.23363, 0.168723, 0.220808, 0.115785, 0.210865, 0.046274, 0.037796, 0.037796, 1.0, 0.026736, 1.0, 0.627568, 1.0, 0.18274, 16.158021, 3.194496, 1.176732, 0.142526, 0.099569];
+const LR_COEF = [-0.230047, 1.527335, 0.632888, 0.448915, -0.402915, -0.238641, 0.316637, 0.428902, 0.328203, 0.688496, 0.215165, 0.186959, 0.285781, 0.133263, 0.0, 0.109507, 0.0, -0.095838, 0.0, 0.062743, 1.415033, 0.068449, 0.210868, -0.230047, 0.175177];
+const LR_INTERCEPT = 0.257836;
 
 function sigmoid(z) {
   return 1 / (1 + Math.exp(-z));
@@ -330,6 +387,8 @@ function ruleBoost(f) {
   let boost = 0;
   if (f.hasLink && f.secretCount) boost += 0.15;
   if (f.urgentCount && f.moneyCount) boost += 0.12;
+  if (f.loanCount && f.urgentCount) boost += 0.12;
+  if (f.voteLinkCount && f.hasLink) boost += 0.10;
   if (f.secretCount && f.moneyCount) boost += 0.15;
   if (f.threatCount && f.hasLink) boost += 0.10;
   if (f.rewardCount && f.moneyCount) boost += 0.12;
@@ -350,18 +409,32 @@ function ruleBoost(f) {
 // for any message, so surfacing them as "reasons" would be noise rather
 // than a meaningful signal.
 const EXPLAIN_KEYS = [
-  "hasLink", "urgentCount", "secretCount", "moneyCount", "threatCount",
-  "identityCount", "rewardCount", "pressureCount", "verificationCount",
-  "suspiciousDomain", "longDomain", "suspiciousZone", "digitDomain",
-  "brandFlag", "homoglyphDomain", "digitCount", "exclamationCount",
-  "uppercaseCount", "hasMultipleWarnings", "urlCount"
+  "hasLink", "urgentCount", "secretCount", "moneyCount", "loanCount",
+  "voteLinkCount", "threatCount", "identityCount", "rewardCount",
+  "pressureCount", "verificationCount", "suspiciousDomain", "longDomain",
+  "suspiciousZone", "digitDomain", "brandFlag", "homoglyphDomain",
+  "digitCount", "exclamationCount", "uppercaseCount", "hasMultipleWarnings",
+  "urlCount"
 ];
+
+// digitCount/exclamationCount/uppercaseCount are raw character counts, not
+// keyword-list matches - a bare ">0" bar is too low for them: virtually
+// every message has >=1 uppercase letter just from starting a sentence, and
+// most ordinary messages mention at least one number (a price, a time), which
+// contradicts their own reasonLabels wording ("many numbers", "many
+// uppercase letters" - see i18n.js). urlCount is similar: its own label says
+// "Multiple links were detected", which a single link would contradict.
+// Every other count feature matches a specific word from a curated list,
+// where even one match (e.g. one loan-request phrase) is meaningful on its
+// own, so those keep the default ">0" bar. Mirrors app.py's explain()
+// min_thresholds dict exactly.
+const MIN_THRESHOLDS = { digitCount: 8, exclamationCount: 2, uppercaseCount: 5, urlCount: 2 };
 
 function explain(f) {
   const reasonKeys = [];
   for (const key of EXPLAIN_KEYS) {
-    const value = key === "urlCount" ? (f.urlCount > 1 ? 1 : 0) : f[key];
-    if (value) reasonKeys.push(key);
+    const value = f[key];
+    if (value && value >= (MIN_THRESHOLDS[key] || 1)) reasonKeys.push(key);
   }
   return reasonKeys;
 }
@@ -369,8 +442,16 @@ function explain(f) {
 function riskStyle(prob) {
   // levelKey is resolved to translated text by the caller (popup.js /
   // background.js), same pattern as fraud_logic.risk_level() in the Python app.
+  //
+  // The mid/high boundary is pinned to 0.5 - the same cutoff analyzeText()'s
+  // `isFraud: prob >= 0.5` verdict uses - so the colored badge can never
+  // contradict the binary verdict. This used to be 0.6, so a prob in
+  // [0.5, 0.6) showed a yellow "mid/Suspicious" badge right next to an
+  // already-FRAUD verdict/advice. Mirrors fraud_logic.risk_level(prob,
+  // threshold=0.5), which computes this generally as
+  // low_cut=threshold*0.6=0.3, high_cut=threshold+(1-threshold)*0.6=0.8.
   if (prob < 0.3) return { levelKey: "low", cssClass: "risk-low", emoji: "🟢" };
-  if (prob < 0.6) return { levelKey: "mid", cssClass: "risk-mid", emoji: "🟡" };
+  if (prob < 0.5) return { levelKey: "mid", cssClass: "risk-mid", emoji: "🟡" };
   if (prob < 0.8) return { levelKey: "high", cssClass: "risk-high", emoji: "🟠" };
   return { levelKey: "critical", cssClass: "risk-critical", emoji: "🔴" };
 }
@@ -407,6 +488,6 @@ if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     analyzeText, extractFeatures, lrScore, heuristicBaseScore, ruleBoost,
     brandImpersonation, domainFlags, getDomain, levenshtein, riskStyle,
-    extractUrls, extractBareDomains
+    extractUrls, extractBareDomains, LR_FEATURE_ORDER
   };
 }
