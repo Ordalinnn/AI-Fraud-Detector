@@ -3967,6 +3967,7 @@ with left:
     else:
         st.markdown(f'<div class="section-title">✍️ {T["input_title"]}</div>', unsafe_allow_html=True)
         st.markdown(f'<div class="section-subtitle">{T["input_subtitle"]}</div>', unsafe_allow_html=True)
+        st.caption(f"ℹ️ {T['call_transcript_hint']}")
 
         with st.form("analysis_form", clear_on_submit=False):
             uploaded = None
