@@ -39,7 +39,7 @@ jobs:
           set -o pipefail
           gradle -p android --no-daemon testDebugUnitTest assembleDebug 2>&1 | tee gradle.log || {
             # Surface compiler/build errors as annotations (readable from the PR page).
-            grep -E "^e: |What went wrong|> |error:|Exception" gradle.log | head -25 | while IFS= read -r l; do
+            { grep -E "^e: |FAILED" gradle.log | head -15; grep -A12 "What went wrong" gradle.log | head -30; } | while IFS= read -r l; do
               echo "::error title=gradle::${l:0:400}"
             done
             exit 1
