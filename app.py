@@ -17,8 +17,38 @@ from sklearn.metrics import (
     accuracy_score, confusion_matrix, f1_score, precision_score,
     recall_score, roc_auc_score,
 )
-import fraud_model as fm
+import importlib
+import sys
+import fraud_logic
+import fraud_model
 import speech
+import translations
+
+
+def _reload_changed_local_modules():
+    """Streamlit Cloud pulls a new commit into the RUNNING server: app.py is
+    re-executed, but modules it imports stay as they were first imported.
+    A merge that adds a translation key then crashes with KeyError until
+    someone reboots the app (this happened with "share_title"). Reload our
+    own modules whenever their file changed since they were loaded."""
+    for mod in (fraud_logic, fraud_model, speech, translations):
+        path = getattr(mod, "__file__", None)
+        if not path:
+            continue
+        try:
+            mtime = os.path.getmtime(path)
+        except OSError:
+            continue
+        loaded = getattr(mod, "_loaded_mtime", None)
+        if loaded is None:
+            mod._loaded_mtime = mtime
+        elif mtime != loaded:
+            importlib.reload(sys.modules[mod.__name__])
+            sys.modules[mod.__name__]._loaded_mtime = mtime
+
+
+_reload_changed_local_modules()
+fm = fraud_model
 from fraud_logic import (
     domain_flags, extract_features, risk_level, highlight_text,
     sanitize_for_csv, derive_feedback_training_examples,
