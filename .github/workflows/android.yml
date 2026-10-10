@@ -1,0 +1,66 @@
+name: Android app
+
+# Builds the Android app (android/), runs its unit tests - including the
+# check that the on-device model gives the same probabilities as the
+# scikit-learn model - and publishes the APK so it can be installed on a
+# phone straight from the Releases page.
+
+on:
+  push:
+    paths:
+      - "android/**"
+      - ".github/workflows/android.yml"
+  pull_request:
+    paths:
+      - "android/**"
+      - ".github/workflows/android.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
+
+      - name: Unit tests and APK
+        run: gradle -p android --no-daemon testDebugUnitTest assembleDebug
+
+      - name: Test report (on failure)
+        if: failure()
+        run: |
+          for f in android/app/build/test-results/testDebugUnitTest/*.xml; do
+            grep -h -A3 "<failure" "$f" | head -20 | sed 's/^/::error title=unit test::/' || true
+          done
+
+      - name: Rename APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk AI-Fraud-Detector.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AI-Fraud-Detector-apk
+          path: AI-Fraud-Detector.apk
+
+      - name: Publish to the "android-latest" release
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view android-latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create android-latest --repo "$GITHUB_REPOSITORY" --prerelease \
+              --title "Android app (latest build)" \
+              --notes "Install: open this page on an Android phone, download AI-Fraud-Detector.apk, allow installing from this source. See android/README.md."
+          fi
+          gh release upload android-latest AI-Fraud-Detector.apk --repo "$GITHUB_REPOSITORY" --clobber
+          echo "::notice title=APK published::https://github.com/$GITHUB_REPOSITORY/releases/download/android-latest/AI-Fraud-Detector.apk (build ${GITHUB_RUN_NUMBER}, ${GITHUB_REF_NAME} @ ${GITHUB_SHA::7})"

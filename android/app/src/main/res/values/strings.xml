@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AI Fraud Detector</string>
+    <string name="subtitle">Проверяет входящие сообщения на мошенничество прямо на телефоне.</string>
+    <string name="status_on">✅ Защита включена</string>
+    <string name="status_off">❌ Нужен доступ к уведомлениям</string>
+    <string name="btn_grant_access">Разрешить доступ к уведомлениям</string>
+    <string name="status_notif_blocked">Приложению запрещено показывать уведомления — предупреждения не будут видны.</string>
+    <string name="btn_allow_notifications">Разрешить уведомления</string>
+    <string name="battery_title">Чтобы телефон не отключал проверку в фоне, разрешите приложению работать без ограничений батареи.</string>
+    <string name="btn_battery">Настройки батареи</string>
+    <string name="btn_demo">Показать пример предупреждения</string>
+    <string name="sensitivity_title">Чувствительность</string>
+    <string name="sens_high">Высокая — больше предупреждений, чаще ложные</string>
+    <string name="sens_normal" formatted="false">Обычная — ловит ~93% мошенничества, ~1 ложное на 100 обычных сообщений</string>
+    <string name="sens_low">Только явные — ~2 ложных на 1000, но пропускает больше</string>
+    <string name="apps_title">Какие приложения проверять</string>
+    <string name="app_group_other">Другие мессенджеры (Viber, Instagram, Messenger, Signal, imo)</string>
+    <string name="manual_title">Проверить текст вручную</string>
+    <string name="manual_hint">Вставьте подозрительное сообщение</string>
+    <string name="btn_check">Проверить</string>
+    <string name="manual_result">Риск: %1$d%% — %2$s</string>
+    <string name="verdict_fraud">похоже на мошенничество</string>
+    <string name="verdict_safe">признаков мошенничества мало</string>
+    <string name="words_label">Подозрительные слова:</string>
+    <string name="alerts_title">Последние предупреждения</string>
+    <string name="alerts_empty">Пока предупреждений не было.</string>
+    <string name="btn_clear">Очистить список</string>
+    <string name="demo_text">Здравствуйте, это служба безопасности Kaspi. По вашей карте подозрительный перевод. Назовите код из SMS, чтобы отменить его.</string>
+    <string name="privacy_note">🔒 У приложения нет доступа в интернет: текст сообщений никуда не отправляется, проверка идёт на телефоне. Список предупреждений хранится только здесь и удаляется кнопкой «Очистить».</string>
+    <string name="channel_name">Предупреждения о мошенничестве</string>
+    <string name="channel_desc">Сообщения, похожие на мошеннические</string>
+    <string name="alert_title">⚠️ Похоже на мошенничество (%1$d%%)</string>
+    <string name="alert_body">%1$s: «%2$s»</string>
+    <string name="alert_advice">Не сообщайте коды из SMS, пароли и данные карты, не переходите по ссылкам. Позвоните в банк по номеру с обратной стороны карты.</string>
+    <string name="detail_title">Подозрительное сообщение</string>
+    <string name="btn_close">Закрыть</string>
+    <string name="btn_open_web">Подробный анализ на сайте</string>
+    <string name="web_note">Кнопка «Подробный анализ на сайте» откроет сайт проекта и передаст ему этот текст.</string>
+</resources>
