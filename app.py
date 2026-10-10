@@ -457,6 +457,9 @@ if _shared:
             del st.query_params[_key]
 
 
+ANDROID_APK_URL = "https://github.com/Ordalinnn/AI-Fraud-Detector/releases/download/android-latest/AI-Fraud-Detector.apk"
+
+
 def public_app_url() -> str:
     """Base URL for the iPhone Shortcut instructions: APP_PUBLIC_URL if set,
     else the origin the visitor is actually using."""
@@ -3879,20 +3882,21 @@ try {
 if st.session_state.get("show_install_instructions"):
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)
     st.markdown(f'<div class="section-title">📲 {T["install_panel_title"]}</div>', unsafe_allow_html=True)
-    st.markdown(f"**{T['install_mobile_title']}**")
-    st.markdown(T["install_mobile_android"])
-    st.markdown(T["install_mobile_ios"])
-    st.markdown(f"**{T['share_title']}**")
-    st.markdown(T["share_android"])
-    st.markdown(T["share_ios"].format(url=public_app_url()))
-    st.markdown(f"**{T['install_extension_title']}**")
-    st.download_button(
-        T["install_extension_download_button"],
-        build_extension_zip(),
-        file_name="browser-extension.zip",
-        mime="application/zip",
-    )
-    st.markdown(T["install_extension_steps"])
+    st.info(T["howto_easy"])
+    tab_android, tab_iphone, tab_pc = st.tabs([T["install_tab_android"], T["install_tab_iphone"], T["install_tab_pc"]])
+    with tab_android:
+        st.markdown(T["howto_android"].format(apk_url=ANDROID_APK_URL))
+    with tab_iphone:
+        st.markdown(T["howto_iphone"].format(url=public_app_url()))
+    with tab_pc:
+        st.markdown(T["howto_pc"])
+        st.download_button(
+            T["install_extension_download_button"],
+            build_extension_zip(),
+            file_name="browser-extension.zip",
+            mime="application/zip",
+        )
+        st.markdown(T["install_extension_steps"])
     st.markdown('</div>', unsafe_allow_html=True)
 
 # =========================
