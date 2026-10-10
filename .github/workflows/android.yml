@@ -81,3 +81,44 @@ jobs:
           fi
           gh release upload android-latest AI-Fraud-Detector.apk --repo "$GITHUB_REPOSITORY" --clobber
           echo "::notice title=APK published::https://github.com/$GITHUB_REPOSITORY/releases/download/android-latest/AI-Fraud-Detector.apk (build ${GITHUB_RUN_NUMBER}, ${GITHUB_REF_NAME} @ ${GITHUB_SHA::7})"
+
+  emulator:
+    # Installs the APK on a real Android 14 emulator, sends it a scam SMS and
+    # checks the app posts a warning; screenshots go to the android-latest release.
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: AI-Fraud-Detector-apk
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Run on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          script: bash android/ci/emulator_smoke.sh AI-Fraud-Detector.apk
+
+      - name: Publish screenshots
+        if: always() && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls -la emulator-out || exit 0
+          gh release upload android-latest emulator-out/1_main_screen.png emulator-out/2_notifications.png \
+            --repo "$GITHUB_REPOSITORY" --clobber || true
