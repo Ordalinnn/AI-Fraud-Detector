@@ -33,7 +33,7 @@ def _run(tmp_path, monkeypatch):
 
     # Simulate a server that imported an OLD translations.py: an in-memory
     # copy without the key, and a file that looks newer than what was loaded.
-    translations.TEXT = {lang: {k: v for k, v in d.items() if k != "share_title"}
+    translations.TEXT = {lang: {k: v for k, v in d.items() if k != "howto_android"}
                          for lang, d in translations.TEXT.items()}
     translations._loaded_mtime = os.path.getmtime(translations.__file__) - 60
 
@@ -41,4 +41,4 @@ def _run(tmp_path, monkeypatch):
     at.run()
     assert not at.exception, at.exception
     import sys
-    assert "share_title" in sys.modules["translations"].TEXT["🇷🇺 RU"]
+    assert "howto_android" in sys.modules["translations"].TEXT["🇷🇺 RU"]
