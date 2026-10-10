@@ -26,3 +26,9 @@ data/voice/**/*.m4a
 data/voice/**/*.ogg
 data/voice/**/*.opus
 data/voice/**/*.webm
+
+# Android build output
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="subtitle">Checks incoming messages for fraud right on your phone.</string>
+    <string name="status_on">✅ Protection is on</string>
+    <string name="status_off">❌ Notification access needed</string>
+    <string name="btn_grant_access">Allow notification access</string>
+    <string name="status_notif_blocked">The app isn\'t allowed to show notifications — you won\'t see warnings.</string>
+    <string name="btn_allow_notifications">Allow notifications</string>
+    <string name="battery_title">So the phone doesn\'t stop checking in the background, let the app run without battery restrictions.</string>
+    <string name="btn_battery">Battery settings</string>
+    <string name="btn_demo">Show a sample warning</string>
+    <string name="sensitivity_title">Sensitivity</string>
+    <string name="sens_high">High — more warnings, more false alarms</string>
+    <string name="sens_normal" formatted="false">Normal — catches ~93% of scams, ~1 false alarm per 100 ordinary messages</string>
+    <string name="sens_low">Only obvious — ~2 false alarms per 1000, but misses more</string>
+    <string name="apps_title">Which apps to check</string>
+    <string name="app_group_other">Other messengers (Viber, Instagram, Messenger, Signal, imo)</string>
+    <string name="manual_title">Check a text manually</string>
+    <string name="manual_hint">Paste a suspicious message</string>
+    <string name="btn_check">Check</string>
+    <string name="manual_result">Risk: %1$d%% — %2$s</string>
+    <string name="verdict_fraud">looks like fraud</string>
+    <string name="verdict_safe">few signs of fraud</string>
+    <string name="words_label">Suspicious words:</string>
+    <string name="alerts_title">Recent warnings</string>
+    <string name="alerts_empty">No warnings yet.</string>
+    <string name="btn_clear">Clear list</string>
+    <string name="demo_text">Hello, this is the Kaspi security service. There is a suspicious transfer on your card. Tell us the SMS code to cancel it.</string>
+    <string name="privacy_note">🔒 The app has no internet access: message text is never sent anywhere, all checking happens on the phone. The warning list is stored only here and removed with “Clear list”.</string>
+    <string name="channel_name">Fraud warnings</string>
+    <string name="channel_desc">Messages that look like fraud</string>
+    <string name="alert_title">⚠️ Looks like fraud (%1$d%%)</string>
+    <string name="alert_body">%1$s: “%2$s”</string>
+    <string name="alert_advice">Don\'t share SMS codes, passwords or card details, and don\'t open links. Call your bank on the number on the back of your card.</string>
+    <string name="detail_title">Suspicious message</string>
+    <string name="btn_close">Close</string>
+    <string name="btn_open_web">Full analysis on the website</string>
+    <string name="web_note">“Full analysis on the website” opens the project\'s website and sends it this text.</string>
+</resources>

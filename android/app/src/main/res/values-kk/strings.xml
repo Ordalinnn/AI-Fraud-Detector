@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="subtitle">Кіріс хабарламаларды алаяқтыққа тікелей телефонда тексереді.</string>
+    <string name="status_on">✅ Қорғаныс қосулы</string>
+    <string name="status_off">❌ Хабарландыруларға рұқсат керек</string>
+    <string name="btn_grant_access">Хабарландыруларға рұқсат беру</string>
+    <string name="status_notif_blocked">Қосымшаға хабарландыру көрсетуге тыйым салынған — ескертулер көрінбейді.</string>
+    <string name="btn_allow_notifications">Хабарландыруларға рұқсат ету</string>
+    <string name="battery_title">Телефон тексеруді фонда өшіріп тастамауы үшін қосымшаға батарея шектеуінсіз жұмыс істеуге рұқсат беріңіз.</string>
+    <string name="btn_battery">Батарея баптаулары</string>
+    <string name="btn_demo">Ескерту үлгісін көрсету</string>
+    <string name="sensitivity_title">Сезімталдық</string>
+    <string name="sens_high">Жоғары — ескерту көп, қате дабыл жиірек</string>
+    <string name="sens_normal" formatted="false">Қалыпты — алаяқтықтың ~93%-ын ұстайды, 100 қалыпты хабарламаға ~1 қате</string>
+    <string name="sens_low">Тек айқын жағдайлар — 1000-ға ~2 қате, бірақ көбірек өткізіп жібереді</string>
+    <string name="apps_title">Қай қосымшаларды тексеру керек</string>
+    <string name="app_group_other">Басқа мессенджерлер (Viber, Instagram, Messenger, Signal, imo)</string>
+    <string name="manual_title">Мәтінді қолмен тексеру</string>
+    <string name="manual_hint">Күдікті хабарламаны қойыңыз</string>
+    <string name="btn_check">Тексеру</string>
+    <string name="manual_result">Тәуекел: %1$d%% — %2$s</string>
+    <string name="verdict_fraud">алаяқтыққа ұқсайды</string>
+    <string name="verdict_safe">алаяқтық белгілері аз</string>
+    <string name="words_label">Күдікті сөздер:</string>
+    <string name="alerts_title">Соңғы ескертулер</string>
+    <string name="alerts_empty">Әзірге ескерту болған жоқ.</string>
+    <string name="btn_clear">Тізімді тазалау</string>
+    <string name="demo_text">Сәлеметсіз бе, бұл Kaspi қауіпсіздік қызметі. Картаңыз бойынша күдікті аударым бар. Оны тоқтату үшін SMS кодты айтыңыз.</string>
+    <string name="privacy_note">🔒 Қосымшада интернетке рұқсат жоқ: хабарлама мәтіні ешқайда жіберілмейді, тексеру телефонда жүреді. Ескертулер тізімі тек осында сақталады және «Тазалау» түймесімен өшіріледі.</string>
+    <string name="channel_name">Алаяқтық туралы ескертулер</string>
+    <string name="channel_desc">Алаяқтыққа ұқсайтын хабарламалар</string>
+    <string name="alert_title">⚠️ Алаяқтыққа ұқсайды (%1$d%%)</string>
+    <string name="alert_body">%1$s: «%2$s»</string>
+    <string name="alert_advice">SMS кодтарын, құпиясөздерді және карта деректерін айтпаңыз, сілтемелерге өтпеңіз. Банкке картаның артындағы нөмір бойынша қоңырау шалыңыз.</string>
+    <string name="detail_title">Күдікті хабарлама</string>
+    <string name="btn_close">Жабу</string>
+    <string name="btn_open_web">Сайтта толық талдау</string>
+    <string name="web_note">«Сайтта толық талдау» түймесі жоба сайтын ашып, осы мәтінді соған жібереді.</string>
+</resources>
