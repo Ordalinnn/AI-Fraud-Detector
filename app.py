@@ -203,8 +203,12 @@ st.iframe("""
     try {
         const topLoc = window.top.location;
         const m = /^#text=(.*)$/s.exec(topLoc.hash || '');
-        if (m && !/[?&]text=/.test(topLoc.search)) {
-            const target = topLoc.origin + topLoc.pathname + '?text=' + m[1];
+        if (m && !/[?&](text|text_missing)=/.test(topLoc.search)) {
+            // An empty "#text=" means the Shortcut ran without any input
+            // (e.g. started after copying, without "Get Clipboard" set up):
+            // tell the page so it can explain the fix instead of an empty box.
+            const target = topLoc.origin + topLoc.pathname +
+                (m[1].trim() ? '?text=' + m[1] : '?text_missing=1');
             const s = topDoc.createElement('script');
             s.textContent = 'location.replace(' + JSON.stringify(target) + ');';
             topDoc.head.appendChild(s);
@@ -467,6 +471,8 @@ _shared = shared_text_from_params(st.query_params)
 # reload came back with an empty box. Keeping it means any reload analyses
 # the same message again. Within one session it is consumed only once, so
 # the user can still edit the text and re-analyse normally.
+if not _shared and "text_missing" in st.query_params:
+    st.warning(T["share_empty_hint"])
 if _shared and st.session_state.get("shared_consumed") != _shared:
     st.session_state["shared_consumed"] = _shared
     st.session_state["main_input_text"] = _shared
