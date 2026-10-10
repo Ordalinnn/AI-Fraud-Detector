@@ -18,6 +18,7 @@ from sklearn.metrics import (
     recall_score, roc_auc_score,
 )
 import importlib
+import re
 import sys
 import fraud_logic
 import fraud_model
@@ -474,6 +475,11 @@ _shared = shared_text_from_params(st.query_params)
 if not _shared and ("text_missing" in st.query_params or "text" in st.query_params):
     # Opened by the Shortcut but it sent no text (no "Get Clipboard" fallback).
     st.warning(T["share_empty_hint"])
+# The clipboard still held the shortcut's own link (copied while setting the
+# shortcut up) instead of a message: explain rather than "analyse" a URL.
+if _shared and re.fullmatch(r"https?://\S+[?&#]text=\S*", _shared.strip()):
+    st.warning(T["share_copied_link_hint"])
+    _shared = ""
 if _shared and st.session_state.get("shared_consumed") != _shared:
     st.session_state["shared_consumed"] = _shared
     st.session_state["main_input_text"] = _shared
