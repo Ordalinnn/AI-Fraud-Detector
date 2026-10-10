@@ -471,7 +471,8 @@ _shared = shared_text_from_params(st.query_params)
 # reload came back with an empty box. Keeping it means any reload analyses
 # the same message again. Within one session it is consumed only once, so
 # the user can still edit the text and re-analyse normally.
-if not _shared and "text_missing" in st.query_params:
+if not _shared and ("text_missing" in st.query_params or "text" in st.query_params):
+    # Opened by the Shortcut but it sent no text (no "Get Clipboard" fallback).
     st.warning(T["share_empty_hint"])
 if _shared and st.session_state.get("shared_consumed") != _shared:
     st.session_state["shared_consumed"] = _shared
