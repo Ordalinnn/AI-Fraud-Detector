@@ -109,3 +109,68 @@ def test_voice_mode_transcript_lands_in_text_box_and_is_analysed(tmp_path, monke
     submit.click().run()
     assert not at.exception, at.exception
     assert at.session_state["last_result"]["prob"] > 0.5
+
+
+# ---------- improvements: model choice, prompt, loudness, Kazakh download ----------
+
+def test_kazakh_gets_the_kazakh_model_others_the_general_one():
+    assert speech.model_for_language("kk") == speech.KAZAKH_MODEL
+    for lang in ("ru", "en", "auto", None):
+        assert speech.model_for_language(lang) == speech.DEFAULT_MODEL_SIZE
+
+
+def test_vocabulary_hint_is_passed_and_can_be_disabled():
+    model = FakeModel()
+    speech.transcribe(model, make_wav(1.0), language="ru")
+    speech.transcribe(model, make_wav(1.0), language="ru", use_prompt=False)
+    speech.transcribe(model, make_wav(1.0), language="auto")
+    assert model.calls[0]["initial_prompt"] == speech.PROMPTS["ru"]
+    assert model.calls[1]["initial_prompt"] is None
+    assert model.calls[2]["initial_prompt"] is None  # no hint when the language is unknown
+
+
+def test_loudness_normalisation_boosts_quiet_audio_without_clipping():
+    quiet = (0.01 * np.sin(np.linspace(0, 200, 16000))).astype(np.float32)
+    out = speech.normalize_loudness(quiet)
+    assert np.sqrt(np.mean(out ** 2)) > 5 * np.sqrt(np.mean(quiet ** 2))
+    assert np.max(np.abs(out)) <= 0.99
+    loud = (0.95 * np.sign(np.sin(np.linspace(0, 200, 16000)))).astype(np.float32)
+    assert np.max(np.abs(speech.normalize_loudness(loud))) <= 0.99
+    silence = np.zeros(1000, dtype=np.float32)
+    assert np.array_equal(speech.normalize_loudness(silence), silence)
+
+
+def _model_tarball(tmp_path):
+    import tarfile
+    src = tmp_path / "src" / "whisper-base-kk-ct2"
+    src.mkdir(parents=True)
+    (src / "model.bin").write_bytes(b"weights")
+    tgz = tmp_path / "model.tar.gz"
+    with tarfile.open(tgz, "w:gz") as tar:
+        tar.add(src, arcname="whisper-base-kk-ct2")
+    return tgz
+
+
+def test_kazakh_model_download_is_checksum_verified(tmp_path):
+    tgz = _model_tarball(tmp_path)
+    url = tgz.as_uri()
+    good = speech._sha256(tgz)
+    with pytest.raises(speech.TranscriptionError, match="model_checksum"):
+        speech.ensure_kazakh_model(tmp_path / "cache_bad", url=url, sha256="0" * 64)
+    assert not (tmp_path / "cache_bad" / "whisper-base-kk-ct2").exists()
+    path = speech.ensure_kazakh_model(tmp_path / "cache", url=url, sha256=good)
+    assert (path / "model.bin").read_bytes() == b"weights"
+    # second call uses the cache (would fail if it tried the bad checksum again)
+    assert speech.ensure_kazakh_model(tmp_path / "cache", url=url, sha256="0" * 64) == path
+
+
+def test_speech_metrics():
+    import importlib.util as u
+    spec = u.spec_from_file_location("eval_speech", Path(__file__).resolve().parent.parent / "scripts" / "eval_speech.py")
+    es = u.module_from_spec(spec)
+    spec.loader.exec_module(es)
+    assert es.wer("Ваша карта заблокирована", "ваша карта заблокирована!") == 0
+    assert es.wer("назовите код из смс", "назовите котис смс") == pytest.approx(0.5)
+    assert es.cer("код", "кот") == pytest.approx(1 / 3)
+    assert es.prompt_leak("привет как дела", "привет kaspi как дела", "ru")
+    assert not es.prompt_leak("переведи на kaspi", "переведи на kaspi", "ru")

@@ -3868,6 +3868,7 @@ VOICE_ERROR_KEYS = {
     "decode_failed": "voice_decode_failed",
     "empty_audio": "voice_empty",
     "unavailable": "voice_unavailable",
+    "model_checksum": "voice_failed",
 }
 
 
@@ -3877,6 +3878,7 @@ def render_voice_input():
     can correct it before pressing Analyze. Nothing is analysed or stored
     automatically: the audio is discarded after transcription."""
     st.info(T["voice_how"])
+    st.caption(f"🎧 {T['voice_tips']}")
     st.caption(f"🔒 {T['voice_privacy']}")
     if not speech.is_available():
         st.warning(T["voice_unavailable"])
@@ -3893,7 +3895,16 @@ def render_voice_input():
     if st.button(T["voice_transcribe"], disabled=audio is None, width="stretch", key="voice_transcribe_btn"):
         try:
             with st.spinner(T["voice_transcribing"]):
-                model = get_speech_model(speech.DEFAULT_MODEL_SIZE)
+                spec = speech.model_for_language(voice_lang)
+                try:
+                    model = get_speech_model(spec)
+                except Exception:
+                    if spec == speech.DEFAULT_MODEL_SIZE:
+                        raise
+                    # Kazakh model unavailable (download/checksum failed):
+                    # fall back to the general model rather than failing.
+                    logger.exception("Kazakh speech model unavailable, falling back")
+                    model = get_speech_model(speech.DEFAULT_MODEL_SIZE)
                 result = speech.transcribe(model, audio.getvalue(), language=voice_lang)
         except speech.TranscriptionError as exc:
             st.error(T[VOICE_ERROR_KEYS.get(str(exc), "voice_failed")])

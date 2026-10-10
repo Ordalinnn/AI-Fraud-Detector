@@ -1,0 +1,65 @@
+name: Build Kazakh speech model
+
+# Converts the Kazakh-fine-tuned Whisper model akuzdeuov/whisper-base.kk
+# (Apache-2.0; trained on ISSAI KSC2, 15.4% WER on its test set) from
+# Hugging Face Transformers format to CTranslate2 int8, the format
+# faster-whisper (speech.py) loads, and publishes it as a release asset.
+# The app downloads it on first Kazakh transcription. Conversion needs
+# torch + transformers, which are far too heavy to install on the app
+# server, so it happens once here instead.
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/build-kazakh-model.yml
+
+permissions:
+  contents: write
+
+env:
+  SOURCE_MODEL: akuzdeuov/whisper-base.kk
+  RELEASE_TAG: models-whisper-base-kk-v1
+  ASSET: whisper-base-kk-ct2-int8.tar.gz
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skip if already published
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Kazakh model::release $RELEASE_TAG already exists, nothing to do"
+          fi
+
+      - uses: actions/setup-python@v5
+        if: steps.check.outputs.exists != 'true'
+        with:
+          python-version: "3.11"
+
+      - name: Convert to CTranslate2 int8
+        if: steps.check.outputs.exists != 'true'
+        run: |
+          pip install --quiet ctranslate2 "transformers[torch]" sentencepiece
+          ct2-transformers-converter --model "$SOURCE_MODEL" --output_dir whisper-base-kk-ct2 \
+            --quantization int8 --copy_files preprocessor_config.json
+          # faster-whisper needs tokenizer.json; the source repo only has the slow-tokenizer files.
+          python -c "from transformers import WhisperTokenizerFast as T; T.from_pretrained('$SOURCE_MODEL').save_pretrained('whisper-base-kk-ct2')"
+          ls -la whisper-base-kk-ct2
+          tar -czf "$ASSET" whisper-base-kk-ct2
+          SHA=$(sha256sum "$ASSET" | cut -d' ' -f1)
+          echo "SHA=$SHA" >> "$GITHUB_ENV"
+          echo "::notice title=Kazakh model sha256::$SHA ($(du -h "$ASSET" | cut -f1))"
+
+      - name: Publish release asset
+        if: steps.check.outputs.exists != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$RELEASE_TAG" "$ASSET" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "Kazakh Whisper model (CTranslate2 int8)" \
+            --notes "Converted from https://huggingface.co/$SOURCE_MODEL (Apache-2.0, fine-tuned on ISSAI KSC2). sha256: $SHA. Used by speech.py for Kazakh voice mode."
