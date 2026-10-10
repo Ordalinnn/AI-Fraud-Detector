@@ -20,10 +20,13 @@ pytestmark = pytest.mark.skipif(
     reason="set RUN_SPEECH_SMOKE=1 and install espeak-ng to run",
 )
 
+# espeak-ng is a robotic voice (its Kazakh especially), so this checks that
+# the pipeline works end to end, not real-world accuracy - that needs real
+# recordings. With "small", espeak's "код" sometimes comes out as "кот".
 CASES = [
     # (espeak voice, whisper language, phrase, words that must survive)
     ("ru", "ru", "Здравствуйте, это служба безопасности банка. Ваша карта заблокирована. "
-                 "Назовите код из СМС, чтобы отменить перевод.", ["карт", "код"]),
+                 "Назовите код из СМС, чтобы отменить перевод.", ["карт", "смс"]),
     ("kk", "kk", "Сәлеметсіз бе, бұл банктің қауіпсіздік қызметі. Сіздің картаңыз бұғатталды. "
                  "Аударымды тоқтату үшін смс кодты айтыңыз.", []),
 ]
