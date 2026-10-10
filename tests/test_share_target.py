@@ -74,4 +74,17 @@ def test_shortcut_without_text_explains_the_fix(tmp_path, monkeypatch):
     # "#text=" with nothing after it -> the page script turns it into ?text_missing=1
     at = _open_with(tmp_path, monkeypatch, text_missing="1")
     assert "last_result" not in at.session_state
-    assert any("Получить буфер обмена" in w.value for w in at.warning)
+    assert any("буфер обмена" in w.value for w in at.warning)
+
+
+def test_empty_text_param_explains_the_fix(tmp_path, monkeypatch):
+    at = _open_with(tmp_path, monkeypatch, text="")
+    assert "last_result" not in at.session_state
+    assert any("буфер обмена" in w.value for w in at.warning)
+
+
+def test_copied_shortcut_link_is_explained_not_analysed(tmp_path, monkeypatch):
+    at = _open_with(tmp_path, monkeypatch,
+                    text="https://ai-fraud-detector-p6jkftqrssphfcsxxepipo.streamlit.app/?text=")
+    assert "last_result" not in at.session_state
+    assert any("ссылка на этот сайт" in w.value for w in at.warning)
