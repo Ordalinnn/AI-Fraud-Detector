@@ -29,11 +29,22 @@ CASES = [
 ]
 
 
+def gh_annotation(level, title, msg):
+    """Also emit a GitHub Actions annotation, so results are readable from
+    the PR's checks page / API without downloading the full job log."""
+    msg = str(msg).replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+    print(f"\n::{level} title={title}::{msg}")
+
+
 @pytest.fixture(scope="module")
 def model():
     t = time.time()
-    m = speech.load_model(speech.DEFAULT_MODEL_SIZE)
-    print(f"\nloaded Whisper '{speech.DEFAULT_MODEL_SIZE}' in {time.time() - t:.1f}s")
+    try:
+        m = speech.load_model(speech.DEFAULT_MODEL_SIZE)
+    except Exception as exc:
+        gh_annotation("error", "Whisper load failed", repr(exc))
+        raise
+    gh_annotation("notice", "Whisper loaded", f"'{speech.DEFAULT_MODEL_SIZE}' in {time.time() - t:.1f}s")
     return m
 
 
@@ -42,9 +53,14 @@ def test_real_transcription(model, tmp_path, voice, lang, phrase, must):
     wav = tmp_path / f"{voice}.wav"
     subprocess.run(["espeak-ng", "-v", voice, "-s", "140", "-w", str(wav), phrase], check=True)
     t = time.time()
-    r = speech.transcribe(model, wav.read_bytes(), language=lang)
+    try:
+        r = speech.transcribe(model, wav.read_bytes(), language=lang)
+    except Exception as exc:
+        gh_annotation("error", f"transcribe {voice} failed", repr(exc))
+        raise
     rss_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
-    print(f"[{voice}] {r['duration']:.1f}s audio -> {time.time() - t:.1f}s, peak RSS {rss_mb:.0f} MB: {r['text']!r}")
+    gh_annotation("notice", f"speech {voice}",
+                  f"{r['duration']:.1f}s audio -> {time.time() - t:.1f}s, peak RSS {rss_mb:.0f} MB: {r['text']!r}")
     assert r["text"]
     low = r["text"].lower()
     for w in must:
