@@ -25,7 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
@@ -37,12 +37,21 @@ jobs:
       - name: Unit tests and APK
         run: gradle -p android --no-daemon testDebugUnitTest assembleDebug
 
-      - name: Test report (on failure)
-        if: failure()
+      - name: Test summary
+        if: always()
         run: |
-          for f in android/app/build/test-results/testDebugUnitTest/*.xml; do
-            grep -h -A3 "<failure" "$f" | head -20 | sed 's/^/::error title=unit test::/' || true
-          done
+          python3 - <<'PY'
+          import glob, xml.etree.ElementTree as ET
+          tests = fails = 0
+          for f in glob.glob("android/app/build/test-results/testDebugUnitTest/*.xml"):
+              r = ET.parse(f).getroot()
+              tests += int(r.get("tests", 0)); fails += int(r.get("failures", 0)) + int(r.get("errors", 0))
+              for tc in r.iter("testcase"):
+                  for bad in list(tc.iter("failure")) + list(tc.iter("error")):
+                      msg = (bad.get("message") or "")[:300].replace("\n", " ")
+                      print(f"::error title={tc.get('classname')}.{tc.get('name')}::{msg}")
+          print(f"::notice title=Android unit tests::{tests} run, {fails} failed")
+          PY
 
       - name: Rename APK
         run: cp android/app/build/outputs/apk/debug/app-debug.apk AI-Fraud-Detector.apk

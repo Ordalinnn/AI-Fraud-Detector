@@ -33,6 +33,7 @@ android {
     }
     testOptions {
         unitTests.isReturnDefaultValues = true
+        unitTests.isIncludeAndroidResources = true // Robolectric: real resources/assets
     }
 }
 
@@ -40,4 +41,7 @@ dependencies {
     // No AndroidX / third-party runtime dependencies on purpose: the app is
     // small, auditable, and has no network library at all.
     testImplementation("junit:junit:4.13.2")
+    // Test-only: runs the notification listener and the main screen on the
+    // JVM with a simulated Android, so CI checks the whole flow end to end.
+    testImplementation("org.robolectric:robolectric:4.14.1")
 }
