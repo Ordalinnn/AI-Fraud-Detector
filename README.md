@@ -31,7 +31,7 @@ You paste in a suspicious message (or upload a file, or a whole spreadsheet of m
 - **How likely it is to be fraud** (a 0–100% risk score)
 - **Why** — which specific words, phrases, or link patterns triggered the score
 - **What to do about it** — plain-language safety advice
-- **How confident the system is** — whether its four underlying models agree or disagree with each other
+- **How confident the system is** — whether its five underlying models agree or disagree with each other
 
 It's designed to be understandable by anyone, not just technical users: a plain-language "how to use this" guide, a color legend, and tooltips explain the interface without requiring any ML background.
 
@@ -46,24 +46,20 @@ extract_features()  →  20 hand-engineered features
     │                    link presence, domain reputation, brand
     │                    impersonation, text statistics...)
     │
-    ├──▶ Logistic Regression  ─┐
-    ├──▶ Random Forest         ├─▶ average probability
-    ├──▶ Gradient Boosting    ─┘
-    │
-    └──▶ TF-IDF + Naive Bayes  (learns word patterns directly
-         (trained on raw text)  from the training text itself,
-                                 not just the hand-picked keyword lists)
-    │
-    ▼
-Ensemble average  +  rule-based boost (capped at +30%)
-    │                (fires on realistic combinations, e.g.
-    │                 "link + request for a code" or "brand
-    │                 impersonation", not single features alone)
-    ▼
-Final risk score → risk level (Low / Suspicious / High / Critical)
+    ├──▶ Logistic Regression   ─┐
+    ├──▶ Random Forest          │
+    ├──▶ Gradient Boosting      ├─▶ logistic-regression STACKER
+    ├──▶ TF-IDF + Naive Bayes   │   (learns how much to trust each model
+    ├──▶ Char n-grams + LR      │    from out-of-fold predictions grouped
+    └──▶ rule-based boost      ─┘    by template)
+                                     │
+                                     ▼
+              Final risk = calibrated probability → risk level
 ```
 
-The first three models are trained on **hand-engineered features** (keyword counts, domain checks). The fourth model (TF-IDF + Naive Bayes) is trained directly on the **raw text**, so it can pick up on fraud-indicative language patterns the hand-curated keyword lists don't explicitly cover. Averaging all four, rather than trusting a single model, is what the in-app "model agreement" indicator is measuring — when the four disagree strongly, the UI flags the result as lower-confidence.
+The first three models read **hand-engineered features** (keyword counts, domain checks); TF-IDF + Naive Bayes reads **words**; the character n-gram model reads **pieces of words**, so Kazakh/Russian endings (*картаңыз / карту / карта*) and obfuscated spellings (*k0d*) still match. The rule boost (fires on realistic combinations such as "link + request for a code") is a sixth input.
+
+**Why a stacker, not an average** (changed after the NIS Taraz jury review, 09.10.2026): measured on the same 282 held-out messages, the old plain average of 4 models (82.3% accuracy) was *worse* than its own best member, TF-IDF + NB (86.2%) — the three keyword-feature models outvoted it, and this held in all 15 folds of a repeated grouped cross-validation. The stacker learns the weights instead (the text models get the largest), and because it is fitted with log-loss its output is a calibrated probability: "80% risk" now means about 80% of such messages really are scams. Full evidence: [`reports/jury_evaluation/REPORT_RU.md`](reports/jury_evaluation/REPORT_RU.md).
 
 The pure detection logic (feature extraction, rule boosting, domain/brand checks, risk levels, text highlighting) lives in [`fraud_logic.py`](fraud_logic.py), completely independent of Streamlit, so it's unit-testable and reusable — the browser extension's `detector.js` is a JavaScript port of the same logic. UI strings for all three languages live in [`translations.py`](translations.py), which validates that KZ/RU/EN all define the same set of keys before the app ever renders a page.
 
@@ -106,6 +102,16 @@ translations.py                KZ/RU/EN UI strings. Validates at import time tha
                                languages have identical key sets, so a missing translation
                                fails loudly at startup instead of silently as a runtime
                                KeyError the first time a user picks that language.
+fraud_model.py                The 5 base models + stacker, hyperparameters, template grouping,
+                               real-message loaders. Shared by app.py, the evaluation and tests.
+fraud_eval.py                 Offline evaluation toolkit (dataset loader, metrics, McNemar,
+                               cluster bootstrap, calibration, threshold costs).
+scripts/run_jury_evaluation.py  Reproduces every number in reports/jury_evaluation/.
+scripts/prepare_external_data.py  Splits the real UCI SMS corpus into train sample / holdout.
+data/external/                Real UCI SMS: full corpus, 400-message train sample, holdout.
+data/real/                    Template for the team's own collected KZ/RU real messages.
+reports/jury_evaluation/      Results, charts and the defense report (Russian).
+tests/test_fraud_model.py     Pytest suite for fraud_model.py / fraud_eval.py
 tests/test_fraud_logic.py     Pytest suite for fraud_logic.py
 tests/test_translations.py    Pytest suite for translations.py
 .github/workflows/tests.yml   Runs the test suite on every push/PR
@@ -189,17 +195,19 @@ A self-contained Chrome/Edge extension in [`browser-extension/`](browser-extensi
 
 ## Dataset & models
 
-- **1,326 training examples** (671 fraud, 655 safe) in Kazakh, Russian, and English, covering 24+ scam categories: bank/card fraud, delivery/prize scams, fake government notices, relative-in-trouble scams, investment/job offers, tech support scams, romance scams, crypto scams, QR code scams, charity scams, subscription/trial scams, SIM swap, social media account recovery, tax refunds, inheritance scams, global brand impersonation (PayPal, Amazon, Apple, Google), business email compromise, AI-generated deepfake investment videos, fake "verify you're human" checks, unpaid-toll SMS scams, AI voice-cloning family emergency scams, crypto romance ("pig butchering") scams, bank "call us back" schemes, NFC tap scams, landlord impersonation, and marketplace fake-verification scams (a fake buyer on Avito/OLX/Telegram asks the seller to pay for a bogus "item check" before a meetup, then disappears).
+- **1,398 hand-written training examples** (686 fraud, 712 safe; 672 Russian, 605 English, 121 Kazakh), covering 24+ scam categories: bank/card fraud, delivery/prize scams, fake government notices, relative-in-trouble scams, investment/job offers, tech support scams, romance scams, crypto scams, QR code scams, charity scams, subscription/trial scams, SIM swap, social media account recovery, tax refunds, inheritance scams, global brand impersonation (PayPal, Amazon, Apple, Google), business email compromise, AI-generated deepfake investment videos, fake "verify you're human" checks, unpaid-toll SMS scams, AI voice-cloning family emergency scams, crypto romance ("pig butchering") scams, bank "call us back" schemes, NFC tap scams, landlord impersonation, and marketplace fake-verification scams (a fake buyer on Avito/OLX/Telegram asks the seller to pay for a bogus "item check" before a meetup, then disappears).
   The base examples were written from real, current fraud patterns reported by the [FTC](https://consumer.ftc.gov/scams), the [FBI's 2025 IC3 Internet Crime Report](https://www.ic3.gov/AnnualReport/Reports/2025_IC3Report.pdf), the [FCC's toll-scam advisory](https://www.fcc.gov/consumer-governmental-affairs/how-spot-and-avoid-toll-road-payment-scam-texts), reporting on 2026 AI voice-cloning scams, and Kazakhstan/Russia-specific banking fraud coverage (e.g. fake Kaspi.kz couriers demanding SMS codes, Halyk Bank bonus-phishing SMS, Sberbank "call-back" and NFC-tap schemes). The dataset was then scaled up by systematically varying real bank/service names across each template (e.g. the same "your card is blocked" pattern adapted to Kaspi, Halyk Bank, Sberbank, Tinkoff, VTB, and others) — disclosed here as a standard data-scaling technique, not as independently sourced incidents for each line. See the [Limitations](#limitations--disclaimer) section for what this means for generalization.
-- **4-model ensemble**: Logistic Regression, Random Forest, and Gradient Boosting (scikit-learn, trained on the 20 hand-engineered features), plus TF-IDF + Multinomial Naive Bayes (trained on raw text).
-- Full breakdown — including exact per-model cross-validated accuracy and a fuller discussion of limitations — is available inside the running app under **"📋 Methodology & Model Card."**
+- **+400 real SMS** (300 legitimate, 100 spam) from the public [UCI SMS Spam Collection](https://archive.ics.uci.edu/dataset/228/sms+spam+collection) (CC BY 4.0), added because a model trained only on written examples falsely flagged 12–18% of ordinary real messages. The other half of that corpus (2,574 messages, split by template group) is never trained on and serves as an independent real-message test — see [`scripts/prepare_external_data.py`](scripts/prepare_external_data.py).
+- **Stacked 5-model ensemble**: Logistic Regression, Random Forest, Gradient Boosting (on the 20 hand-engineered features), TF-IDF + Multinomial Naive Bayes and character n-grams + Logistic Regression (on raw text), combined by a logistic-regression stacker — see [`fraud_model.py`](fraud_model.py).
+- **Evaluation**: every number in the app's sidebar comes from one template-grouped held-out test, the same for every model. The full jury evaluation (same-test comparison with McNemar tests, per-language metrics, never-seen scam types, real messages, calibration and threshold costs) is reproducible with `python scripts/run_jury_evaluation.py`; results and charts are in [`reports/jury_evaluation/`](reports/jury_evaluation/). To test on your own collected messages: `python scripts/run_jury_evaluation.py --real data/real/your_file.csv` (columns `text,label[,language]`, template in [`data/real/`](data/real/)).
 
 ## Limitations & disclaimer
 
 This is an educational prototype, not a certified security product:
 
 - Many training examples were created by swapping the bank/service name into the same template, so the model may have learned those specific names more than genuinely new phrasing — see [Dataset & models](#dataset--models) above.
-- Cross-validated accuracy may look inflated because many training examples are very similar to each other.
+- Ordinary cross-validation accuracy would look inflated because many training examples are very similar to each other, so all reported numbers use a template-grouped split instead.
+- The real-message test is English only (UCI corpus). Kazakh is the weakest language (121 examples) and romance/investment scams are the hardest never-seen types — see the jury report for exact numbers.
 - It only analyzes text — it can't detect voice, video, or real-time deception cues.
 - **Always verify suspicious messages through an official source. Never share codes, passwords, CVVs, or card numbers based on any single tool's output, including this one.**
 

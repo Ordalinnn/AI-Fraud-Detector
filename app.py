@@ -12,20 +12,14 @@ import streamlit as st
 from datetime import datetime
 from pathlib import Path
 import base64
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-from sklearn.linear_model import LogisticRegression
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import cross_val_score, GroupShuffleSplit
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.model_selection import GroupShuffleSplit
 from sklearn.metrics import (
     accuracy_score, confusion_matrix, f1_score, precision_score,
     recall_score, roc_auc_score,
 )
-from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.naive_bayes import MultinomialNB
+import fraud_model as fm
 from fraud_logic import (
-    domain_flags, extract_features, rule_boost, risk_level, highlight_text,
+    domain_flags, extract_features, risk_level, highlight_text,
     sanitize_for_csv, derive_feedback_training_examples,
 )
 from translations import LANG_OPTIONS, OLD_LANG_MAP, DEFAULT_LANG, get_translations
@@ -2452,214 +2446,97 @@ def render_risk_meter(prob, threshold, title):
     """
 
 # =========================
-# TRAIN MODELS (ENSEMBLE)
+# TRAIN MODELS (STACKED ENSEMBLE)
 # =========================
-# Shared hyperparameters for the 4-model ensemble. Defined once and used by
-# both _evaluate_ensemble() (throwaway copy, for honest held-out metrics)
-# and train_models() (the real production models) so the two can never
-# silently drift apart — previously each hardcoded its own copies of these
-# numbers, so a tuning change to one and not the other would leave the
-# reported eval metrics describing a different model than the one users
-# are actually scored against.
-MODEL_RANDOM_STATE = 42
-LR_C = 1.0
-LR_MAX_ITER = 1000
-RF_N_ESTIMATORS = 50
-GB_N_ESTIMATORS = 50
-TFIDF_NGRAM_RANGE = (1, 2)
-TFIDF_MIN_DF = 1
-CV_FOLDS = 3  # 3-fold: dataset is small, keeps startup fast
-EVAL_TEST_SIZE = 0.2
+# Models, hyperparameters and the template-grouping split live in
+# fraud_model.py so the live app, the offline jury evaluation
+# (scripts/run_jury_evaluation.py) and the tests all use one implementation.
+#
+# What changed after the jury review (09.10.2026), and why:
+#   - Measured on the SAME held-out messages, the old plain average of 4
+#     models was worse than its best member (TF-IDF+NB) - the three
+#     keyword-feature models outvoted it. Now 5 base models (adding a
+#     character n-gram model) are combined by a logistic-regression stacker
+#     that learns each model's weight from out-of-fold predictions; the rule
+#     boost is one more stacker input instead of a hand-set +30%.
+#   - The sidebar used to show each model's ordinary cross-validation
+#     accuracy, which near-duplicate templates inflate and which can't be
+#     compared with the ensemble's stricter grouped test. Every number shown
+#     now comes from one grouped held-out test, the same for every model.
+#   - A small sample of REAL messages (data/external/real_train_sample.csv)
+#     is added to training; the stacker's output is a calibrated probability.
+EVAL_TEST_SIZE = fm.EVAL_TEST_SIZE
 
-def _build_ensemble_pipelines():
-    """Fresh, untrained (lr, rf, gb, tfidf) pipelines using the shared
-    hyperparameters above. Called separately by _evaluate_ensemble() and
-    train_models() since each needs its own instances to fit on different
-    data (held-out split vs. full dataset)."""
-    lr = Pipeline([("scaler", StandardScaler()), ("clf", LogisticRegression(C=LR_C, max_iter=LR_MAX_ITER, random_state=MODEL_RANDOM_STATE))])
-    rf = Pipeline([("scaler", StandardScaler()), ("clf", RandomForestClassifier(n_estimators=RF_N_ESTIMATORS, random_state=MODEL_RANDOM_STATE))])
-    gb = Pipeline([("scaler", StandardScaler()), ("clf", GradientBoostingClassifier(n_estimators=GB_N_ESTIMATORS, random_state=MODEL_RANDOM_STATE))])
-    tfidf = Pipeline([("tfidf", TfidfVectorizer(ngram_range=TFIDF_NGRAM_RANGE, min_df=TFIDF_MIN_DF, lowercase=True)), ("clf", MultinomialNB())])
-    return lr, rf, gb, tfidf
-
-def _template_groups(texts, similarity_threshold=0.6):
-    """Groups near-duplicate training examples — e.g. the same "your card is
-    blocked, confirm at <link>" scam template repeated with a different bank
-    name swapped in — so a group-aware train/test split can put every
-    variant of a template entirely on one side of the split. Without this,
-    near-identical examples leak across train/test and inflate reported
-    accuracy, which is exactly the risk the Limitations section warns about.
-    Similarity is measured with character n-gram TF-IDF cosine similarity
-    rather than a hardcoded brand-name substitution list, so it generalizes
-    to any repeated phrasing, not just known bank names."""
-    vectorizer = TfidfVectorizer(analyzer="char_wb", ngram_range=(3, 5), min_df=1)
-    X = vectorizer.fit_transform(texts)
-    sim = cosine_similarity(X)
-
-    n = len(texts)
-    parent = list(range(n))
-
-    def find(a):
-        while parent[a] != a:
-            parent[a] = parent[parent[a]]
-            a = parent[a]
-        return a
-
-    def union(a, b):
-        ra, rb = find(a), find(b)
-        if ra != rb:
-            parent[ra] = rb
-
-    i_idx, j_idx = np.triu_indices(n, k=1)
-    for i, j in zip(i_idx[sim[i_idx, j_idx] >= similarity_threshold],
-                     j_idx[sim[i_idx, j_idx] >= similarity_threshold]):
-        union(int(i), int(j))
-
-    return np.array([find(i) for i in range(n)])
-
-
-def _evaluate_ensemble(feature_rows, texts, labels, groups):
-    """Trains a throwaway copy of the 4-model ensemble on a group-aware
-    80/20 split (built from _template_groups, so near-duplicate template
-    variants never appear on both sides) and reports held-out precision/
-    recall/F1/confusion-matrix/ROC-AUC plus a naive keyword-count baseline
-    for comparison. These are the numbers a science-fair judge would
-    actually trust — unlike the in-sample cross-validation accuracy shown
-    elsewhere in the UI, which the training data's templated structure can
-    inflate."""
-    splitter = GroupShuffleSplit(n_splits=1, test_size=EVAL_TEST_SIZE, random_state=MODEL_RANDOM_STATE)
-    train_idx, test_idx = next(splitter.split(feature_rows, labels, groups=groups))
-
-    X_tr, X_te = feature_rows.iloc[train_idx], feature_rows.iloc[test_idx]
-    y_tr, y_te = labels[train_idx], labels[test_idx]
-    texts_tr = [texts[i] for i in train_idx]
-    texts_te = [texts[i] for i in test_idx]
-
-    lr, rf, gb, tfidf = _build_ensemble_pipelines()
-
-    lr.fit(X_tr, y_tr)
-    rf.fit(X_tr, y_tr)
-    gb.fit(X_tr, y_tr)
-    tfidf.fit(texts_tr, y_tr)
-
-    ensemble_probs = np.minimum(0.99, (
-        lr.predict_proba(X_te)[:, 1]
-        + rf.predict_proba(X_te)[:, 1]
-        + gb.predict_proba(X_te)[:, 1]
-        + tfidf.predict_proba(texts_te)[:, 1]
-    ) / 4.0 + np.array([rule_boost(row) for row in X_te.to_dict("records")]))
-    preds = (ensemble_probs >= 0.5).astype(int)
-
-    # Naive baseline: flags anything with at least one urgency/secret/threat/
-    # reward keyword. Represents what a simple keyword-matching system (no
-    # ML, no domain analysis, no rule boosting) would achieve — the contrast
-    # that shows whether the trained ensemble is actually earning its
-    # complexity.
-    baseline_preds = (
-        (X_te["urgent_count"] + X_te["secret_count"] + X_te["threat_count"] + X_te["reward_count"]) > 0
-    ).astype(int).to_numpy()
-
-    def _metrics(y_true, y_pred, y_score=None):
-        return {
-            "accuracy": round(accuracy_score(y_true, y_pred) * 100, 1),
-            "precision": round(precision_score(y_true, y_pred, zero_division=0) * 100, 1),
-            "recall": round(recall_score(y_true, y_pred, zero_division=0) * 100, 1),
-            "f1": round(f1_score(y_true, y_pred, zero_division=0) * 100, 1),
-            "roc_auc": round(roc_auc_score(y_true, y_score) * 100, 1) if y_score is not None else None,
-        }
-
-    return {
-        "n_train": int(len(train_idx)),
-        "n_test": int(len(test_idx)),
-        "n_template_groups": int(len(set(groups.tolist()))),
-        "n_examples": int(len(texts)),
-        "ensemble": _metrics(y_te, preds, ensemble_probs),
-        "baseline": _metrics(y_te, baseline_preds),
-        "confusion_matrix": confusion_matrix(y_te, preds).tolist(),
-    }
+# Real messages (UCI SMS Spam Collection sample) appended after the
+# hand-written core and vetted feedback. Kept separate from `data` so the
+# methodology numbers can say exactly how many examples are real.
+real_training_examples = fm.load_real_training_sample()
+training_data = training_data + real_training_examples
 
 
 @st.cache_resource(show_spinner=False)
-def train_models(feature_schema):
-    """`feature_schema` isn't used in the body — it exists purely so the
-    cache key changes whenever extract_features()'s output shape changes.
-    st.cache_resource only invalidates on this function's OWN source
-    changing, not on a helper it calls; without this, adding/removing a
-    feature (like brand_flag) silently leaves a stale cached model with
-    the wrong number of columns, causing a ValueError at predict time."""
-    rows, labels, texts = [], [], []
-    for text, label in training_data:
-        f, _ = extract_features(text)
-        rows.append(f)
-        labels.append(label)
-        texts.append(text)
+def train_models(feature_schema, n_examples):
+    """`feature_schema` and `n_examples` aren't used in the body - they exist
+    so the cache key changes whenever extract_features()'s output shape or
+    the training set changes (st.cache_resource only invalidates on this
+    function's own source changing, not on a helper it calls)."""
+    texts = [text for text, _ in training_data]
+    y = np.array([label for _, label in training_data])
+    feats = fm.featurise(texts)
+    groups = fm.template_groups(texts)
 
-    X_train = pd.DataFrame(rows)
-    y_train = np.array(labels)
-
-    # Held-out, group-aware evaluation (see _evaluate_ensemble docstring) —
-    # done BEFORE the final fit below, on a throwaway model copy, purely to
-    # produce an honest metrics report for the UI/methodology section.
-    eval_report = _evaluate_ensemble(X_train, texts, y_train, _template_groups(texts))
-
-    # Ensemble of 4 models for more reliable predictions. Final production
-    # models are trained on the FULL dataset — the held-out split above
-    # already produced honest metrics, so there's no reason to withhold
-    # real training data from what users' queries are actually scored
-    # against.
-    lr_model, rf_model, gb_model, tfidf_model = _build_ensemble_pipelines()
-
-    lr_model.fit(X_train, y_train)
-    rf_model.fit(X_train, y_train)
-    gb_model.fit(X_train, y_train)
-
-    # 4th ensemble member: learns fraud-indicative language directly from the
-    # training text (word/bigram frequencies) instead of only scoring against
-    # the hand-curated keyword lists above — this is what lets the system
-    # catch scam phrasing that isn't in any of those lists.
-    tfidf_model.fit(texts, y_train)
-
-    # Cross-validation accuracy for each model
-    lr_cv = cross_val_score(lr_model, X_train, y_train, cv=CV_FOLDS, scoring="accuracy").mean()
-    rf_cv = cross_val_score(rf_model, X_train, y_train, cv=CV_FOLDS, scoring="accuracy").mean()
-    gb_cv = cross_val_score(gb_model, X_train, y_train, cv=CV_FOLDS, scoring="accuracy").mean()
-    tfidf_cv = cross_val_score(tfidf_model, texts, y_train, cv=CV_FOLDS, scoring="accuracy").mean()
-
-    metrics = {
-        "Logistic Regression": round(lr_cv * 100, 1),
-        "Random Forest": round(rf_cv * 100, 1),
-        "Gradient Boosting": round(gb_cv * 100, 1),
-        "Text Patterns (TF-IDF)": round(tfidf_cv * 100, 1),
+    # 1) Honest held-out evaluation on a throwaway copy: group-aware 80/20
+    #    split so no variant of a test template is ever trained on.
+    splitter = GroupShuffleSplit(n_splits=1, test_size=EVAL_TEST_SIZE, random_state=fm.MODEL_RANDOM_STATE)
+    tr, te = next(splitter.split(feats, y, groups))
+    eval_model = fm.FraudEnsemble().fit([texts[i] for i in tr], y[tr], feats.iloc[tr], groups[tr])
+    s = eval_model.score([texts[i] for i in te], feats.iloc[te])
+    y_te = y[te]
+    preds = (s["final"] >= 0.5).astype(int)
+    metrics = {fm.MODEL_DISPLAY_NAMES[k]: round(accuracy_score(y_te, (s[k] >= 0.5).astype(int)) * 100, 1)
+               for k in fm.BASE_MODELS + ["final"]}
+    eval_report = {
+        "n_train": int(len(tr)),
+        "n_test": int(len(te)),
+        "n_template_groups": int(len(set(groups.tolist()))),
+        "n_examples": int(len(texts)),
+        "n_real_examples": int(len(real_training_examples)),
+        "ensemble": {
+            "accuracy": round(accuracy_score(y_te, preds) * 100, 1),
+            "precision": round(precision_score(y_te, preds, zero_division=0) * 100, 1),
+            "recall": round(recall_score(y_te, preds, zero_division=0) * 100, 1),
+            "f1": round(f1_score(y_te, preds, zero_division=0) * 100, 1),
+            "roc_auc": round(roc_auc_score(y_te, s["final"]) * 100, 1),
+        },
+        "confusion_matrix": confusion_matrix(y_te, preds).tolist(),
     }
 
-    return lr_model, rf_model, gb_model, tfidf_model, metrics, eval_report
+    # 2) Production model trained on everything.
+    model = fm.FraudEnsemble().fit(texts, y, feats, groups)
+    eval_report["stacker_weights"] = {k: round(v, 3) for k, v in model.weights.items()}
+    return model, metrics, eval_report
 
 
 FEATURE_SCHEMA = tuple(sorted(extract_features("")[0].keys()))
-lr_model, rf_model, gb_model, tfidf_model, model_metrics, eval_report = train_models(FEATURE_SCHEMA)
+fraud_model, model_metrics, eval_report = train_models(FEATURE_SCHEMA, len(training_data))
+lr_model = fraud_model.base.models["lr"]
+rf_model = fraud_model.base.models["rf"]
+gb_model = fraud_model.base.models["gb"]
+tfidf_model = fraud_model.base.models["tfidf"]
+char_model = fraud_model.base.models["char"]
+ENSEMBLE_ACCURACY = model_metrics[fm.MODEL_DISPLAY_NAMES["final"]]
 
 
 def ensemble_predict(feats_list, texts):
-    """Runs the trained 4-model ensemble + rule boost on a batch of one or
-    more messages. `feats_list` and `texts` must be the same length and in
-    the same order. This is the single source of truth for the scoring
-    formula (average of 4 model probabilities + capped rule boost) — it
-    used to be copy-pasted three times (held-out evaluation, batch CSV
-    analysis, single-message analysis) and had to be kept in sync by hand.
-    Returns a dict of numpy arrays, one entry per model plus "raw" (pre-boost
-    average) and "final" (post-boost, capped at 0.99)."""
-    X = pd.DataFrame(feats_list)
-    lr_p = lr_model.predict_proba(X)[:, 1]
-    rf_p = rf_model.predict_proba(X)[:, 1]
-    gb_p = gb_model.predict_proba(X)[:, 1]
-    tfidf_p = tfidf_model.predict_proba(texts)[:, 1]
-    raw_p = (lr_p + rf_p + gb_p + tfidf_p) / 4.0
-    boosts = np.array([rule_boost(f) for f in feats_list])
-    final_p = np.minimum(0.99, raw_p + boosts)
-    return {
-        "lr": lr_p, "rf": rf_p, "gb": gb_p, "tfidf": tfidf_p,
-        "raw": raw_p, "boost": boosts, "final": final_p,
-    }
+    """Scores a batch of one or more messages with the stacked ensemble.
+    `feats_list` and `texts` must be the same length and in the same order.
+    Single source of truth for the scoring formula. Returns a dict of numpy
+    arrays: one entry per base model, "raw" (plain average of the 5 models,
+    shown for transparency), "boost" (rule boost, a stacker input) and
+    "final" (the stacker's calibrated probability)."""
+    scores = fraud_model.score(list(texts), pd.DataFrame(feats_list))
+    scores["raw"] = scores["average"]
+    return scores
 
 # =========================
 # UI STYLE
@@ -3672,6 +3549,7 @@ with st.sidebar:
 
     st.divider()
     st.markdown(f"### 📊 {T['model_metrics']}")
+    st.caption(T["model_metrics_note"].format(n=eval_report["n_test"]))
     for model_name, acc in model_metrics.items():
         color = "#16a34a" if acc >= 90 else "#ca8a04"
         st.markdown(
@@ -3934,7 +3812,7 @@ if st.session_state.get("show_install_instructions"):
 # stays visible outside the expander since it matters even to someone who
 # never opens this.
 # =========================
-_avg_acc = round(sum(model_metrics.values()) / len(model_metrics), 1)
+_avg_acc = ENSEMBLE_ACCURACY
 
 with st.expander(f"🧭 {T['how_to_use']}", expanded=False):
     st.markdown(f"""
@@ -4147,12 +4025,13 @@ if mode != "batch" and analyze:
         features, domains = extract_features(input_text)
         X_input = pd.DataFrame([features])
 
-        # Ensemble prediction — average probabilities from all 4 models
+        # Stacked ensemble prediction (5 base models + learned combiner)
         scores = ensemble_predict([features], [input_text])
         lr_prob = float(scores["lr"][0])
         rf_prob = float(scores["rf"][0])
         gb_prob = float(scores["gb"][0])
         tfidf_prob = float(scores["tfidf"][0])
+        char_prob = float(scores["char"][0])
         raw_prob = float(scores["raw"][0])
         prob = float(scores["final"][0])
         pred = int(prob >= threshold)
@@ -4178,6 +4057,7 @@ if mode != "batch" and analyze:
             "rf_prob": rf_prob,
             "gb_prob": gb_prob,
             "tfidf_prob": tfidf_prob,
+            "char_prob": char_prob,
             "raw_prob": raw_prob,
             "boost": float(scores["boost"][0]),
             "prob": prob,
@@ -4202,6 +4082,13 @@ if mode != "batch" and analyze:
         })
         save_history(st.session_state.history)
 
+def _model_probs(r):
+    """The 5 base-model probabilities of a stored result, in fm.BASE_MODELS
+    order. .get() for char_prob: a result stored by a pre-update session
+    (still in session_state across a redeploy) has no char model score."""
+    return [r["lr_prob"], r["rf_prob"], r["gb_prob"], r["tfidf_prob"], r.get("char_prob", r["tfidf_prob"])]
+
+
 # =========================
 # RESULT DISPLAY (reads from session_state so it survives feedback/history
 # button clicks instead of disappearing on the next rerun)
@@ -4216,7 +4103,7 @@ if mode != "batch" and "last_result" in st.session_state:
     c1.markdown(f'<div class="metric-card"><div class="metric-icon">%</div><div class="metric-label">{T["risk"]}</div><div class="metric-value">{r["prob"]*100:.1f}%</div></div>', unsafe_allow_html=True)
     c2.markdown(f'<div class="metric-card"><div class="metric-icon">⚠️</div><div class="metric-label">{T["detected"]}</div><div class="metric-value">{len(r["explanations"])}</div></div>', unsafe_allow_html=True)
     c3.markdown(f'<div class="metric-card"><div class="metric-icon">🎚️</div><div class="metric-label">{T["threshold"]}</div><div class="metric-value">{r["threshold"]:.2f}</div></div>', unsafe_allow_html=True)
-    c4.markdown(f'<div class="metric-card"><div class="metric-icon">🧠</div><div class="metric-label">{T["model"]}</div><div class="metric-value">4-way</div></div>', unsafe_allow_html=True)
+    c4.markdown(f'<div class="metric-card"><div class="metric-icon">🧠</div><div class="metric-label">{T["model"]}</div><div class="metric-value">5 + stack</div></div>', unsafe_allow_html=True)
     st.caption(f"ℹ️ {T['model_help']}")
 
     st.markdown(f'<div class="{r["risk_class"]}">{r["emoji"]} {r["risk_label"]}</div>', unsafe_allow_html=True)
@@ -4263,13 +4150,12 @@ if mode != "batch" and "last_result" in st.session_state:
     with chart_col2:
         st.markdown(f"**{T['model_compare']}**")
         model_df = pd.DataFrame(
-            {"Probability (%)": [r["lr_prob"] * 100, r["rf_prob"] * 100, r["gb_prob"] * 100, r["tfidf_prob"] * 100]},
-            index=["Logistic Regression", "Random Forest", "Gradient Boosting", "Text Patterns (TF-IDF)"],
+            {"Probability (%)": [p * 100 for p in _model_probs(r)]},
+            index=[fm.MODEL_DISPLAY_NAMES[k] for k in fm.BASE_MODELS],
         )
         st.bar_chart(model_df, height=220)
 
-        probs_spread = max(r["lr_prob"], r["rf_prob"], r["gb_prob"], r["tfidf_prob"]) - \
-            min(r["lr_prob"], r["rf_prob"], r["gb_prob"], r["tfidf_prob"])
+        probs_spread = max(_model_probs(r)) - min(_model_probs(r))
         if probs_spread < 0.15:
             agreement_msg = T["agreement_high"]
         elif probs_spread < 0.35:
@@ -4411,10 +4297,11 @@ Logistic Regression probability: {r["lr_prob"]*100:.1f}%
 Random Forest probability:       {r["rf_prob"]*100:.1f}%
 Gradient Boosting probability:   {r["gb_prob"]*100:.1f}%
 Text Patterns (TF-IDF) probability: {r["tfidf_prob"]*100:.1f}%
-Ensemble average (raw):          {r["raw_prob"]*100:.1f}%
-Model agreement spread:          {(max(r["lr_prob"], r["rf_prob"], r["gb_prob"], r["tfidf_prob"]) - min(r["lr_prob"], r["rf_prob"], r["gb_prob"], r["tfidf_prob"]))*100:.1f} pts
-Rule boost applied:              +{r["boost"]*100:.1f}%
-Final fraud risk:                {r["prob"]*100:.1f}%
+Char n-grams (LR) probability:   {r.get("char_prob", 0.0)*100:.1f}%
+Plain average of 5 models:       {r["raw_prob"]*100:.1f}%
+Model agreement spread:          {(max(_model_probs(r)) - min(_model_probs(r)))*100:.1f} pts
+Rule boost (stacker input):      +{r["boost"]*100:.1f}%
+Final fraud risk (stacked, calibrated): {r["prob"]*100:.1f}%
 Risk level:                      {r["risk_label"]}
 Decision threshold:              {r["threshold"]}
 Prediction:                      {"FRAUD" if r["pred"] == 1 else "SAFE"}
@@ -4441,15 +4328,12 @@ SECURITY ADVICE:
                 "random_forest": round(r["rf_prob"], 4),
                 "gradient_boosting": round(r["gb_prob"], 4),
                 "text_patterns_tfidf": round(r["tfidf_prob"], 4),
+                "char_ngrams": round(r.get("char_prob", 0.0), 4),
                 "ensemble_raw": round(r["raw_prob"], 4),
                 "rule_boost": round(r["boost"], 4),
                 "final": round(r["prob"], 4),
             },
-            "model_agreement_spread": round(
-                max(r["lr_prob"], r["rf_prob"], r["gb_prob"], r["tfidf_prob"])
-                - min(r["lr_prob"], r["rf_prob"], r["gb_prob"], r["tfidf_prob"]),
-                4,
-            ),
+            "model_agreement_spread": round(max(_model_probs(r)) - min(_model_probs(r)), 4),
             "threshold": r["threshold"],
             "prediction": "FRAUD" if r["pred"] == 1 else "SAFE",
             "risk_level": r["risk_label"],
