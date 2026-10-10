@@ -151,15 +151,15 @@ def test_txt_upload_over_max_chars_is_truncated_with_warning(isolated_cwd):
     assert not at.exception, at.exception
 
     at.file_uploader(key="txt_file_uploader").set_value(("big.txt", big_text.encode("utf-8"), "text/plain"))
-    at.run()
+    # The uploader lives inside st.form, and newer Streamlit (>=1.6x) only
+    # commits a form widget's value on submit, so the truncation warning is
+    # checked after submitting rather than after a bare rerun.
+    submit = [b for b in at.button if "analysis_form" in b.key][0]
+    submit.click().run()
     assert not at.exception, at.exception
 
     warnings_text = "\n".join(w.value for w in at.warning)
     assert str(max_input_chars) in warnings_text
-
-    submit = [b for b in at.button if "analysis_form" in b.key][0]
-    submit.click().run()
-    assert not at.exception, at.exception
 
     result = at.session_state["last_result"] if "last_result" in at.session_state else {}
     assert result, "analysis should still succeed on the truncated text"

@@ -99,17 +99,18 @@ test("lrScore() (the ported LogisticRegression member) returns a valid probabili
   }
 });
 
-test("lrScore alone over-scores an ordinary greeting, but the blended analyzeText() result stays safe", () => {
-  // Locks in the reason LR_BLEND_WEIGHT is only 0.2 (see detector.js's file
-  // header comment): evaluated in isolation, the ported LR member assigns a
-  // high fraud probability to this plain, link-free Cyrillic greeting — a
-  // dataset-distribution artifact, not a real signal. If this ever stops
-  // being true (e.g. the model is retrained on a more representative
-  // dataset), LR_BLEND_WEIGHT can safely be revisited/increased.
+test("an ordinary greeting stays safe, both in lrScore alone and in the blended analyzeText() result", () => {
+  // This test used to lock in a known artifact: the ported LR member alone
+  // gave this plain, link-free Cyrillic greeting >90% fraud probability,
+  // which is why LR_BLEND_WEIGHT was kept at 0.2 (see detector.js's header).
+  // After the coefficients were re-extracted in the parity update the
+  // artifact is gone (LR alone now scores it ~4.5%), so the test asserts the
+  // behaviour we actually want. LR_BLEND_WEIGHT is deliberately unchanged
+  // here; raising it should be a separate, measured decision.
   const { extractFeatures, lrScore } = require("../detector.js");
   const text = "Привет, как дела? Встретимся завтра в 9:00.";
   const isolatedLrProb = lrScore(extractFeatures(text));
-  assert.ok(isolatedLrProb > 0.9, `expected the known over-scoring artifact, got ${isolatedLrProb}`);
+  assert.ok(isolatedLrProb < 0.5, `LR alone should not flag an ordinary greeting, got ${isolatedLrProb}`);
 
   const result = FraudDetector.analyzeText(text);
   assert.equal(result.isFraud, false);
