@@ -67,6 +67,7 @@ The pure detection logic (feature extraction, rule boosting, domain/brand checks
 
 **Analysis modes**
 - SMS / message text, call transcript, `.txt` file upload, or batch CSV (many messages at once, with a summary chart and CSV export)
+- **Voice / call recording**: record a call on speakerphone with the browser microphone, or upload a voice message or recording (WhatsApp/Telegram `.ogg`/`.opus`, `.mp3`, `.m4a`, `.wav`...). Whisper (via [faster-whisper](https://github.com/SYSTRAN/faster-whisper), model `small` by default, override with the `WHISPER_MODEL` environment variable) turns it into text locally on the server, in Kazakh, Russian or English; the transcript goes into the normal text box to be checked and analysed. Audio is never sent to a third party and is not stored. Phones don't let ordinary apps record or listen to calls automatically (Android 10+ reserves call audio for system apps; iOS gives none), which is why the user records the call themselves - see [`speech.py`](speech.py).
 
 **Explainability**
 - Highlighted trigger words directly in your input text

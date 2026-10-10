@@ -23,6 +23,29 @@ jobs:
       - name: Run tests
         run: pytest tests/ -v
 
+  speech-smoke:
+    # Voice mode with the real Whisper model on synthetic speech. Separate
+    # job because it downloads ~500 MB; a failure here never blocks the
+    # unit tests above.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y espeak-ng
+          pip install -r requirements-dev.txt
+
+      - name: Transcribe synthetic Russian and Kazakh speech
+        env:
+          RUN_SPEECH_SMOKE: "1"
+        run: pytest tests/test_speech_smoke.py -v -s
+
   extension-test:
     runs-on: ubuntu-latest
     steps:

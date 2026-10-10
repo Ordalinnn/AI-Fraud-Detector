@@ -18,6 +18,7 @@ from sklearn.metrics import (
     recall_score, roc_auc_score,
 )
 import fraud_model as fm
+import speech
 from fraud_logic import (
     domain_flags, extract_features, risk_level, highlight_text,
     sanitize_for_csv, derive_feedback_training_examples,
@@ -3483,7 +3484,7 @@ with st.sidebar:
 
     st.divider()
 
-    MODE_KEYS = ["sms", "call", "file", "batch"]
+    MODE_KEYS = ["sms", "call", "voice", "file", "batch"]
     mode = st.selectbox(
         T["mode"],
         MODE_KEYS,
@@ -3853,6 +3854,69 @@ with st.expander(f"🧭 {T['how_to_use']}", expanded=False):
 st.markdown(f'<div class="disclaimer-box">{T["disclaimer"]}</div>', unsafe_allow_html=True)
 
 # =========================
+# VOICE MODE (speech -> text -> the normal text analysis)
+# =========================
+@st.cache_resource(show_spinner=False)
+def get_speech_model(size):
+    """One Whisper model per server process, shared by all sessions - it
+    takes seconds to load and hundreds of MB of memory."""
+    return speech.load_model(size)
+
+
+VOICE_ERROR_KEYS = {
+    "too_large": "voice_too_large",
+    "decode_failed": "voice_decode_failed",
+    "empty_audio": "voice_empty",
+    "unavailable": "voice_unavailable",
+}
+
+
+def render_voice_input():
+    """Record (browser microphone) or upload audio, transcribe it locally,
+    and put the transcript into the normal text box below, where the user
+    can correct it before pressing Analyze. Nothing is analysed or stored
+    automatically: the audio is discarded after transcription."""
+    st.info(T["voice_how"])
+    st.caption(f"🔒 {T['voice_privacy']}")
+    if not speech.is_available():
+        st.warning(T["voice_unavailable"])
+        return
+
+    lang_names = {"auto": T["voice_lang_auto"], "kk": "Қазақша", "ru": "Русский", "en": "English"}
+    voice_lang = st.selectbox(T["voice_language"], speech.LANGUAGES,
+                              format_func=lambda k: lang_names[k], key="voice_lang")
+    recorded = st.audio_input(T["voice_record"], key="voice_recorder")
+    uploaded_audio = st.file_uploader(T["voice_upload"], type=speech.SUPPORTED_AUDIO_TYPES,
+                                      key="voice_file_uploader")
+    audio = recorded or uploaded_audio
+
+    if st.button(T["voice_transcribe"], disabled=audio is None, width="stretch", key="voice_transcribe_btn"):
+        try:
+            with st.spinner(T["voice_transcribing"]):
+                model = get_speech_model(speech.DEFAULT_MODEL_SIZE)
+                result = speech.transcribe(model, audio.getvalue(), language=voice_lang)
+        except speech.TranscriptionError as exc:
+            st.error(T[VOICE_ERROR_KEYS.get(str(exc), "voice_failed")])
+        except Exception:
+            logger.exception("Voice transcription failed")
+            st.error(T["voice_failed"])
+        else:
+            if not result["text"]:
+                st.warning(T["voice_empty"])
+            else:
+                st.session_state["main_input_text"] = result["text"][:MAX_INPUT_CHARS]
+                st.session_state["voice_last"] = {k: v for k, v in result.items() if k != "text"}
+                st.rerun()
+
+    last = st.session_state.get("voice_last")
+    if last:
+        st.success(T["voice_done"].format(
+            seconds=round(last["duration"]), lang=lang_names.get(last["language"], last["language"])))
+        if last["truncated"]:
+            st.warning(T["voice_truncated"].format(minutes=speech.MAX_AUDIO_SECONDS // 60))
+
+
+# =========================
 # INPUT
 # =========================
 left, right = st.columns([2.1, 0.9], gap="large")
@@ -3874,7 +3938,10 @@ with left:
     else:
         st.markdown(f'<div class="section-title">✍️ {T["input_title"]}</div>', unsafe_allow_html=True)
         st.markdown(f'<div class="section-subtitle">{T["input_subtitle"]}</div>', unsafe_allow_html=True)
-        st.caption(f"ℹ️ {T['call_transcript_hint']}")
+        if mode == "voice":
+            render_voice_input()
+        else:
+            st.caption(f"ℹ️ {T['call_transcript_hint']}")
 
         with st.form("analysis_form", clear_on_submit=False):
             uploaded = None
