@@ -17,3 +17,12 @@ venv/
 Thumbs.db
 .idea/
 .vscode/
+
+# Voice recordings for scripts/eval_speech.py: people's voices stay local
+# unless they explicitly agree to publish them (manifest.csv is committed).
+data/voice/**/*.wav
+data/voice/**/*.mp3
+data/voice/**/*.m4a
+data/voice/**/*.ogg
+data/voice/**/*.opus
+data/voice/**/*.webm
