@@ -4,6 +4,6 @@
   "private": true,
   "description": "Browser extension for AI Fraud Detector — tests only, no build step needed to load the extension itself.",
   "scripts": {
-    "test": "node --test tests/"
+    "test": "node --test tests/*.test.js"
   }
 }

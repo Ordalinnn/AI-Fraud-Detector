@@ -6,7 +6,7 @@ Why this exists: detector.js can't load scikit-learn or run app.py's full
 it ports only the Logistic Regression member — a StandardScaler +
 LogisticRegression pipeline is just a dot product + sigmoid, cheap to
 hand-port. This script trains that exact pipeline (same hyperparameters as
-app.py's _build_ensemble_pipelines(): C=1.0, max_iter=1000, random_state=42)
+fraud_model.build_base_models(): C=1.0, max_iter=1000, random_state=42)
 on the FULL training dataset embedded in app.py's `data` list, using
 fraud_logic.extract_features() so the feature vector is byte-for-byte the
 same one the real production model is trained on. It then prints the
@@ -36,7 +36,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from fraud_logic import extract_features  # noqa: E402
 
-# Must match app.py's _build_ensemble_pipelines() LR hyperparameters exactly,
+# Must match fraud_model.build_base_models() LR hyperparameters exactly,
 # so the ported coefficients reflect the same model the real app trains.
 LR_C = 1.0
 LR_MAX_ITER = 1000
