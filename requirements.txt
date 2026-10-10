@@ -3,3 +3,6 @@ scikit-learn~=1.8
 pandas~=3.0
 numpy~=2.4
 anthropic~=0.121.0
+faster-whisper~=1.2
+
+av>=16,<19  # PyAV 19 removed an argument faster-whisper 1.2 still passes
