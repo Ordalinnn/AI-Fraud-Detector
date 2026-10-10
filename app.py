@@ -195,6 +195,22 @@ st.iframe("""
     setMeta('meta[name="twitter:description"]', { name: 'twitter:description', content: SITE_DESC });
     setMeta('meta[name="twitter:image"]', { name: 'twitter:image', content: SITE_IMAGE });
 
+    // iPhone Shortcut links use "#text=..." (a fragment): unlike "?text=",
+    // browsers keep a fragment through any redirect the host does on first
+    // visit. Turn it into "?text=..." so the Python side can read it. Runs
+    // via a <script> added to the TOP document because this iframe is
+    // sandboxed and may not navigate the top window itself.
+    try {
+        const topLoc = window.top.location;
+        const m = /^#text=(.*)$/s.exec(topLoc.hash || '');
+        if (m && !/[?&]text=/.test(topLoc.search)) {
+            const target = topLoc.origin + topLoc.pathname + '?text=' + m[1];
+            const s = topDoc.createElement('script');
+            s.textContent = 'location.replace(' + JSON.stringify(target) + ');';
+            topDoc.head.appendChild(s);
+        }
+    } catch (e) {}
+
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register(resolvedUrl('app/static/sw.js')).catch(function () {});
     }
@@ -445,16 +461,18 @@ def shared_text_from_params(params) -> str:
 
 
 _shared = shared_text_from_params(st.query_params)
-if _shared:
+# The text is deliberately LEFT in the URL. On iPhone the page opened from a
+# Shortcut often reloads once right after the first load (Safari / Streamlit
+# Cloud reconnecting); when the parameter had already been cleared, that
+# reload came back with an empty box. Keeping it means any reload analyses
+# the same message again. Within one session it is consumed only once, so
+# the user can still edit the text and re-analyse normally.
+if _shared and st.session_state.get("shared_consumed") != _shared:
+    st.session_state["shared_consumed"] = _shared
     st.session_state["main_input_text"] = _shared
     st.session_state["mode_select"] = "sms"
     st.session_state["shared_autorun"] = True
     st.session_state["scroll_to_result"] = True
-    # Clear so a rerun / reload doesn't re-analyse the same message, and the
-    # message text doesn't linger in the address bar or browser history.
-    for _key in SHARE_PARAMS:
-        if _key in st.query_params:
-            del st.query_params[_key]
 
 
 ANDROID_APK_URL = "https://github.com/Ordalinnn/AI-Fraud-Detector/releases/download/android-latest/AI-Fraud-Detector.apk"
