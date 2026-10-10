@@ -50,7 +50,9 @@ st.set_page_config(
     # of a placeholder that gets swapped a moment later.
     page_icon=str(BASE_DIR / "static" / "icon.png"),
     layout="wide",
-    initial_sidebar_state="expanded"
+    # Opened from the phone's Share menu: go straight to the verdict instead
+    # of covering it with the sidebar (which fills the whole screen on mobile).
+    initial_sidebar_state="collapsed" if any(k in st.query_params for k in ("title", "text", "url")) else "expanded",
 )
 
 # Real SMS/chat messages and call transcripts are rarely more than a couple
@@ -105,7 +107,7 @@ MAX_BATCH_ROWS = 500
 # forces a fresh fetch instead of relying on the user to clear their cache.
 # If you change static/manifest.json or static/icon.png, bump this AND the
 # matching "?v=" inside static/manifest.json's own icon entries.
-PWA_ASSET_VERSION = "4"
+PWA_ASSET_VERSION = "5"
 
 st.iframe("""
 <script>
@@ -385,6 +387,60 @@ def apply_lang_change():
 
 lang = st.session_state.lang
 T = get_translations(lang)
+
+
+# =========================
+# SHARED TEXT ("Share -> AI Fraud Detector" on Android, iPhone Shortcut)
+# =========================
+# Android: static/manifest.json declares a Web Share Target, so once the
+# site is installed to the home screen it appears in the system Share menu;
+# sharing text opens the app at /?title=...&text=...&url=... .
+# iPhone: a Shortcut in the Share menu opens the same URL with ?text=... .
+# Either way the shared message is put in the text box, the mode is set to
+# "message" and the analysis runs immediately - two taps from a suspicious
+# message to a verdict, with no copy-paste.
+SHARE_PARAMS = ("title", "text", "url")
+
+
+def shared_text_from_params(params) -> str:
+    """Joins the share-target fields into one message. Android apps differ
+    in which field they fill (and often repeat the link in both "text" and
+    "url"), so empty and repeated parts are dropped."""
+    parts = []
+    for key in SHARE_PARAMS:
+        value = (params.get(key) or "").strip()
+        if value and not any(value in p for p in parts):
+            parts.append(value)
+    return "\n".join(parts)[:MAX_INPUT_CHARS]
+
+
+_shared = shared_text_from_params(st.query_params)
+if _shared:
+    st.session_state["main_input_text"] = _shared
+    st.session_state["mode_select"] = "sms"
+    st.session_state["shared_autorun"] = True
+    st.session_state["scroll_to_result"] = True
+    # Clear so a rerun / reload doesn't re-analyse the same message, and the
+    # message text doesn't linger in the address bar or browser history.
+    for _key in SHARE_PARAMS:
+        if _key in st.query_params:
+            del st.query_params[_key]
+
+
+def public_app_url() -> str:
+    """Base URL for the iPhone Shortcut instructions: APP_PUBLIC_URL if set,
+    else the origin the visitor is actually using."""
+    configured = os.environ.get("APP_PUBLIC_URL", "").strip()
+    if configured:
+        return configured.rstrip("/") + "/"
+    try:
+        from urllib.parse import urlsplit
+        u = urlsplit(st.context.url or "")
+        if u.scheme and u.netloc:
+            return f"{u.scheme}://{u.netloc}/"
+    except Exception:
+        pass
+    return "https://ai-fraud-detector-p6jkftqrssphfcsxxepipo.streamlit.app/"
 
 # =========================
 # EXPANDED TRAINING DATA
@@ -3796,6 +3852,9 @@ if st.session_state.get("show_install_instructions"):
     st.markdown(f"**{T['install_mobile_title']}**")
     st.markdown(T["install_mobile_android"])
     st.markdown(T["install_mobile_ios"])
+    st.markdown(f"**{T['share_title']}**")
+    st.markdown(T["share_android"])
+    st.markdown(T["share_ios"].format(url=public_app_url()))
     st.markdown(f"**{T['install_extension_title']}**")
     st.download_button(
         T["install_extension_download_button"],
@@ -3979,6 +4038,8 @@ with left:
             st.caption(f"📝 {T['char_count']}: {char_count} | {T['word_count']}: {word_count_val}")
 
             analyze = st.form_submit_button(T["analyze"], width="stretch")
+            if st.session_state.pop("shared_autorun", False):
+                analyze = True
 
         batch_go = False
         batch_file = None
@@ -4175,7 +4236,16 @@ if mode != "batch" and "last_result" in st.session_state:
     r = st.session_state["last_result"]
     X_input = pd.DataFrame([r["features"]])
 
-    st.markdown(f'<div class="section-title">📊 {T["result"]}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="section-title" id="fraud-result">📊 {T["result"]}</div>', unsafe_allow_html=True)
+    if st.session_state.pop("scroll_to_result", False):
+        # Opened from the Share menu: jump straight to the verdict instead of
+        # leaving the user at the top of the page on a small phone screen.
+        st.iframe("""<script>
+        setTimeout(function () {
+            var el = window.parent.document.getElementById('fraud-result');
+            if (el) el.scrollIntoView({behavior: 'smooth', block: 'start'});
+        }, 400);
+        </script>""", height=1, width=1)
 
     c1, c2, c3, c4 = st.columns(4)
     c1.markdown(f'<div class="metric-card"><div class="metric-icon">%</div><div class="metric-label">{T["risk"]}</div><div class="metric-value">{r["prob"]*100:.1f}%</div></div>', unsafe_allow_html=True)

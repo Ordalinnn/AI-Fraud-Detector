@@ -190,6 +190,11 @@ The site is installable to a phone's home screen, opening full-screen with no br
 
 It still needs an internet connection to reach the server — installing it skips the browser UI, it doesn't enable offline use.
 
+**Check a message in two taps (no copy-paste):**
+- **Android:** once the site is installed to the home screen, it appears in the system *Share* menu (Web Share Target in [`static/manifest.json`](static/manifest.json)). Select a message's text in WhatsApp/Telegram/SMS → *Share* → *AI Fraud Detector*: the app opens, analyses the message immediately and scrolls to the verdict. Re-install if it was installed before this feature.
+- **iPhone:** iOS doesn't support web share targets, so use a Shortcut in the Share Sheet (*URL Encode* the input → open `https://<app>/?text=<encoded>`); step-by-step instructions are in the app under *📲 Install as an app*.
+- Both just open `/?text=...`, which the app analyses on load and then removes from the address bar. Reading notifications automatically is only possible with a native Android app (NotificationListenerService) and not at all on iOS.
+
 ## Browser extension
 
 A self-contained Chrome/Edge extension in [`browser-extension/`](browser-extension/) — see its own [README](browser-extension/README.md) for install steps. Runs entirely on-device: your text is never sent anywhere, and it works even without the main web app running. It blends hand-tuned rule-based scoring with the real trained Logistic Regression member's coefficients (ported to plain JS via `scripts/extract_lr_coefficients.py` — a dot product + sigmoid, cheap to run without scikit-learn) at a deliberately minority weight; the Random Forest, Gradient Boosting, and TF-IDF/Naive Bayes ensemble members aren't portable to a browser, so this remains a lighter, offline approximation of the full app, not a 1:1 port of its accuracy.
