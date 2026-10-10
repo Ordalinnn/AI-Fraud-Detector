@@ -28,7 +28,20 @@ def test_shared_scam_is_analysed_immediately(tmp_path, monkeypatch):
     result = at.session_state["last_result"]
     assert result["input_text"] == msg
     assert result["prob"] > 0.5
-    assert "text" not in at.query_params  # cleared from the address bar
+    # Kept in the URL so a reload (common on iPhone right after opening)
+    # still shows the message instead of an empty box.
+    assert at.query_params["text"] in (msg, [msg])  # AppTest returns a list
+
+
+def test_shared_text_is_analysed_once_per_session_so_user_can_edit(tmp_path, monkeypatch):
+    msg = "Срочно! Ваша карта заблокирована. Отправьте код из SMS http://kaspi-secure.xyz"
+    at = _open_with(tmp_path, monkeypatch, text=msg)
+    at.text_area(key="main_input_text").set_value("Привет, как дела?")
+    # (the box is inside a form: newer Streamlit commits it on submit)
+    [b for b in at.button if b.key and "analysis_form" in b.key][0].click().run()
+    assert not at.exception, at.exception
+    # the shared text must not overwrite what the user typed and analysed
+    assert at.session_state["last_result"]["input_text"] == "Привет, как дела?"
 
 
 def test_shared_ordinary_message_is_safe(tmp_path, monkeypatch):
