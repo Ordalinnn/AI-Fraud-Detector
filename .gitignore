@@ -32,3 +32,6 @@ android/.gradle/
 android/build/
 android/app/build/
 android/local.properties
+
+# Browser extension dev dependencies (tests only)
+browser-extension/node_modules/
