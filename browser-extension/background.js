@@ -1,4 +1,17 @@
-importScripts("i18n.js", "detector.js");
+importScripts("i18n.js", "scorer.js", "detector.js");
+
+// The on-device model (char_model.tsv, ~0.9 MB) is parsed once per service
+// worker life. If it can't be loaded, analysis falls back to the rules.
+let scorerPromise = null;
+function getScorer() {
+  if (!scorerPromise) {
+    scorerPromise = fetch(chrome.runtime.getURL("char_model.tsv"))
+      .then((r) => r.text())
+      .then((t) => self.CharScorer.parse(t))
+      .catch((e) => { console.warn("AI Fraud Detector: model not loaded", e); scorerPromise = null; return null; });
+  }
+  return scorerPromise;
+}
 
 function contextMenuTitleFor(lang) {
   return self.I18N.strings(lang).contextMenuTitle;
@@ -29,12 +42,13 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
 });
 
-chrome.contextMenus.onClicked.addListener((info) => {
+chrome.contextMenus.onClicked.addListener(async (info) => {
   if (info.menuItemId !== "check-fraud-selection" || !info.selectionText) return;
+  const scorer = await getScorer();
 
   self.I18N.getLang((lang) => {
     const s = self.I18N.strings(lang);
-    const result = self.FraudDetector.analyzeText(info.selectionText);
+    const result = self.FraudDetector.analyzeText(info.selectionText, scorer);
 
     chrome.storage.local.set({
       lastResult: result,
@@ -53,4 +67,18 @@ chrome.contextMenus.onClicked.addListener((info) => {
       priority: result.isFraud ? 2 : 0
     });
   });
+});
+
+// Scoring for content.js (automatic checks in WhatsApp Web / Telegram Web /
+// Gmail). Message text is scored here, inside the extension, and only
+// numbers go back to the page - nothing is sent over the network.
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (!msg || msg.type !== "score" || !Array.isArray(msg.texts)) return false;
+  getScorer().then((scorer) => {
+    sendResponse(msg.texts.map((t) => {
+      const r = self.FraudDetector.analyzeText(String(t).slice(0, 4000), scorer);
+      return { prob: r.prob, pct: r.pct, words: r.modelWords };
+    }));
+  });
+  return true; // async response
 });

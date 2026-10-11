@@ -456,11 +456,26 @@ function riskStyle(prob) {
   return { levelKey: "critical", cssClass: "risk-critical", emoji: "🔴" };
 }
 
-function analyzeText(text) {
+// `scorer` (optional): the on-device ML model from scorer.js. When given,
+// the risk percentage comes from it - the same model as the Android app,
+// checked against scikit-learn - and the rules below only supply the
+// human-readable reasons and domain checks. Without it (model file failed
+// to load) the older rules + LR blend is used, so the extension never
+// stops working.
+function analyzeText(text, scorer) {
   const f = extractFeatures(text);
-  const base = (1 - LR_BLEND_WEIGHT) * heuristicBaseScore(f) + LR_BLEND_WEIGHT * lrScore(f);
-  const boost = ruleBoost(f);
-  const prob = Math.min(0.99, base + boost);
+  let prob;
+  let modelWords = [];
+  let engine = "rules";
+  if (scorer) {
+    const r = scorer.analyze(String(text == null ? "" : text));
+    prob = r.probability;
+    modelWords = r.suspiciousWords;
+    engine = "model";
+  } else {
+    const base = (1 - LR_BLEND_WEIGHT) * heuristicBaseScore(f) + LR_BLEND_WEIGHT * lrScore(f);
+    prob = Math.min(0.99, base + ruleBoost(f));
+  }
   const style = riskStyle(prob);
   const reasons = explain(f);
   const domainInfo = f.domains.map((d) => ({ domain: d, flags: domainFlags(d) }));
@@ -470,7 +485,9 @@ function analyzeText(text) {
     isFraud: prob >= 0.5,
     ...style,
     reasons,
-    domainInfo
+    domainInfo,
+    modelWords,
+    engine
   };
 }
 

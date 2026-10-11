@@ -90,7 +90,7 @@ The pure detection logic (feature extraction, rule boosting, domain/brand checks
 
 **Beyond the browser tab**
 - Installable as a home-screen app on mobile (PWA)
-- A standalone browser extension: right-click any selected text on any webpage to check it, entirely on-device, no server call
+- A standalone browser extension: automatically labels suspicious incoming messages in WhatsApp Web, Telegram Web and Gmail, and checks any selected text via right-click — entirely on-device, no server call
 
 ## Project structure
 
@@ -123,9 +123,11 @@ static/
   icon.png                     App icon
 
 browser-extension/            Standalone Chrome/Edge extension (Manifest V3)
-  detector.js                   JS port of fraud_logic.py's rule-based logic
+  scorer.js + char_model.tsv    On-device ML model (same file as the Android app)
+  content.js / content.css      Automatic checks + red label in WhatsApp Web, Telegram Web, Gmail
+  detector.js                   Reasons, domain checks, rule-based fallback (port of fraud_logic.py)
   i18n.js                       KZ/RU/EN translations shared by the popup and background script
-  background.js                 Right-click "check for fraud" + notifications
+  background.js                 Loads the model, scores for content.js, right-click check + notifications
   popup.html / .js / .css       Toolbar popup UI
   manifest.json                 Extension manifest
   README.md                     Extension-specific install/usage instructions
@@ -201,7 +203,7 @@ It still needs an internet connection to reach the server — installing it skip
 
 ## Browser extension
 
-A self-contained Chrome/Edge extension in [`browser-extension/`](browser-extension/) — see its own [README](browser-extension/README.md) for install steps. Runs entirely on-device: your text is never sent anywhere, and it works even without the main web app running. It blends hand-tuned rule-based scoring with the real trained Logistic Regression member's coefficients (ported to plain JS via `scripts/extract_lr_coefficients.py` — a dot product + sigmoid, cheap to run without scikit-learn) at a deliberately minority weight; the Random Forest, Gradient Boosting, and TF-IDF/Naive Bayes ensemble members aren't portable to a browser, so this remains a lighter, offline approximation of the full app, not a 1:1 port of its accuracy.
+A self-contained Chrome/Edge extension in [`browser-extension/`](browser-extension/) — see its own [README](browser-extension/README.md) for install steps. Runs entirely on-device: your text is never sent anywhere, and it works even without the main web app running. It runs the same character n-gram + logistic regression model as the Android app (the strongest single member of the web ensemble, checked against scikit-learn to < 10⁻⁶), automatically labels suspicious incoming messages in WhatsApp Web, Telegram Web and Gmail, and checks any selected text via right-click.
 
 ## Dataset & models
 

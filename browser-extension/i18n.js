@@ -6,11 +6,16 @@ const DEFAULT_LANG = "en";
 
 const TRANSLATIONS = {
   en: {
+    autoscanLabel: "Automatically check new messages in WhatsApp Web, Telegram Web and Gmail",
+    badgeLabel: "Looks like fraud",
+    badgeWords: "Suspicious words:",
+    badgeAdvice: "Don't share codes, passwords or card details and don't open links. Contact the organization only via its official number.",
+    modelWordsLabel: "Words that raised the risk:",
     appTitle: "AI Fraud Detector",
     appSubtitle: "Runs locally — nothing leaves your device",
     placeholder: "Paste a suspicious SMS, message, or call transcript…",
     analyzeBtn: "🚀 Analyze",
-    footer: "Lightweight rule-based prototype — not a certified security tool.",
+    footer: "On-device ML model (character n-grams) + rules — not a certified security tool.",
     adviceBad: "⚠️ Do not share codes, passwords, CVV, or card numbers. Do not click the link. Contact the organization only through its official number.",
     adviceGood: "✅ This message looks safe. If unsure, verify through an official source.",
     noReasons: "No strong fraud indicators were found.",
@@ -53,11 +58,16 @@ const TRANSLATIONS = {
     }
   },
   ru: {
+    autoscanLabel: "Автоматически проверять новые сообщения в WhatsApp Web, Telegram Web и Gmail",
+    badgeLabel: "Похоже на мошенничество",
+    badgeWords: "Подозрительные слова:",
+    badgeAdvice: "Не сообщайте коды, пароли и данные карты, не переходите по ссылкам. Связывайтесь с организацией только по официальному номеру.",
+    modelWordsLabel: "Слова, повысившие риск:",
     appTitle: "AI Fraud Detector",
     appSubtitle: "Работает локально — ничего не покидает ваше устройство",
     placeholder: "Вставьте подозрительное SMS, сообщение или текст звонка…",
     analyzeBtn: "🚀 Анализ",
-    footer: "Лёгкий прототип на правилах — не сертифицированный инструмент безопасности.",
+    footer: "ML-модель на устройстве (символьные n-граммы) + правила — не сертифицированный инструмент безопасности.",
     adviceBad: "⚠️ Не сообщайте код, пароль, CVV или номер карты. Не переходите по ссылке. Свяжитесь с организацией только по официальному номеру.",
     adviceGood: "✅ Сообщение выглядит безопасным. Если сомневаетесь, проверьте через официальный источник.",
     noReasons: "Сильные признаки мошенничества не найдены.",
@@ -100,11 +110,16 @@ const TRANSLATIONS = {
     }
   },
   kz: {
+    autoscanLabel: "WhatsApp Web, Telegram Web және Gmail-дағы жаңа хабарламаларды автоматты тексеру",
+    badgeLabel: "Алаяқтыққа ұқсайды",
+    badgeWords: "Күдікті сөздер:",
+    badgeAdvice: "Кодтарды, құпиясөздерді және карта деректерін айтпаңыз, сілтемелерге өтпеңіз. Ұйыммен тек ресми нөмір арқылы байланысыңыз.",
+    modelWordsLabel: "Тәуекелді арттырған сөздер:",
     appTitle: "AI Fraud Detector",
     appSubtitle: "Жергілікті жұмыс істейді — деректер құрылғыдан шықпайды",
     placeholder: "Күмәнді SMS, хабарлама немесе қоңырау мәтінін қойыңыз…",
     analyzeBtn: "🚀 Талдау",
-    footer: "Ереже негізіндегі жеңіл прототип — ресми қауіпсіздік құралы емес.",
+    footer: "Құрылғыдағы ML-модель (символдық n-грамдар) + ережелер — ресми қауіпсіздік құралы емес.",
     adviceBad: "⚠️ Код, пароль, CVV немесе карта нөмірін бермеңіз. Сілтемеге баспаңыз. Ұйыммен тек ресми нөмір арқылы хабарласыңыз.",
     adviceGood: "✅ Хабарлама қауіпсіз көрінеді. Күмәндансаңыз, ресми дереккөз арқылы тексеріңіз.",
     noReasons: "Күшті алаяқтық белгілері табылмады.",
@@ -148,8 +163,17 @@ const TRANSLATIONS = {
   }
 };
 
+// Until the user picks a language, follow the browser's: a Kazakh or Russian
+// Chrome gets Kazakh or Russian labels instead of English.
+function i18nBrowserLang() {
+  const nav = (typeof navigator !== "undefined" && navigator.language || "").toLowerCase();
+  if (nav.startsWith("kk")) return "kz";
+  if (nav.startsWith("ru")) return "ru";
+  return DEFAULT_LANG;
+}
+
 function i18nGetLang(callback) {
-  chrome.storage.local.get(["lang"], (data) => callback(data.lang || DEFAULT_LANG));
+  chrome.storage.local.get(["lang"], (data) => callback(data.lang || i18nBrowserLang()));
 }
 
 function i18nSetLang(lang, callback) {
@@ -206,7 +230,7 @@ function validateTranslations(translations) {
 validateTranslations(TRANSLATIONS);
 
 if (typeof self !== "undefined") {
-  self.I18N = { TRANSLATIONS, DEFAULT_LANG, getLang: i18nGetLang, setLang: i18nSetLang, strings: i18nStrings };
+  self.I18N = { TRANSLATIONS, DEFAULT_LANG, browserLang: i18nBrowserLang, getLang: i18nGetLang, setLang: i18nSetLang, strings: i18nStrings };
 }
 
 // Also exposed via CommonJS exports so the test suite can exercise
@@ -215,7 +239,7 @@ if (typeof self !== "undefined") {
 // Guarded because classic browser/service-worker scripts have no `module`.
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
-    TRANSLATIONS, DEFAULT_LANG, getLang: i18nGetLang, setLang: i18nSetLang,
+    TRANSLATIONS, DEFAULT_LANG, browserLang: i18nBrowserLang, getLang: i18nGetLang, setLang: i18nSetLang,
     strings: i18nStrings, validateTranslations, collectKeyPaths
   };
 }

@@ -26,13 +26,20 @@
   <div id="result" class="result hidden" role="status" aria-live="polite">
     <div id="riskBanner" class="risk-banner"></div>
     <div id="advice" class="advice"></div>
+    <div id="modelWords" class="model-words hidden"></div>
     <ul id="reasons" class="reasons"></ul>
     <ul id="domains" class="domains"></ul>
   </div>
 
+  <label class="autoscan">
+    <input type="checkbox" id="autoscan" checked>
+    <span id="autoscanLabel">Automatically check new messages in WhatsApp Web, Telegram Web and Gmail</span>
+  </label>
+
   <footer id="footerText">Lightweight rule-based prototype — not a certified security tool.</footer>
 
   <script src="i18n.js"></script>
+  <script src="scorer.js"></script>
   <script src="detector.js"></script>
   <script src="popup.js"></script>
 </body>

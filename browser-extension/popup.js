@@ -6,6 +6,15 @@ const reasonsEl = document.getElementById("reasons");
 const domainsEl = document.getElementById("domains");
 const langSelectEl = document.getElementById("langSelect");
 const validationMsgEl = document.getElementById("validationMsg");
+const modelWordsEl = document.getElementById("modelWords");
+const autoscanEl = document.getElementById("autoscan");
+
+// The on-device ML model (same as the Android app). Loaded once; if it
+// cannot be loaded, analyzeText falls back to the rules.
+const scorerPromise = fetch(chrome.runtime.getURL("char_model.tsv"))
+  .then((r) => r.text())
+  .then((tsv) => self.CharScorer.parse(tsv))
+  .catch(() => null);
 
 let currentLang = self.I18N.DEFAULT_LANG;
 let lastResult = null;
@@ -17,6 +26,7 @@ function applyStaticText() {
   document.getElementById("appSubtitle").textContent = s.appSubtitle;
   document.getElementById("footerText").textContent = s.footer;
   document.getElementById("analyzeBtn").textContent = s.analyzeBtn;
+  document.getElementById("autoscanLabel").textContent = s.autoscanLabel;
   inputEl.placeholder = s.placeholder;
   langSelectEl.value = currentLang;
   if (!validationMsgEl.classList.contains("hidden")) {
@@ -41,6 +51,10 @@ function render(result) {
   riskBannerEl.textContent = `${result.emoji} ${s.riskLabels[result.levelKey]} — ${result.pct}%`;
 
   adviceEl.textContent = result.isFraud ? s.adviceBad : s.adviceGood;
+
+  const words = result.modelWords || [];
+  modelWordsEl.classList.toggle("hidden", !(result.isFraud && words.length));
+  modelWordsEl.textContent = `${s.modelWordsLabel} ${words.join(", ")}`;
 
   clearChildren(reasonsEl);
   if (result.reasons.length) {
@@ -83,20 +97,27 @@ function hideValidationError() {
   validationMsgEl.classList.add("hidden");
 }
 
-document.getElementById("analyzeBtn").addEventListener("click", () => {
+document.getElementById("analyzeBtn").addEventListener("click", async () => {
   const text = inputEl.value.trim();
   if (!text) {
     showValidationError();
     return;
   }
   hideValidationError();
-  lastResult = self.FraudDetector.analyzeText(text);
+  lastResult = self.FraudDetector.analyzeText(text, await scorerPromise);
   chrome.storage.local.set({ lastResult, lastText: text });
   render(lastResult);
 });
 
 inputEl.addEventListener("input", () => {
   if (inputEl.value.trim()) hideValidationError();
+});
+
+chrome.storage.local.get({ autoscan: true }, (data) => {
+  autoscanEl.checked = data.autoscan !== false;
+});
+autoscanEl.addEventListener("change", () => {
+  chrome.storage.local.set({ autoscan: autoscanEl.checked });
 });
 
 langSelectEl.addEventListener("change", () => {
