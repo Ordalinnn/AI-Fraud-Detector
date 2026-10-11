@@ -481,7 +481,8 @@ function analyzeText(text, scorer) {
   const domainInfo = f.domains.map((d) => ({ domain: d, flags: domainFlags(d) }));
   return {
     prob,
-    pct: Math.round(prob * 100),
+    // never show 100 %: no model is that certain
+    pct: Math.min(99, Math.round(prob * 100)),
     isFraud: prob >= 0.5,
     ...style,
     reasons,

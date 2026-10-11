@@ -20,7 +20,7 @@ function score(texts) {
   calls += 1;
   return Promise.resolve(texts.map((t) => {
     const r = analyzeText(t, scorer);
-    return { prob: r.prob, pct: r.pct, words: r.modelWords };
+    return { prob: r.prob, pct: r.pct, words: r.modelWords, reasons: r.reasons, domains: r.domainInfo };
   }));
 }
 
@@ -51,10 +51,9 @@ test("WhatsApp: scam messages get a label (incoming and own), normal ones don't"
   await sc.scan();
   const badges = doc.querySelectorAll(".afd-badge");
   assert.equal(badges.length, 2);
-  assert.match(badges[0].textContent, /^⚠️ Похоже на мошенничество · \d+%$/);
+  assert.match(badges[0].textContent, /^⚠️ Похоже на мошенничество · \d+% · почему\? ▾$/);
   assert.deepEqual(sc.status(), { host: "web.whatsapp.com", running: true, checked: 3, flagged: 2 });
-  assert.match(badges[0].title, /Не сообщайте коды/);
-  assert.ok(badges[0].previousElementSibling.textContent.includes("заблокирована"));
+  assert.ok(badges[0].parentElement.previousElementSibling.textContent.includes("заблокирована"));
   sc.stop();
 });
 
@@ -102,8 +101,42 @@ test("Telegram (web A and web K) and Gmail markup", async () => {
   }
   // Gmail: label goes above the email body, not after a long email; a quoted
   // email nested inside another is part of it and gets no label of its own
-  assert.equal(gm.querySelector(".afd-badge").nextElementSibling.className, "a3s");
+  assert.equal(gm.querySelector(".afd-box").nextElementSibling.className, "a3s");
   assert.equal(gm.querySelectorAll(".a3s .afd-badge").length, 0);
+});
+
+test("clicking the label shows what is suspicious, clicking again hides it", async () => {
+  const text = "Здравствуйте, служба безопасности Kaspi. Ваша карта заблокирована! Срочно назовите код из SMS или перейдите http://kaspi-bank-secure.xyz/login";
+  const dom = new JSDOM(`<!doctype html><body><div id="chat">${waBubble(text)}</div></body>`);
+  const doc = dom.window.document;
+  let bubbled = 0;
+  doc.getElementById("chat").addEventListener("click", () => { bubbled += 1; });
+  const sc = createScanner({ doc, site: siteFor("web.whatsapp.com"), score, strings: () => I18N.strings("ru") });
+  sc.start();
+  await sc.scan();
+  const badge = doc.querySelector(".afd-badge");
+  const details = doc.querySelector(".afd-details");
+  assert.equal(details.hidden, true);
+
+  badge.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true, cancelable: true }));
+  assert.equal(details.hidden, false);
+  assert.equal(badge.getAttribute("aria-expanded"), "true");
+  assert.equal(bubbled, 0, "the click must not reach WhatsApp's own handlers");
+  const shown = details.textContent;
+  assert.match(shown, /Почему это подозрительно/);
+  assert.match(shown, /Подозрительные слова:/);
+  assert.ok(details.querySelectorAll(".afd-chip").length >= 1);
+  assert.match(shown, /Признаки:/);
+  assert.ok(details.querySelectorAll(".afd-list li").length >= 2, shown);
+  assert.match(shown, /kaspi-bank-secure\.xyz — /, "the fake link and why it is suspicious");
+  assert.match(shown, /Не сообщайте коды/);
+  const link = details.querySelector("a.afd-link");
+  assert.ok(link.href.startsWith("https://ai-fraud-detector-p6jkftqrssphfcsxxepipo.streamlit.app/?text="));
+  assert.equal(decodeURIComponent(link.href.split("?text=")[1]), text);
+
+  badge.dispatchEvent(new dom.window.KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+  assert.equal(details.hidden, true);
+  sc.stop();
 });
 
 test("short texts are skipped until they grow; reset removes all labels", async () => {

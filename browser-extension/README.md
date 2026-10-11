@@ -7,8 +7,10 @@ entirely on your device — no server, no network request, no data collection.
 
 - **Automatic checks in WhatsApp Web, Telegram Web and Gmail.** While one of
   these is open, the extension watches for new incoming messages and puts a
-  red label **"⚠️ Looks like fraud · 87%"** next to a suspicious one (hover
-  it for the words that raised the risk and what to do). Your own outgoing
+  red label **"⚠️ Looks like fraud · 87% · why?"** next to a suspicious one.
+  Click it to see why: the words that raised the risk (also highlighted in
+  yellow inside the message), the warning signs, what is wrong with the
+  links, and what to do. Your own outgoing
   messages are not checked. Can be switched off in the popup.
 - **Right-click any selected text** on any other webpage → "Check '...' for
   fraud/scam" → a notification pops up with the risk level.

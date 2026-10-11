@@ -56,7 +56,7 @@
     if (scope.querySelectorAll) all.push(...scope.querySelectorAll(site.selector));
     for (const el of all) {
       if (el.dataset[CHECKED] !== undefined) continue;
-      if (el.closest(".afd-badge")) continue;
+      if (el.closest(".afd-box")) continue;
       // a match nested inside another match is the same message
       if (el.parentElement && el.parentElement.closest(site.selector)) continue;
       if (site.skip && el.closest(site.skip)) { el.dataset[CHECKED] = "own"; continue; }
@@ -67,20 +67,123 @@
     return out;
   }
 
-  function makeBadge(doc, result, strings) {
-    const b = doc.createElement("span");
-    b.className = "afd-badge";
-    b.setAttribute("role", "note");
-    b.textContent = `⚠️ ${strings.badgeLabel} · ${result.pct}%`;
-    const words = (result.words || []).length ? `${strings.badgeWords} ${result.words.join(", ")}\n` : "";
-    b.title = words + strings.badgeAdvice;
-    return b;
+  const WEB_APP_URL = "https://ai-fraud-detector-p6jkftqrssphfcsxxepipo.streamlit.app/";
+
+  // Yellow highlight of the suspicious words inside the message itself. Uses
+  // the CSS Custom Highlight API: no change to WhatsApp's/Telegram's own DOM
+  // (they redraw messages and would fight any <mark> we insert).
+  function highlightWords(doc, el, words) {
+    const win = doc.defaultView;
+    if (!win || !win.CSS || !win.CSS.highlights || typeof win.Highlight !== "function") return;
+    const ranges = [];
+    const wanted = (words || []).map((w) => w.toLowerCase()).filter((w) => w.length >= 2);
+    const walker = doc.createTreeWalker(el, win.NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      const low = n.data.toLowerCase();
+      for (const w of wanted) {
+        for (let i = low.indexOf(w); i >= 0; i = low.indexOf(w, i + w.length)) {
+          const r = doc.createRange();
+          r.setStart(n, i);
+          r.setEnd(n, i + w.length);
+          ranges.push(r);
+        }
+      }
+    }
+    const h = win.CSS.highlights.get("afd-words") || new win.Highlight();
+    for (const r of ranges) h.add(r);
+    win.CSS.highlights.set("afd-words", h);
+  }
+
+  function clearHighlights(doc) {
+    const win = doc.defaultView;
+    if (win && win.CSS && win.CSS.highlights) win.CSS.highlights.delete("afd-words");
+  }
+
+  function mk(doc, tag, cls, text) {
+    const e = doc.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  // "Why is it suspicious?" panel shown when the label is clicked.
+  function makeDetails(doc, result, strings, text) {
+    const d = mk(doc, "div", "afd-details");
+    d.hidden = true;
+    d.appendChild(mk(doc, "div", "afd-details-title", strings.detailsTitle));
+
+    if ((result.words || []).length) {
+      const row = mk(doc, "div", "afd-row");
+      row.appendChild(mk(doc, "span", "afd-row-label", strings.badgeWords + " "));
+      for (const w of result.words) row.appendChild(mk(doc, "span", "afd-chip", w));
+      d.appendChild(row);
+    }
+
+    if ((result.reasons || []).length) {
+      d.appendChild(mk(doc, "div", "afd-row-label", strings.detailsReasons));
+      const ul = mk(doc, "ul", "afd-list");
+      // the first few are enough; link problems get their own section below
+      for (const key of result.reasons.slice(0, 6)) ul.appendChild(mk(doc, "li", null, strings.reasonLabels[key] || key));
+      d.appendChild(ul);
+    }
+
+    const flagged = (result.domains || []).filter((x) => x.flags.length);
+    if (flagged.length) {
+      d.appendChild(mk(doc, "div", "afd-row-label", strings.detailsLinks));
+      const ul = mk(doc, "ul", "afd-list");
+      for (const x of flagged) {
+        const flags = x.flags.map((f) => (f.severity === "critical" ? "🔴 " : "⚠️ ") +
+          (strings.domainFlagLabels[f.labelKey] || f.labelKey).replace("{brand}", f.brand || ""));
+        ul.appendChild(mk(doc, "li", null, `${x.domain} — ${flags.join(", ")}`));
+      }
+      d.appendChild(ul);
+    }
+
+    d.appendChild(mk(doc, "div", "afd-advice", strings.badgeAdvice));
+
+    const a = mk(doc, "a", "afd-link", strings.detailsOpenSite);
+    a.href = WEB_APP_URL + "?text=" + encodeURIComponent(text.slice(0, 1500));
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.title = strings.detailsOpenSiteNote;
+    d.appendChild(a);
+    return d;
+  }
+
+  // The red label + its (hidden) details, in one box next to the message.
+  function makeBadge(doc, result, strings, text, msgEl) {
+    const box = mk(doc, "div", "afd-box");
+    const b = mk(doc, "span", "afd-badge", `⚠️ ${strings.badgeLabel} · ${result.pct}% · ${strings.badgeWhy} ▾`);
+    b.setAttribute("role", "button");
+    b.setAttribute("tabindex", "0");
+    b.setAttribute("aria-expanded", "false");
+    b.title = strings.badgeClickHint;
+    const details = makeDetails(doc, result, strings, text || "");
+    const toggle = (ev) => {
+      // don't let WhatsApp/Telegram treat the click as "select/open message"
+      ev.preventDefault();
+      ev.stopPropagation();
+      details.hidden = !details.hidden;
+      b.setAttribute("aria-expanded", String(!details.hidden));
+      b.textContent = `⚠️ ${strings.badgeLabel} · ${result.pct}% · ${strings.badgeWhy} ${details.hidden ? "▾" : "▴"}`;
+      clearHighlights(doc);
+      if (!details.hidden && msgEl) highlightWords(doc, msgEl, result.words);
+    };
+    b.addEventListener("click", toggle);
+    b.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") toggle(ev); });
+    for (const t of ["mousedown", "mouseup", "pointerdown", "pointerup", "dblclick"]) {
+      box.addEventListener(t, (ev) => ev.stopPropagation());
+    }
+    details.addEventListener("click", (ev) => { if (ev.target.tagName !== "A") ev.stopPropagation(); });
+    box.appendChild(b);
+    box.appendChild(details);
+    return box;
   }
 
   function placeBadge(site, el, badge) {
     // re-rendered message: drop our previous label first
     const prev = site.where === "afterend" ? el.nextElementSibling : el.previousElementSibling;
-    if (prev && prev.classList.contains("afd-badge")) prev.remove();
+    if (prev && prev.classList.contains("afd-box")) prev.remove();
     el.insertAdjacentElement(site.where, badge);
   }
 
@@ -113,7 +216,7 @@
           const r = cache.get(text);
           if (!r) continue;
           el.dataset[CHECKED] = r.prob >= THRESHOLD ? "fraud" : "ok";
-          if (r.prob >= THRESHOLD) placeBadge(site, el, makeBadge(doc, r, strings()));
+          if (r.prob >= THRESHOLD) placeBadge(site, el, makeBadge(doc, r, strings(), text, el));
         }
       } finally {
         busy = false;
@@ -152,7 +255,8 @@
 
     // Remove all labels and forget what was checked (autoscan off, language change).
     function reset() {
-      for (const b of doc.querySelectorAll(".afd-badge")) b.remove();
+      for (const b of doc.querySelectorAll(".afd-box")) b.remove();
+      clearHighlights(doc);
       for (const el of doc.querySelectorAll("[data-afd-checked]")) delete el.dataset[CHECKED];
     }
 
