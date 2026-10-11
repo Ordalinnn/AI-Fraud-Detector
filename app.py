@@ -251,23 +251,44 @@ EXTENSION_DIR = BASE_DIR / "browser-extension"
 EXTENSION_EXCLUDED_DIRS = {"tests", "node_modules"}
 EXTENSION_EXCLUDED_FILES = {"package.json", "package-lock.json"}
 
-@st.cache_data(show_spinner=False)
-def build_extension_zip() -> bytes:
+def _extension_files() -> list[Path]:
+    files = []
+    for path in sorted(EXTENSION_DIR.rglob("*")):
+        if not path.is_file():
+            continue
+        if EXTENSION_EXCLUDED_DIRS & set(path.relative_to(EXTENSION_DIR).parts):
+            continue
+        if path.name in EXTENSION_EXCLUDED_FILES:
+            continue
+        files.append(path)
+    return files
+
+
+def extension_fingerprint() -> tuple:
+    """Changes whenever an extension file changes. Passed to the cached
+    builder below so a redeploy with a new extension never serves the old
+    ZIP from cache (st.cache_data keys on arguments + the function's own
+    source, which doesn't change when only the extension files do)."""
+    return tuple((str(p.relative_to(EXTENSION_DIR)), p.stat().st_mtime_ns, p.stat().st_size)
+                 for p in _extension_files())
+
+
+def extension_version() -> str:
+    try:
+        return json.loads((EXTENSION_DIR / "manifest.json").read_text(encoding="utf-8"))["version"]
+    except Exception:
+        return ""
+
+
+@st.cache_data(show_spinner=False, max_entries=2)
+def build_extension_zip(fingerprint: tuple = ()) -> bytes:
     """Packages browser-extension/ (excluding dev-only files like tests/ and
     package.json) into a ZIP a user can unpack and load unpacked into
-    Chrome/Edge. Cached so it's only built once per deployment, not on
-    every rerun."""
+    Chrome/Edge. Cached per `fingerprint` (see extension_fingerprint)."""
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for path in sorted(EXTENSION_DIR.rglob("*")):
-            if not path.is_file():
-                continue
-            if EXTENSION_EXCLUDED_DIRS & set(path.relative_to(EXTENSION_DIR).parts):
-                continue
-            if path.name in EXTENSION_EXCLUDED_FILES:
-                continue
-            arcname = Path("browser-extension") / path.relative_to(EXTENSION_DIR)
-            zf.write(path, arcname)
+        for path in _extension_files():
+            zf.write(path, Path("browser-extension") / path.relative_to(EXTENSION_DIR))
     return buf.getvalue()
 
 # =========================
@@ -3921,10 +3942,11 @@ if st.session_state.get("show_install_instructions"):
         st.markdown(T["howto_iphone"].format(url=public_app_url()))
     with tab_pc:
         st.markdown(T["howto_pc"])
+        ext_version = extension_version()
         st.download_button(
-            T["install_extension_download_button"],
-            build_extension_zip(),
-            file_name="browser-extension.zip",
+            T["install_extension_download_button"] + (f" · v{ext_version}" if ext_version else ""),
+            build_extension_zip(extension_fingerprint()),
+            file_name=f"AI-Fraud-Detector-extension-{ext_version or 'latest'}.zip",
             mime="application/zip",
         )
         st.markdown(T["install_extension_steps"])

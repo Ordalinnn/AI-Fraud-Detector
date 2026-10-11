@@ -44,14 +44,15 @@ test("site table covers the three web apps and nothing else", () => {
   assert.equal(siteFor("evilweb.whatsapp.com.example"), null);
 });
 
-test("WhatsApp: scam message gets a label, normal and own messages don't", async () => {
+test("WhatsApp: scam messages get a label (incoming and own), normal ones don't", async () => {
   const doc = page(`<div id="chat">${waBubble(SCAM)}${waBubble(OK)}${waBubble(SCAM, true)}${waBubble("ок")}</div>`);
   const sc = createScanner({ doc, site: siteFor("web.whatsapp.com"), score, strings: () => I18N.strings("ru") });
   sc.start();
   await sc.scan();
   const badges = doc.querySelectorAll(".afd-badge");
-  assert.equal(badges.length, 1);
+  assert.equal(badges.length, 2);
   assert.match(badges[0].textContent, /^⚠️ Похоже на мошенничество · \d+%$/);
+  assert.deepEqual(sc.status(), { host: "web.whatsapp.com", running: true, checked: 3, flagged: 2 });
   assert.match(badges[0].title, /Не сообщайте коды/);
   assert.ok(badges[0].previousElementSibling.textContent.includes("заблокирована"));
   sc.stop();
@@ -92,7 +93,7 @@ test("Telegram (web A and web K) and Gmail markup", async () => {
   const tgK = page(`<div class="bubble"><div class="message"><span class="translatable-message">${SCAM}</span></div></div>` +
     `<div class="bubble is-out"><div class="message"><span class="translatable-message">${SCAM}</span></div></div>`);
   const gm = page(`<div class="a3s">${OK}<div class="a3s">quoted ${SCAM}</div></div><div class="a3s">${SCAM}</div>`);
-  for (const [doc, host, expected] of [[tgA, "web.telegram.org", 1], [tgK, "web.telegram.org", 1], [gm, "mail.google.com", 2]]) {
+  for (const [doc, host, expected] of [[tgA, "web.telegram.org", 2], [tgK, "web.telegram.org", 2], [gm, "mail.google.com", 2]]) {
     const sc = createScanner({ doc, site: siteFor(host), score, strings: () => I18N.strings("ru") });
     sc.start();
     await sc.scan();
@@ -135,7 +136,9 @@ test("manifest injects content.js only on the three sites", () => {
   assert.deepEqual(m.content_scripts[0].matches.sort(),
     ["https://mail.google.com/*", "https://web.telegram.org/*", "https://web.whatsapp.com/*"]);
   assert.deepEqual(m.content_scripts[0].js, ["i18n.js", "content.js"]);
-  assert.ok(!m.host_permissions, "no extra host permissions needed");
+  // host permissions = exactly the same three sites (only so the popup can
+  // see that the tab is WhatsApp/Telegram/Gmail and say "press F5")
+  assert.deepEqual([...m.host_permissions].sort(), [...m.content_scripts[0].matches].sort());
   for (const f of [...m.content_scripts[0].js, ...m.content_scripts[0].css]) {
     assert.ok(fs.existsSync(path.join(__dirname, "..", f)), f);
   }

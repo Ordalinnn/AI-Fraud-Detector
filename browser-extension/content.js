@@ -19,17 +19,19 @@
   const BATCH = 40;
   const CHECKED = "afdChecked"; // dataset key -> data-afd-checked
 
-  // `skip`: ancestors that mean "this is my own outgoing message".
+  // Outgoing messages are checked too: a forwarded scam gets the label, and
+  // the easiest way to try the extension is to send yourself a scam text.
+  // `skip` (optional): ancestors whose messages must not be checked.
   // `where`: put the label after the text (chat bubbles) or before it (long emails).
   const SITES = [
     { host: "web.whatsapp.com",
       selector: "div.copyable-text[data-pre-plain-text]",
       textOf: (el) => (el.querySelector("span.selectable-text") || el).innerText || el.textContent,
-      skip: ".message-out",
+      skip: null,
       where: "afterend" },
     { host: "web.telegram.org",
       selector: ".text-content, .translatable-message",
-      skip: ".own, .is-out",
+      skip: null,
       where: "afterend" },
     { host: "mail.google.com",
       selector: "div.a3s",
@@ -154,7 +156,16 @@
       for (const el of doc.querySelectorAll("[data-afd-checked]")) delete el.dataset[CHECKED];
     }
 
-    return { start, stop, reset, scan, schedule, get running() { return running; } };
+    function status() {
+      return {
+        host: site.host,
+        running,
+        checked: doc.querySelectorAll("[data-afd-checked]").length,
+        flagged: doc.querySelectorAll(".afd-badge").length,
+      };
+    }
+
+    return { start, stop, reset, scan, schedule, status, get running() { return running; } };
   }
 
   function boot() {
@@ -175,6 +186,10 @@
     chrome.storage.local.get({ autoscan: true, lang }, (data) => {
       lang = data.lang || lang;
       if (data.autoscan !== false) scanner.start();
+    });
+    // The popup asks "is autoscan working on this tab?"
+    chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+      if (msg && msg.type === "status") sendResponse(scanner.status());
     });
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== "local") return;

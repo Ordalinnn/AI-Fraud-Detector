@@ -6,6 +6,10 @@ const DEFAULT_LANG = "en";
 
 const TRANSLATIONS = {
   en: {
+    statusActive: "✅ Autoscan is working on this tab: {checked} messages checked, {flagged} suspicious.",
+    statusReload: "⚠️ Reload this tab (F5): the extension was installed or updated after the page was opened.",
+    statusOtherPage: "ℹ️ Autoscan works in WhatsApp Web, Telegram Web and Gmail. Open one of them in this tab (already open? press F5).",
+    statusOff: "Autoscan is off.",
     autoscanLabel: "Automatically check new messages in WhatsApp Web, Telegram Web and Gmail",
     badgeLabel: "Looks like fraud",
     badgeWords: "Suspicious words:",
@@ -58,6 +62,10 @@ const TRANSLATIONS = {
     }
   },
   ru: {
+    statusActive: "✅ Автопроверка работает на этой вкладке: проверено сообщений — {checked}, подозрительных — {flagged}.",
+    statusReload: "⚠️ Обновите эту вкладку (F5): расширение установили или обновили, когда страница уже была открыта.",
+    statusOtherPage: "ℹ️ Автопроверка работает в WhatsApp Web, Telegram Web и Gmail. Откройте один из них в этой вкладке (если уже открыт — нажмите F5).",
+    statusOff: "Автопроверка выключена.",
     autoscanLabel: "Автоматически проверять новые сообщения в WhatsApp Web, Telegram Web и Gmail",
     badgeLabel: "Похоже на мошенничество",
     badgeWords: "Подозрительные слова:",
@@ -110,6 +118,10 @@ const TRANSLATIONS = {
     }
   },
   kz: {
+    statusActive: "✅ Бұл бетте автотексеру жұмыс істеп тұр: тексерілген хабарлама — {checked}, күдіктісі — {flagged}.",
+    statusReload: "⚠️ Бұл бетті жаңартыңыз (F5): кеңейтім бет ашылғаннан кейін орнатылды немесе жаңартылды.",
+    statusOtherPage: "ℹ️ Автотексеру WhatsApp Web, Telegram Web және Gmail-да жұмыс істейді. Солардың бірін осы бетте ашыңыз (ашық болса — F5 басыңыз).",
+    statusOff: "Автотексеру өшірулі.",
     autoscanLabel: "WhatsApp Web, Telegram Web және Gmail-дағы жаңа хабарламаларды автоматты тексеру",
     badgeLabel: "Алаяқтыққа ұқсайды",
     badgeWords: "Күдікті сөздер:",
