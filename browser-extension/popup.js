@@ -8,6 +8,8 @@ const langSelectEl = document.getElementById("langSelect");
 const validationMsgEl = document.getElementById("validationMsg");
 const modelWordsEl = document.getElementById("modelWords");
 const autoscanEl = document.getElementById("autoscan");
+const scanStatusEl = document.getElementById("scanStatus");
+const AUTOSCAN_HOSTS = ["web.whatsapp.com", "web.telegram.org", "mail.google.com"];
 
 // The on-device ML model (same as the Android app). Loaded once; if it
 // cannot be loaded, analyzeText falls back to the rules.
@@ -24,7 +26,7 @@ function applyStaticText() {
   document.documentElement.lang = currentLang;
   document.getElementById("appTitle").textContent = s.appTitle;
   document.getElementById("appSubtitle").textContent = s.appSubtitle;
-  document.getElementById("footerText").textContent = s.footer;
+  document.getElementById("footerText").textContent = `${s.footer} · v${chrome.runtime.getManifest().version}`;
   document.getElementById("analyzeBtn").textContent = s.analyzeBtn;
   document.getElementById("autoscanLabel").textContent = s.autoscanLabel;
   inputEl.placeholder = s.placeholder;
@@ -84,6 +86,7 @@ function render(result) {
 
 function reRenderIfResultShown() {
   applyStaticText();
+  refreshScanStatus();
   if (lastResult) render(lastResult);
 }
 
@@ -113,11 +116,34 @@ inputEl.addEventListener("input", () => {
   if (inputEl.value.trim()) hideValidationError();
 });
 
+// Tells the user whether autoscan is actually running on the current tab,
+// and if not, what to do (open the site / press F5).
+function refreshScanStatus() {
+  const s = self.I18N.strings(currentLang);
+  if (!autoscanEl.checked) { scanStatusEl.textContent = s.statusOff; return; }
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    const tab = tabs && tabs[0];
+    if (!tab || tab.id == null) { scanStatusEl.textContent = s.statusOtherPage; return; }
+    let host = "";
+    try { host = new URL(tab.url || "").hostname; } catch (e) { host = ""; }
+    const known = AUTOSCAN_HOSTS.includes(host);
+    chrome.tabs.sendMessage(tab.id, { type: "status" }, (res) => {
+      if (chrome.runtime.lastError || !res) {
+        scanStatusEl.textContent = known ? s.statusReload : s.statusOtherPage;
+      } else {
+        scanStatusEl.textContent = s.statusActive
+          .replace("{checked}", res.checked).replace("{flagged}", res.flagged);
+      }
+    });
+  });
+}
+
 chrome.storage.local.get({ autoscan: true }, (data) => {
   autoscanEl.checked = data.autoscan !== false;
+  refreshScanStatus();
 });
 autoscanEl.addEventListener("change", () => {
-  chrome.storage.local.set({ autoscan: autoscanEl.checked });
+  chrome.storage.local.set({ autoscan: autoscanEl.checked }, () => setTimeout(refreshScanStatus, 600));
 });
 
 langSelectEl.addEventListener("change", () => {
@@ -131,6 +157,7 @@ langSelectEl.addEventListener("change", () => {
 self.I18N.getLang((lang) => {
   currentLang = lang;
   applyStaticText();
+  refreshScanStatus();
   document.body.classList.remove("loading");
 
   chrome.storage.local.get(["lastResult", "lastText"], (data) => {

@@ -136,3 +136,5 @@ footer {
   cursor: pointer;
 }
 .autoscan input { margin: 2px 0 0; flex: none; }
+.scan-status { font-size: 11px; color: #475569; margin: 6px 0 0 22px; line-height: 1.4; }
+.scan-status:empty { display: none; }
