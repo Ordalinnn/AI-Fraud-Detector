@@ -77,7 +77,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   getScorer().then((scorer) => {
     sendResponse(msg.texts.map((t) => {
       const r = self.FraudDetector.analyzeText(String(t).slice(0, 4000), scorer);
-      return { prob: r.prob, pct: r.pct, words: r.modelWords };
+      return { prob: r.prob, pct: r.pct, words: r.modelWords, reasons: r.reasons, domains: r.domainInfo };
     }));
   });
   return true; // async response

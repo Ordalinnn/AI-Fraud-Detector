@@ -6,6 +6,13 @@ const DEFAULT_LANG = "en";
 
 const TRANSLATIONS = {
   en: {
+    badgeWhy: "why?",
+    badgeClickHint: "Click to see what looks suspicious",
+    detailsTitle: "Why this looks suspicious",
+    detailsReasons: "Signs:",
+    detailsLinks: "Links:",
+    detailsOpenSite: "Full analysis on the website ↗",
+    detailsOpenSiteNote: "Opens the AI Fraud Detector website with this message's text",
     statusActive: "✅ Autoscan is working on this tab: {checked} messages checked, {flagged} suspicious.",
     statusReload: "⚠️ Reload this tab (F5): the extension was installed or updated after the page was opened.",
     statusOtherPage: "ℹ️ Autoscan works in WhatsApp Web, Telegram Web and Gmail. Open one of them in this tab (already open? press F5).",
@@ -62,6 +69,13 @@ const TRANSLATIONS = {
     }
   },
   ru: {
+    badgeWhy: "почему?",
+    badgeClickHint: "Нажмите, чтобы увидеть, что подозрительно",
+    detailsTitle: "Почему это подозрительно",
+    detailsReasons: "Признаки:",
+    detailsLinks: "Ссылки:",
+    detailsOpenSite: "Подробный разбор на сайте ↗",
+    detailsOpenSiteNote: "Откроет сайт AI Fraud Detector с текстом этого сообщения",
     statusActive: "✅ Автопроверка работает на этой вкладке: проверено сообщений — {checked}, подозрительных — {flagged}.",
     statusReload: "⚠️ Обновите эту вкладку (F5): расширение установили или обновили, когда страница уже была открыта.",
     statusOtherPage: "ℹ️ Автопроверка работает в WhatsApp Web, Telegram Web и Gmail. Откройте один из них в этой вкладке (если уже открыт — нажмите F5).",
@@ -118,6 +132,13 @@ const TRANSLATIONS = {
     }
   },
   kz: {
+    badgeWhy: "неге?",
+    badgeClickHint: "Не күдікті екенін көру үшін басыңыз",
+    detailsTitle: "Неге бұл күдікті",
+    detailsReasons: "Белгілер:",
+    detailsLinks: "Сілтемелер:",
+    detailsOpenSite: "Сайтта толық талдау ↗",
+    detailsOpenSiteNote: "AI Fraud Detector сайтын осы хабарламаның мәтінімен ашады",
     statusActive: "✅ Бұл бетте автотексеру жұмыс істеп тұр: тексерілген хабарлама — {checked}, күдіктісі — {flagged}.",
     statusReload: "⚠️ Бұл бетті жаңартыңыз (F5): кеңейтім бет ашылғаннан кейін орнатылды немесе жаңартылды.",
     statusOtherPage: "ℹ️ Автотексеру WhatsApp Web, Telegram Web және Gmail-да жұмыс істейді. Солардың бірін осы бетте ашыңыз (ашық болса — F5 басыңыз).",
