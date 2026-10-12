@@ -23,6 +23,7 @@ import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Toast
 import java.net.URLEncoder
 import java.text.DateFormat
 import java.util.Date
@@ -127,6 +128,8 @@ class MainActivity : Activity() {
         }
         root.addView(input)
         val result = TextView(this).apply { textSize = 16f; setPadding(0, px(8), 0, 0) }
+        // "The model is wrong": saved on this phone, exported from the section below
+        val wrong = Button(this).apply { text = getString(R.string.mistake_wrong); visibility = View.GONE }
         button(getString(R.string.btn_check)) {
             val t = input.text.toString()
             if (t.isNotBlank()) {
@@ -137,9 +140,15 @@ class MainActivity : Activity() {
                     if (r.suspiciousWords.isNotEmpty()) "\n" + getString(R.string.words_label) + " " +
                         r.suspiciousWords.joinToString(", ") else ""
                 result.setTextColor(if (fraud) RED else GREEN)
+                wrong.visibility = View.VISIBLE
+                wrong.setOnClickListener {
+                    reportMistake(t, fraud, r.probability, "app: manual check")
+                    wrong.visibility = View.GONE
+                }
             }
         }
         root.addView(result)
+        root.addView(wrong)
 
         // ---- recent warnings ----
         section()
@@ -157,6 +166,23 @@ class MainActivity : Activity() {
             })
         }
         if (alerts.isNotEmpty()) button(getString(R.string.btn_clear)) { store.clearAlerts(); render() }
+
+        // ---- marked mistakes ----
+        val mistakes = store.mistakes()
+        if (mistakes.isNotEmpty()) {
+            section()
+            title(getString(R.string.mistakes_title, mistakes.size), 18f)
+            text(getString(R.string.mistakes_note), muted = true)
+            button(getString(R.string.btn_share_csv)) {
+                val send = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_SUBJECT, "AI Fraud Detector: mistakes")
+                    putExtra(Intent.EXTRA_TEXT, Mistakes.toCsv(store.mistakes()))
+                }
+                startActivity(Intent.createChooser(send, getString(R.string.btn_share_csv)))
+            }
+            button(getString(R.string.btn_clear_mistakes)) { store.clearMistakes(); render() }
+        }
 
         section()
         text(getString(R.string.privacy_note), muted = true)
@@ -181,6 +207,9 @@ class MainActivity : Activity() {
             .setTitle(R.string.detail_title)
             .setMessage(msg)
             .setPositiveButton(R.string.btn_close, null)
+            .setNegativeButton(R.string.mistake_not_fraud) { _, _ ->
+                reportMistake(a.text, true, a.probability, "app: ${a.app}")
+            }
             .setNeutralButton(R.string.btn_open_web) { _, _ ->
                 val url = WEB_APP_URL + "?text=" + URLEncoder.encode(a.text, "UTF-8")
                 startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
@@ -195,6 +224,12 @@ class MainActivity : Activity() {
             probability = r.probability, words = r.suspiciousWords)
         store.addAlert(a)
         Alerts.show(this, a)
+        render()
+    }
+
+    private fun reportMistake(text: String, predictedFraud: Boolean, probability: Double, source: String) {
+        store.addMistake(Mistakes.makeEntry(text, predictedFraud, probability, source))
+        Toast.makeText(this, R.string.mistake_thanks, Toast.LENGTH_SHORT).show()
         render()
     }
 

@@ -141,6 +141,21 @@
 
     d.appendChild(mk(doc, "div", "afd-advice", strings.badgeAdvice));
 
+    // "Not fraud": saved on this computer only (mistakes.js), exportable from the popup
+    if (root.Mistakes) {
+      const btn = mk(doc, "button", "afd-mistake", strings.mistakeFlaggedBtn);
+      btn.type = "button";
+      btn.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        btn.disabled = true;
+        root.Mistakes.add({ text, predictedFraud: true, prob: result.prob, source: doc.location ? doc.location.hostname : "page" })
+          .then(() => { btn.textContent = strings.mistakeThanks; })
+          .catch(() => { btn.disabled = false; });
+      });
+      d.appendChild(btn);
+    }
+
     const a = mk(doc, "a", "afd-link", strings.detailsOpenSite);
     a.href = WEB_APP_URL + "?text=" + encodeURIComponent(text.slice(0, 1500));
     a.target = "_blank";

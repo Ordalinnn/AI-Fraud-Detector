@@ -20,6 +20,13 @@
 // Runs entirely locally: no network request is made, so message text never
 // leaves the user's device.
 
+// Undo disguises ("к0д", Latin look-alike letters, "к о д ы") before
+// counting keywords - same step as the web app (text_normalize.py).
+const normalizeForRules = (typeof self !== "undefined" && self.normalizeText)
+  || (typeof require === "function" ? require("./normalize.js").normalizeText : (t) => t);
+const isDisguisedText = (typeof self !== "undefined" && self.isDisguised)
+  || (typeof require === "function" ? require("./normalize.js").isDisguised : () => false);
+
 const WORD_LISTS = {
   urgent: [
     "срочно", "шұғыл", "быстро", "немедленно", "қазір", "тез",
@@ -251,6 +258,11 @@ function extractFeatures(text) {
     text = String(text);
   }
   const textLower = text.toLowerCase();
+  // Everything is counted in the de-disguised text EXCEPT links/domains,
+  // which come from the original, so "kаspi.kz" with a Cyrillic "а" is
+  // still flagged as a look-alike domain.
+  const norm = normalizeForRules(text);
+  const normLower = norm.toLowerCase();
   const urls = extractUrls(textLower);
   const bareDomains = extractBareDomains(textLower, urls);
   const domains = urls.map(getDomain).concat(bareDomains);
@@ -266,20 +278,20 @@ function extractFeatures(text) {
     if (!isAscii(d)) homoglyphDomain = 1;
   }
 
-  const urgentCount = countMatches(textLower, WORD_LISTS.urgent);
-  const loanCount = countMatches(textLower, WORD_LISTS.loan);
-  const voteLinkCount = countMatches(textLower, WORD_LISTS.voteLink);
-  const threatCount = countMatches(textLower, WORD_LISTS.threat);
+  const urgentCount = countMatches(normLower, WORD_LISTS.urgent);
+  const loanCount = countMatches(normLower, WORD_LISTS.loan);
+  const voteLinkCount = countMatches(normLower, WORD_LISTS.voteLink);
+  const threatCount = countMatches(normLower, WORD_LISTS.threat);
 
   // Basic text statistics — mirrors fraud_logic.extract_features()'s
   // digit_count/exclamation_count/uppercase_count/text_length/word_count/
   // avg_word_length. uppercaseCount is measured against the ORIGINAL
   // (non-lowercased) text, same as the Python version.
-  const words = textLower.split(/\s+/).filter((w) => w.length > 0);
-  const digitCount = (textLower.match(/\d/g) || []).length;
-  const exclamationCount = (textLower.match(/!/g) || []).length;
-  const uppercaseCount = Array.from(text).filter(isUpperChar).length;
-  const textLength = Array.from(text).length;
+  const words = normLower.split(/\s+/).filter((w) => w.length > 0);
+  const digitCount = (normLower.match(/\d/g) || []).length;
+  const exclamationCount = (normLower.match(/!/g) || []).length;
+  const uppercaseCount = Array.from(norm).filter(isUpperChar).length;
+  const textLength = Array.from(norm).length;
   const wordCount = words.length;
   const avgWordLength = wordCount
     ? Math.round((words.reduce((sum, w) => sum + Array.from(w).length, 0) / wordCount) * 100) / 100
@@ -288,15 +300,15 @@ function extractFeatures(text) {
   return {
     hasLink: linkCount > 0 ? 1 : 0,
     urgentCount,
-    secretCount: countMatches(textLower, WORD_LISTS.secret),
-    moneyCount: countMatches(textLower, WORD_LISTS.money),
+    secretCount: countMatches(normLower, WORD_LISTS.secret),
+    moneyCount: countMatches(normLower, WORD_LISTS.money),
     loanCount,
     voteLinkCount,
     threatCount,
-    identityCount: countMatches(textLower, WORD_LISTS.identity),
-    rewardCount: countMatches(textLower, WORD_LISTS.reward),
-    verificationCount: countMatches(textLower, WORD_LISTS.verificationService),
-    pressureCount: countMatches(textLower, WORD_LISTS.pressure),
+    identityCount: countMatches(normLower, WORD_LISTS.identity),
+    rewardCount: countMatches(normLower, WORD_LISTS.reward),
+    verificationCount: countMatches(normLower, WORD_LISTS.verificationService),
+    pressureCount: countMatches(normLower, WORD_LISTS.pressure),
     suspiciousDomain,
     longDomain,
     suspiciousZone,
@@ -478,6 +490,9 @@ function analyzeText(text, scorer) {
   }
   const style = riskStyle(prob);
   const reasons = explain(f);
+  // Disguised text ("к0д", Latin look-alikes, invisible characters) is a
+  // warning sign of its own - shown first; not a model input.
+  if (isDisguisedText(text)) reasons.unshift("disguised");
   const domainInfo = f.domains.map((d) => ({ domain: d, flags: domainFlags(d) }));
   return {
     prob,

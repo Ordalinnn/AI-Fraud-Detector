@@ -15,6 +15,9 @@
 (function (root) {
   "use strict";
 
+  const normalizeText = root.normalizeText
+    || (typeof require === "function" ? require("./normalize.js").normalizeText : null);
+
   // Python's str.split() whitespace set.
   function isPyWhitespace(cp) {
     switch (cp) {
@@ -43,11 +46,21 @@
   }
 
   class CharScorer {
-    constructor(vocab, intercept, nMin, nMax) {
+    constructor(vocab, intercept, nMin, nMax, normalize) {
       this.vocab = vocab; // Map: n-gram -> [idf, coef]
       this.intercept = intercept;
       this.nMin = nMin;
       this.nMax = nMax;
+      // model trained on de-disguised text (text_normalize.py): undo the
+      // same disguises here before reading n-grams
+      this.normalize = !!normalize;
+    }
+
+    prepare(text) {
+      const t = String(text == null ? "" : text);
+      if (!this.normalize) return t;
+      if (!normalizeText) throw new Error("normalize.js not loaded");
+      return normalizeText(t);
     }
 
     // scikit-learn's char_wb analyzer for one word.
@@ -72,7 +85,7 @@
 
     probability(text) {
       const counts = new Map();
-      for (const g of this.ngrams(text)) {
+      for (const g of this.ngrams(this.prepare(text))) {
         if (this.vocab.has(g)) counts.set(g, (counts.get(g) || 0) + 1);
       }
       let dot = 0;
@@ -89,7 +102,7 @@
 
     // Probability + the words that pushed the score up the most.
     analyze(text, topWords = 3) {
-      const scored = [...new Set(words(text))].map((w) => {
+      const scored = [...new Set(words(this.prepare(text)))].map((w) => {
         let s = 0;
         for (const g of this.wordNgrams(w)) {
           const v = this.vocab.get(g);
@@ -109,12 +122,14 @@
       let intercept = 0;
       let nMin = 2;
       let nMax = 5;
+      let normalize = false;
       for (const line of tsv.split("\n")) {
         // Comments never contain a tab; every model line does (an n-gram
         // itself may start with "#", e.g. from the word "c#").
         if (!line || (line[0] === "#" && line.indexOf("\t") < 0)) continue;
         const parts = line.split("\t");
         if (parts[0] === "intercept" && parts.length === 2) intercept = parseFloat(parts[1]);
+        else if (parts[0] === "normalize" && parts.length === 2) normalize = parts[1] === "text_normalize_v1";
         else if (parts[0] === "ngram_range" && parts.length === 3) {
           nMin = parseInt(parts[1], 10);
           nMax = parseInt(parts[2], 10);
@@ -122,7 +137,7 @@
         else throw new Error("bad model line: " + line.slice(0, 60));
       }
       if (!vocab.size) throw new Error("empty model");
-      return new CharScorer(vocab, intercept, nMin, nMax);
+      return new CharScorer(vocab, intercept, nMin, nMax, normalize);
     }
   }
 

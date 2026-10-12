@@ -37,4 +37,11 @@
     <string name="btn_close">Закрыть</string>
     <string name="btn_open_web">Подробный анализ на сайте</string>
     <string name="web_note">Кнопка «Подробный анализ на сайте» откроет сайт проекта и передаст ему этот текст.</string>
+    <string name="mistake_not_fraud">👎 Это не мошенничество</string>
+    <string name="mistake_wrong">Модель ошиблась</string>
+    <string name="mistake_thanks">Спасибо! Отмечено. Хранится только на телефоне.</string>
+    <string name="mistakes_title">Отмеченные ошибки: %1$d</string>
+    <string name="mistakes_note">Отметки помогают улучшить модель. Перед отправкой команде замените имена, телефоны и номера карт на [ИМЯ], [ТЕЛЕФОН], [КАРТА].</string>
+    <string name="btn_share_csv">Поделиться файлом (CSV)</string>
+    <string name="btn_clear_mistakes">Очистить отметки</string>
 </resources>

@@ -6,6 +6,13 @@ const DEFAULT_LANG = "en";
 
 const TRANSLATIONS = {
   en: {
+    mistakeFlaggedBtn: "👎 Not fraud — the model is wrong",
+    mistakeMissedBtn: "⚠️ It IS fraud — the model is wrong",
+    mistakeThanks: "Thanks! Marked. Saved only on this computer.",
+    mistakesTitle: "Marked mistakes: {n}",
+    mistakesDownload: "⬇️ Download CSV",
+    mistakesClear: "Clear",
+    mistakesNote: "Before sending the file to the team, replace names, phone and card numbers with [NAME], [PHONE], [CARD].",
     badgeWhy: "why?",
     badgeClickHint: "Click to see what looks suspicious",
     detailsTitle: "Why this looks suspicious",
@@ -36,6 +43,7 @@ const TRANSLATIONS = {
     langLabel: "Language",
     riskLabels: { low: "Low risk", mid: "Suspicious", high: "High risk", critical: "Critical risk" },
     reasonLabels: {
+      disguised: "The text is disguised: look-alike letters, digits or invisible characters (a trick to dodge filters)",
       hasLink: "A link was detected",
       urgentCount: "Urgent action words were found",
       secretCount: "Possible request for code / password / CVV",
@@ -69,6 +77,13 @@ const TRANSLATIONS = {
     }
   },
   ru: {
+    mistakeFlaggedBtn: "👎 Это не мошенничество — модель ошиблась",
+    mistakeMissedBtn: "⚠️ Это мошенничество — модель ошиблась",
+    mistakeThanks: "Спасибо! Отмечено. Хранится только на этом компьютере.",
+    mistakesTitle: "Отмеченные ошибки: {n}",
+    mistakesDownload: "⬇️ Скачать CSV",
+    mistakesClear: "Очистить",
+    mistakesNote: "Перед отправкой файла команде замените имена, телефоны и номера карт на [ИМЯ], [ТЕЛЕФОН], [КАРТА].",
     badgeWhy: "почему?",
     badgeClickHint: "Нажмите, чтобы увидеть, что подозрительно",
     detailsTitle: "Почему это подозрительно",
@@ -99,6 +114,7 @@ const TRANSLATIONS = {
     langLabel: "Язык",
     riskLabels: { low: "Низкий риск", mid: "Подозрительно", high: "Высокий риск", critical: "Очень высокий риск" },
     reasonLabels: {
+      disguised: "Текст замаскирован: латинские буквы, цифры или невидимые символы вместо обычных букв",
       hasLink: "Обнаружена ссылка",
       urgentCount: "Есть срочный призыв к действию",
       secretCount: "Возможен запрос кода / пароля / CVV",
@@ -132,6 +148,13 @@ const TRANSLATIONS = {
     }
   },
   kz: {
+    mistakeFlaggedBtn: "👎 Бұл алаяқтық емес — модель қателесті",
+    mistakeMissedBtn: "⚠️ Бұл алаяқтық — модель қателесті",
+    mistakeThanks: "Рахмет! Белгіленді. Тек осы компьютерде сақталады.",
+    mistakesTitle: "Белгіленген қателер: {n}",
+    mistakesDownload: "⬇️ CSV жүктеу",
+    mistakesClear: "Тазалау",
+    mistakesNote: "Файлды командаға жібермес бұрын аттарды, телефондарды және карта нөмірлерін [АТЫ], [ТЕЛЕФОН], [КАРТА] деп ауыстырыңыз.",
     badgeWhy: "неге?",
     badgeClickHint: "Не күдікті екенін көру үшін басыңыз",
     detailsTitle: "Неге бұл күдікті",
@@ -162,6 +185,7 @@ const TRANSLATIONS = {
     langLabel: "Тіл",
     riskLabels: { low: "Қауіп төмен", mid: "Күмәнді", high: "Жоғары қауіп", critical: "Өте жоғары қауіп" },
     reasonLabels: {
+      disguised: "Мәтін бүркемеленген: латын әріптері, цифрлар немесе көрінбейтін таңбалар",
       hasLink: "Сілтеме анықталды",
       urgentCount: "Шұғыл әрекетке шақыру бар",
       secretCount: "Код / пароль / CVV сұрауы мүмкін",

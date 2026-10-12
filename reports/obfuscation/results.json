@@ -1,0 +1,155 @@
+{
+  "before": {
+    "original": {
+      "final": {
+        "recall": 0.9307692307692308,
+        "accuracy": 0.9468085106382979,
+        "false_alarm_rate": 0.039473684210526314
+      },
+      "char": {
+        "recall": 0.9307692307692308,
+        "accuracy": 0.9361702127659575,
+        "false_alarm_rate": 0.05921052631578947
+      }
+    },
+    "homoglyph": {
+      "final": {
+        "recall": 0.7307692307692307
+      },
+      "char": {
+        "recall": 0.7692307692307693
+      }
+    },
+    "digits": {
+      "final": {
+        "recall": 0.9230769230769231
+      },
+      "char": {
+        "recall": 0.8846153846153846
+      }
+    },
+    "invisible": {
+      "final": {
+        "recall": 0.8076923076923077
+      },
+      "char": {
+        "recall": 0.7846153846153846
+      }
+    },
+    "spaced": {
+      "final": {
+        "recall": 0.8307692307692308
+      },
+      "char": {
+        "recall": 0.823076923076923
+      }
+    },
+    "fullwidth": {
+      "final": {
+        "recall": 0.46153846153846156
+      },
+      "char": {
+        "recall": 0.46923076923076923
+      }
+    },
+    "combo": {
+      "final": {
+        "recall": 0.6846153846153846
+      },
+      "char": {
+        "recall": 0.6538461538461539
+      }
+    },
+    "leet": {
+      "final": {
+        "recall": 0.9153846153846154
+      },
+      "char": {
+        "recall": 0.8769230769230769
+      }
+    },
+    "real_holdout_false_alarms": {
+      "final": 0.004014272970561998,
+      "char": 0.010704727921498661
+    },
+    "n_fraud_test": 130,
+    "n_real_legit": 2242
+  },
+  "after": {
+    "original": {
+      "final": {
+        "recall": 0.9307692307692308,
+        "accuracy": 0.9468085106382979,
+        "false_alarm_rate": 0.039473684210526314
+      },
+      "char": {
+        "recall": 0.9307692307692308,
+        "accuracy": 0.9361702127659575,
+        "false_alarm_rate": 0.05921052631578947
+      }
+    },
+    "homoglyph": {
+      "final": {
+        "recall": 0.9307692307692308
+      },
+      "char": {
+        "recall": 0.9307692307692308
+      }
+    },
+    "digits": {
+      "final": {
+        "recall": 0.9230769230769231
+      },
+      "char": {
+        "recall": 0.9384615384615385
+      }
+    },
+    "invisible": {
+      "final": {
+        "recall": 0.9307692307692308
+      },
+      "char": {
+        "recall": 0.9307692307692308
+      }
+    },
+    "spaced": {
+      "final": {
+        "recall": 0.9307692307692308
+      },
+      "char": {
+        "recall": 0.9307692307692308
+      }
+    },
+    "fullwidth": {
+      "final": {
+        "recall": 0.9307692307692308
+      },
+      "char": {
+        "recall": 0.9307692307692308
+      }
+    },
+    "combo": {
+      "final": {
+        "recall": 0.9307692307692308
+      },
+      "char": {
+        "recall": 0.9230769230769231
+      }
+    },
+    "leet": {
+      "final": {
+        "recall": 0.9153846153846154
+      },
+      "char": {
+        "recall": 0.8769230769230769
+      }
+    },
+    "real_holdout_false_alarms": {
+      "final": 0.004014272970561998,
+      "char": 0.010704727921498661
+    },
+    "n_fraud_test": 130,
+    "n_real_legit": 2242
+  },
+  "runtime_seconds": 15.8
+}

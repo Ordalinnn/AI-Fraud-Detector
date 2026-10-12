@@ -25,12 +25,17 @@ class FraudScorer private constructor(
     private val intercept: Double,
     private val nMin: Int,
     private val nMax: Int,
+    /** Model trained on de-disguised text (text_normalize.py): undo the
+     *  same disguises here ("к0д", Latin look-alikes, "к о д ы"). */
+    private val normalize: Boolean,
 ) {
     data class Result(val probability: Double, val suspiciousWords: List<String>)
 
+    private fun prepare(text: String) = if (normalize) TextNormalizer.normalize(text) else text
+
     fun probability(text: String): Double {
         val counts = HashMap<String, Int>()
-        for (g in ngrams(text)) {
+        for (g in ngrams(prepare(text))) {
             if (idf.containsKey(g)) counts[g] = (counts[g] ?: 0) + 1
         }
         var dot = 0.0
@@ -47,7 +52,7 @@ class FraudScorer private constructor(
     /** Probability plus the words that pushed the score up the most - a
      *  simple, honest explanation: each word's n-grams' weights summed. */
     fun analyze(text: String, topWords: Int = 3): Result {
-        val scored = words(text).distinct().map { word ->
+        val scored = words(prepare(text)).distinct().map { word ->
             word to wordNgrams(word).sumOf { g -> (coef[g] ?: 0.0) * (idf[g] ?: 0.0) }
         }
         val top = scored.filter { it.second > 0 }.sortedByDescending { it.second }.take(topWords).map { it.first }
@@ -124,6 +129,7 @@ class FraudScorer private constructor(
             var intercept = 0.0
             var nMin = 2
             var nMax = 5
+            var normalize = false
             BufferedReader(InputStreamReader(input, Charsets.UTF_8)).useLines { lines ->
                 for (line in lines) {
                     // Comments never contain a tab; every model line does (an n-gram
@@ -132,6 +138,7 @@ class FraudScorer private constructor(
                     val parts = line.split('\t')
                     when {
                         parts[0] == "intercept" && parts.size == 2 -> intercept = parts[1].toDouble()
+                        parts[0] == "normalize" && parts.size == 2 -> normalize = parts[1] == "text_normalize_v1"
                         parts[0] == "ngram_range" && parts.size == 3 -> {
                             nMin = parts[1].toInt(); nMax = parts[2].toInt()
                         }
@@ -144,7 +151,7 @@ class FraudScorer private constructor(
                 }
             }
             require(idf.isNotEmpty()) { "empty model" }
-            return FraudScorer(idf, coef, intercept, nMin, nMax)
+            return FraudScorer(idf, coef, intercept, nMin, nMax, normalize)
         }
     }
 }

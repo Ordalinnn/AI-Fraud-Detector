@@ -168,11 +168,37 @@ test("manifest injects content.js only on the three sites", () => {
   const m = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "manifest.json"), "utf8"));
   assert.deepEqual(m.content_scripts[0].matches.sort(),
     ["https://mail.google.com/*", "https://web.telegram.org/*", "https://web.whatsapp.com/*"]);
-  assert.deepEqual(m.content_scripts[0].js, ["i18n.js", "content.js"]);
+  assert.deepEqual(m.content_scripts[0].js, ["i18n.js", "mistakes.js", "content.js"]);
   // host permissions = exactly the same three sites (only so the popup can
   // see that the tab is WhatsApp/Telegram/Gmail and say "press F5")
   assert.deepEqual([...m.host_permissions].sort(), [...m.content_scripts[0].matches].sort());
   for (const f of [...m.content_scripts[0].js, ...m.content_scripts[0].css]) {
     assert.ok(fs.existsSync(path.join(__dirname, "..", f)), f);
+  }
+});
+
+test("'Not fraud' in the details panel saves a mistake report", async () => {
+  const saved = [];
+  globalThis.Mistakes = { add: async (e) => { saved.push(e); return saved.length; } };
+  try {
+    const dom = new JSDOM(`<!doctype html><body><div id="chat">${waBubble(SCAM)}</div></body>`, { url: "https://web.whatsapp.com/" });
+    const doc = dom.window.document;
+    const sc = createScanner({ doc, site: siteFor("web.whatsapp.com"), score, strings: () => I18N.strings("ru") });
+    sc.start();
+    await sc.scan();
+    doc.querySelector(".afd-badge").dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
+    const btn = doc.querySelector(".afd-mistake");
+    assert.match(btn.textContent, /Это не мошенничество/);
+    btn.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
+    await tick(10);
+    assert.equal(saved.length, 1);
+    assert.equal(saved[0].text, SCAM);
+    assert.equal(saved[0].predictedFraud, true);
+    assert.equal(saved[0].source, "web.whatsapp.com");
+    assert.match(btn.textContent, /Спасибо/);
+    assert.equal(btn.disabled, true);
+    sc.stop();
+  } finally {
+    delete globalThis.Mistakes;
   }
 });

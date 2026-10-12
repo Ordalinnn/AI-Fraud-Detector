@@ -7,6 +7,13 @@ tests. app.py imports everything it needs from here; the UI, translations,
 and model training stay in app.py.
 """
 import re
+
+from text_normalize import normalize_text
+
+# Undo disguises ("к0д", "зaблoкирoвана" with Latin letters, "к о д ы") before
+# counting keywords. Switched off only by scripts/eval_obfuscation.py to
+# measure what the step is worth.
+NORMALIZE_INPUT = True
 import html
 
 # =========================
@@ -285,6 +292,11 @@ def extract_features(text):
     elif not isinstance(text, str):
         text = str(text)
     text_lower = text.lower()
+    # Everything is counted in the de-disguised text EXCEPT links and
+    # domains, which are read from the ORIGINAL text, so a look-alike domain
+    # ("kаspi.kz" with a Cyrillic "а") still raises the homoglyph flag.
+    norm = normalize_text(text) if NORMALIZE_INPUT else text
+    norm_lower = norm.lower()
     urls = extract_urls(text_lower)
     bare_domains = extract_bare_domains(text_lower, urls)
     domains = [get_domain(u) for u in urls] + bare_domains
@@ -311,37 +323,37 @@ def extract_features(text):
         if not d.isascii():
             homoglyph_domain = 1
 
-    words = text_lower.split()
+    words = norm_lower.split()
     avg_word_len = sum(len(w) for w in words) / len(words) if words else 0
 
     return {
         "has_link": int(link_count > 0),
-        "urgent_count": count_matches(text_lower, urgent_words),
-        "secret_count": count_matches(text_lower, secret_words),
-        "money_count": count_matches(text_lower, money_words),
-        "loan_count": count_matches(text_lower, loan_words),
-        "vote_link_count": count_matches(text_lower, vote_link_words),
-        "threat_count": count_matches(text_lower, threat_words),
-        "identity_count": count_matches(text_lower, identity_words),
-        "reward_count": count_matches(text_lower, reward_words),
-        "pressure_count": count_matches(text_lower, pressure_phrases),
-        "verification_count": count_matches(text_lower, verification_service_words),
+        "urgent_count": count_matches(norm_lower, urgent_words),
+        "secret_count": count_matches(norm_lower, secret_words),
+        "money_count": count_matches(norm_lower, money_words),
+        "loan_count": count_matches(norm_lower, loan_words),
+        "vote_link_count": count_matches(norm_lower, vote_link_words),
+        "threat_count": count_matches(norm_lower, threat_words),
+        "identity_count": count_matches(norm_lower, identity_words),
+        "reward_count": count_matches(norm_lower, reward_words),
+        "pressure_count": count_matches(norm_lower, pressure_phrases),
+        "verification_count": count_matches(norm_lower, verification_service_words),
         "suspicious_domain": suspicious_domain,
         "long_domain": long_domain,
         "suspicious_zone": suspicious_zone,
         "digit_domain": digit_domain,
         "brand_flag": brand_flag,
         "homoglyph_domain": homoglyph_domain,
-        "digit_count": sum(ch.isdigit() for ch in text_lower),
-        "exclamation_count": text_lower.count("!"),
-        "uppercase_count": sum(1 for ch in text if ch.isupper()),
-        "text_length": len(text),
+        "digit_count": sum(ch.isdigit() for ch in norm_lower),
+        "exclamation_count": norm_lower.count("!"),
+        "uppercase_count": sum(1 for ch in norm if ch.isupper()),
+        "text_length": len(norm),
         "word_count": len(words),
         "avg_word_length": round(avg_word_len, 2),
         "url_count": link_count,
         "has_multiple_warnings": int(
-            count_matches(text_lower, urgent_words) > 0
-            and count_matches(text_lower, threat_words) > 0
+            count_matches(norm_lower, urgent_words) > 0
+            and count_matches(norm_lower, threat_words) > 0
         ),
     }, domains
 

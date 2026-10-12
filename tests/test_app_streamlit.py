@@ -218,3 +218,22 @@ def test_single_link_is_not_mislabeled_as_multiple_links(isolated_cwd):
     _submit_message(at2, "check both http://example-one.com and http://example-two.com")
     assert not at2.exception, at2.exception
     assert multi_link_label in at2.session_state["last_result"]["explanations"]
+
+
+def test_wrong_verdict_offers_csv_for_the_team(isolated_cwd):
+    at = AppTest.from_file(APP_PATH, default_timeout=90)
+    at.run()
+    _submit_message(at, "Ваша к@рта зaблoкирoвана, назовите к0д из SMS")
+    assert not at.exception, at.exception
+    # disguised text is named as a warning sign of its own, first
+    assert "замаскирован" in at.session_state["last_result"]["explanations"][0] or \
+        "disguised" in at.session_state["last_result"]["explanations"][0] or \
+        "бүркемеленген" in at.session_state["last_result"]["explanations"][0]
+    fb_no = [b for b in at.button if b.key == "fb_no"][0]
+    fb_no.click().run()
+    assert not at.exception, at.exception
+    rows = at.session_state["mistakes"]
+    assert len(rows) == 1 and rows[0]["language"] == "ru"
+    # the model called this disguised scam fraud; "wrong" means the visitor says it is not
+    assert rows[0]["label"] == (0 if at.session_state["last_result"]["pred"] == 1 else 1)
+    assert rows[0]["source"].startswith("site: model said")

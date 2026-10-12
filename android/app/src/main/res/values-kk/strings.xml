@@ -36,4 +36,11 @@
     <string name="btn_close">Жабу</string>
     <string name="btn_open_web">Сайтта толық талдау</string>
     <string name="web_note">«Сайтта толық талдау» түймесі жоба сайтын ашып, осы мәтінді соған жібереді.</string>
+    <string name="mistake_not_fraud">👎 Бұл алаяқтық емес</string>
+    <string name="mistake_wrong">Модель қателесті</string>
+    <string name="mistake_thanks">Рахмет! Белгіленді. Тек телефонда сақталады.</string>
+    <string name="mistakes_title">Белгіленген қателер: %1$d</string>
+    <string name="mistakes_note">Белгілер модельді жақсартуға көмектеседі. Командаға жібермес бұрын аттарды, телефондарды және карта нөмірлерін [АТЫ], [ТЕЛЕФОН], [КАРТА] деп ауыстырыңыз.</string>
+    <string name="btn_share_csv">Файлмен бөлісу (CSV)</string>
+    <string name="btn_clear_mistakes">Белгілерді тазалау</string>
 </resources>

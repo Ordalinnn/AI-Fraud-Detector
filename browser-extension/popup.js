@@ -9,6 +9,10 @@ const validationMsgEl = document.getElementById("validationMsg");
 const modelWordsEl = document.getElementById("modelWords");
 const autoscanEl = document.getElementById("autoscan");
 const scanStatusEl = document.getElementById("scanStatus");
+const mistakeBtnEl = document.getElementById("mistakeBtn");
+const mistakeThanksEl = document.getElementById("mistakeThanks");
+const mistakesBoxEl = document.getElementById("mistakesBox");
+let lastText = "";
 const AUTOSCAN_HOSTS = ["web.whatsapp.com", "web.telegram.org", "mail.google.com"];
 
 // The on-device ML model (same as the Android app). Loaded once; if it
@@ -29,6 +33,10 @@ function applyStaticText() {
   document.getElementById("footerText").textContent = `${s.footer} · v${chrome.runtime.getManifest().version}`;
   document.getElementById("analyzeBtn").textContent = s.analyzeBtn;
   document.getElementById("autoscanLabel").textContent = s.autoscanLabel;
+  document.getElementById("mistakesDownload").textContent = s.mistakesDownload;
+  document.getElementById("mistakesClear").textContent = s.mistakesClear;
+  document.getElementById("mistakesNote").textContent = s.mistakesNote;
+  refreshMistakes();
   inputEl.placeholder = s.placeholder;
   langSelectEl.value = currentLang;
   if (!validationMsgEl.classList.contains("hidden")) {
@@ -53,6 +61,10 @@ function render(result) {
   riskBannerEl.textContent = `${result.emoji} ${s.riskLabels[result.levelKey]} — ${result.pct}%`;
 
   adviceEl.textContent = result.isFraud ? s.adviceBad : s.adviceGood;
+
+  mistakeBtnEl.textContent = result.isFraud ? s.mistakeFlaggedBtn : s.mistakeMissedBtn;
+  mistakeBtnEl.disabled = false;
+  mistakeThanksEl.classList.add("hidden");
 
   const words = result.modelWords || [];
   modelWordsEl.classList.toggle("hidden", !(result.isFraud && words.length));
@@ -108,12 +120,47 @@ document.getElementById("analyzeBtn").addEventListener("click", async () => {
   }
   hideValidationError();
   lastResult = self.FraudDetector.analyzeText(text, await scorerPromise);
+  lastText = text;
   chrome.storage.local.set({ lastResult, lastText: text });
   render(lastResult);
 });
 
 inputEl.addEventListener("input", () => {
   if (inputEl.value.trim()) hideValidationError();
+});
+
+// "This is a mistake": saved on this computer, exportable as CSV for the team.
+async function refreshMistakes() {
+  const s = self.I18N.strings(currentLang);
+  const list = await self.Mistakes.list();
+  mistakesBoxEl.classList.toggle("hidden", list.length === 0);
+  document.getElementById("mistakesTitle").textContent = s.mistakesTitle.replace("{n}", list.length);
+}
+
+mistakeBtnEl.addEventListener("click", async () => {
+  if (!lastResult || !lastText) return;
+  await self.Mistakes.add({ text: lastText, predictedFraud: lastResult.isFraud, prob: lastResult.prob, source: "popup" });
+  mistakeBtnEl.disabled = true;
+  mistakeThanksEl.textContent = self.I18N.strings(currentLang).mistakeThanks;
+  mistakeThanksEl.classList.remove("hidden");
+  refreshMistakes();
+});
+
+document.getElementById("mistakesDownload").addEventListener("click", async () => {
+  const csv = self.Mistakes.toCsv(await self.Mistakes.list());
+  const url = URL.createObjectURL(new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `ai-fraud-detector-mistakes-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+
+document.getElementById("mistakesClear").addEventListener("click", async () => {
+  await self.Mistakes.clear();
+  refreshMistakes();
 });
 
 // Tells the user whether autoscan is actually running on the current tab,
@@ -161,7 +208,7 @@ self.I18N.getLang((lang) => {
   document.body.classList.remove("loading");
 
   chrome.storage.local.get(["lastResult", "lastText"], (data) => {
-    if (data.lastText) inputEl.value = data.lastText;
+    if (data.lastText) { inputEl.value = data.lastText; lastText = data.lastText; }
     if (data.lastResult) {
       lastResult = data.lastResult;
       render(lastResult);
