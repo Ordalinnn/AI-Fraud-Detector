@@ -35,3 +35,7 @@ android/local.properties
 
 # Browser extension dev dependencies (tests only)
 browser-extension/node_modules/
+
+# Testers' raw "this is a mistake" exports (may contain personal data until
+# anonymised); scripts/import_mistakes.py writes data/real/collected_mistakes.csv
+data/real/mistakes/

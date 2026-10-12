@@ -43,5 +43,32 @@ class Store(context: Context) {
     @Synchronized
     fun clearAlerts() { prefs.edit().remove("alerts").apply() }
 
+    // ---- "the model was wrong" reports (Mistakes.kt), only on this phone ----
+
+    @Synchronized
+    fun mistakes(): List<Mistakes.Entry> {
+        val arr = JSONArray(prefs.getString("mistakes", "[]"))
+        return (0 until arr.length()).map { i ->
+            val o = arr.getJSONObject(i)
+            Mistakes.Entry(o.getString("text"), o.getInt("label"), o.getString("language"),
+                o.getString("source"), o.getString("date"))
+        }
+    }
+
+    @Synchronized
+    fun addMistake(e: Mistakes.Entry): Int {
+        val list = Mistakes.addTo(mistakes(), e)
+        val arr = JSONArray()
+        for (x in list) {
+            arr.put(JSONObject().put("text", x.text).put("label", x.label).put("language", x.language)
+                .put("source", x.source).put("date", x.date))
+        }
+        prefs.edit().putString("mistakes", arr.toString()).apply()
+        return list.size
+    }
+
+    @Synchronized
+    fun clearMistakes() { prefs.edit().remove("mistakes").apply() }
+
     companion object { const val MAX_ALERTS = 20 }
 }

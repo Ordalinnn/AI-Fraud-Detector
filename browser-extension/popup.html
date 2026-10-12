@@ -29,6 +29,8 @@
     <div id="modelWords" class="model-words hidden"></div>
     <ul id="reasons" class="reasons"></ul>
     <ul id="domains" class="domains"></ul>
+    <button id="mistakeBtn" class="secondary-btn" type="button"></button>
+    <div id="mistakeThanks" class="mistake-thanks hidden" role="status"></div>
   </div>
 
   <label class="autoscan">
@@ -37,9 +39,19 @@
   </label>
   <div id="scanStatus" class="scan-status"></div>
 
+  <div id="mistakesBox" class="mistakes-box hidden">
+    <div id="mistakesTitle" class="mistakes-title"></div>
+    <div class="mistakes-actions">
+      <button id="mistakesDownload" class="secondary-btn" type="button"></button>
+      <button id="mistakesClear" class="link-btn" type="button"></button>
+    </div>
+    <div id="mistakesNote" class="mistakes-note"></div>
+  </div>
+
   <footer id="footerText">Lightweight rule-based prototype — not a certified security tool.</footer>
 
   <script src="i18n.js"></script>
+  <script src="mistakes.js"></script>
   <script src="normalize.js"></script>
   <script src="scorer.js"></script>
   <script src="detector.js"></script>

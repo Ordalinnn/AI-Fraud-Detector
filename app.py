@@ -21,6 +21,7 @@ import importlib
 import re
 import sys
 import text_normalize
+import mistakes
 import fraud_logic
 import fraud_model
 import speech
@@ -36,7 +37,7 @@ def _reload_changed_local_modules():
     # In dependency order. If any changed, reload it and everything after it
     # (fraud_logic does `from text_normalize import ...`, so it must be
     # reloaded to pick up a new text_normalize).
-    mods = (text_normalize, fraud_logic, fraud_model, speech, translations)
+    mods = (text_normalize, mistakes, fraud_logic, fraud_model, speech, translations)
     changed = False
     for mod in mods:
         mod = sys.modules.get(mod.__name__, mod)
@@ -4388,8 +4389,24 @@ if mode != "batch" and "last_result" in st.session_state:
             "UserSaysCorrect": False,
             "Session": _session_id(),
         })
+        # The server's feedback file does not survive a redeploy on
+        # Streamlit Cloud, so the visitor also gets the report as a CSV in
+        # the team's data format (mistakes.py) to send to the team.
+        st.session_state["mistakes"] = mistakes.add_row(
+            st.session_state.get("mistakes", []),
+            mistakes.make_row(r["input_text"], r["pred"] == 1, r["prob"], "site"))
         st.session_state["feedback_given"] = True
         st.rerun()
+
+    if st.session_state.get("mistakes"):
+        st.download_button(
+            T["mistakes_download"].format(n=len(st.session_state["mistakes"])),
+            ("\ufeff" + mistakes.to_csv(st.session_state["mistakes"])).encode("utf-8"),
+            file_name=f"ai-fraud-detector-mistakes-{datetime.now():%Y-%m-%d}.csv",
+            mime="text/csv",
+            key="mistakes_download",
+            help=T["mistakes_note"],
+        )
 
     chart_col1, chart_col2 = st.columns(2)
     with chart_col1:
