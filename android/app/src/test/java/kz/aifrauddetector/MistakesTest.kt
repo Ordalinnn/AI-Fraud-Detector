@@ -1,6 +1,7 @@
 package kz.aifrauddetector
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 import java.util.Date
@@ -41,5 +42,14 @@ class MistakesTest {
         assertEquals("\"Карта, \"\"заблокирована\"\"", lines[1])
         assertEquals("срочно\",1,ru,,web.whatsapp.com,2026-10-12", lines[2])
         assertEquals("'=HYPERLINK(1),0,en,,popup,2026-10-12", lines[3])
+    }
+
+    @Test
+    fun onlyNotFraudMarksAreSkipped() {
+        var list = Mistakes.addTo(emptyList(), Mistakes.makeEntry("missed scam text", false, 0.2, "x"))
+        list = Mistakes.addTo(list, Mistakes.makeEntry("  ordinary text  ", true, 0.9, "x"))
+        val set = Mistakes.notFraudSet(list)
+        assertTrue(Mistakes.textKey("ordinary text") in set)
+        assertTrue(Mistakes.textKey("missed scam text") !in set)
     }
 }

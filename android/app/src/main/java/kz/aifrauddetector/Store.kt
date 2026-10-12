@@ -70,5 +70,14 @@ class Store(context: Context) {
     @Synchronized
     fun clearMistakes() { prefs.edit().remove("mistakes").apply() }
 
+    fun isMarkedNotFraud(text: String): Boolean = Mistakes.textKey(text) in Mistakes.notFraudSet(mistakes())
+
+    @Synchronized
+    fun removeAlert(id: Int) {
+        val keep = alerts().filter { it.id != id }
+        prefs.edit().remove("alerts").apply()
+        for (a in keep.asReversed()) addAlert(a)
+    }
+
     companion object { const val MAX_ALERTS = 20 }
 }

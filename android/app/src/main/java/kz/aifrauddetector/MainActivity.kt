@@ -208,7 +208,10 @@ class MainActivity : Activity() {
             .setMessage(msg)
             .setPositiveButton(R.string.btn_close, null)
             .setNegativeButton(R.string.mistake_not_fraud) { _, _ ->
-                reportMistake(a.text, true, a.probability, "app: ${a.app}")
+                // remembered: the same message won't be warned about again
+                store.removeAlert(a.id)
+                getSystemService(android.app.NotificationManager::class.java).cancel(a.id)
+                reportMistake(a.text, true, a.probability, "app: ${a.app}", R.string.not_fraud_done)
             }
             .setNeutralButton(R.string.btn_open_web) { _, _ ->
                 val url = WEB_APP_URL + "?text=" + URLEncoder.encode(a.text, "UTF-8")
@@ -227,9 +230,10 @@ class MainActivity : Activity() {
         render()
     }
 
-    private fun reportMistake(text: String, predictedFraud: Boolean, probability: Double, source: String) {
+    private fun reportMistake(text: String, predictedFraud: Boolean, probability: Double, source: String,
+                              message: Int = R.string.mistake_thanks) {
         store.addMistake(Mistakes.makeEntry(text, predictedFraud, probability, source))
-        Toast.makeText(this, R.string.mistake_thanks, Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
         render()
     }
 

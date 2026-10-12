@@ -28,9 +28,16 @@ object Mistakes {
         return if (cyr >= lat) "ru" else "en"
     }
 
+    /** How a message is matched against the user's "not fraud" marks. */
+    fun textKey(text: String): String = text.trim().take(MAX_TEXT)
+
+    /** Texts the user marked "not fraud": no more warnings for them on this
+     *  phone (until the marks are cleared). */
+    fun notFraudSet(list: List<Entry>): Set<String> = list.filter { it.label == 0 }.map { textKey(it.text) }.toSet()
+
     /** The report means "the opposite is true": the label is the corrected one. */
     fun makeEntry(text: String, predictedFraud: Boolean, probability: Double, source: String, now: Date = Date()): Entry {
-        val t = text.trim().take(MAX_TEXT)
+        val t = textKey(text)
         return Entry(
             text = t,
             label = if (predictedFraud) 0 else 1,

@@ -197,8 +197,40 @@ test("'Not fraud' in the details panel saves a mistake report", async () => {
     assert.equal(saved[0].source, "web.whatsapp.com");
     assert.match(btn.textContent, /Спасибо/);
     assert.equal(btn.disabled, true);
+    // the red label is replaced by a quiet note right away
+    assert.equal(doc.querySelectorAll(".afd-badge").length, 0);
+    assert.match(doc.querySelector(".afd-note").textContent, /не мошенничество/);
+    assert.equal(sc.status().flagged, 0);
     sc.stop();
   } finally {
     delete globalThis.Mistakes;
   }
+});
+
+
+test("texts the user marked 'not fraud' are not flagged again, even after a redraw", async () => {
+  const M = require("../mistakes.js");
+  const marks = M.addTo([], M.makeEntry({ text: SCAM, predictedFraud: true, prob: 0.97 }));
+  const dismissed = M.notFraudSet(marks);
+  const doc = page(`<div id="chat">${waBubble(SCAM)}${waBubble(SCAM.replace("банка", "Kaspi"))}</div>`);
+  const sc = createScanner({ doc, site: siteFor("web.whatsapp.com"), score, strings: () => I18N.strings("ru"),
+    isDismissed: (t) => dismissed.has(M.textKey(t)) });
+  sc.start();
+  await sc.scan();
+  // only the other (unmarked) scam gets a label
+  assert.equal(doc.querySelectorAll(".afd-badge").length, 1);
+  assert.ok(doc.querySelector(".afd-box").previousElementSibling.textContent.includes("Kaspi"));
+  doc.getElementById("chat").innerHTML = waBubble(SCAM);
+  await sc.scan();
+  assert.equal(doc.querySelectorAll(".afd-badge").length, 0);
+  sc.stop();
+});
+
+test("only 'not fraud' marks are skipped, not 'it IS fraud' ones", () => {
+  const M = require("../mistakes.js");
+  let list = M.addTo([], M.makeEntry({ text: "missed scam text", predictedFraud: false }));
+  list = M.addTo(list, M.makeEntry({ text: "  ordinary text  ", predictedFraud: true }));
+  const set = M.notFraudSet(list);
+  assert.ok(set.has(M.textKey("ordinary text")));
+  assert.ok(!set.has(M.textKey("missed scam text")));
 });

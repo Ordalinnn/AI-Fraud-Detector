@@ -37,6 +37,8 @@ class NotificationWatcher : NotificationListenerService() {
         val scorer = Scorer.get(this)
         val threshold = store.sensitivity.threshold
         for (text in texts) {
+            // the user said "not fraud" about this exact message before
+            if (store.isMarkedNotFraud(text)) continue
             val r = scorer.analyze(text)
             if (r.probability >= threshold) {
                 val alert = Store.Alert(

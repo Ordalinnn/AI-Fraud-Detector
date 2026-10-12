@@ -29,7 +29,7 @@
   // `predictedFraud`: what the model said; the report means "the opposite is
   // true", so the CSV label is the corrected one.
   function makeEntry({ text, predictedFraud, prob, source }) {
-    const t = String(text || "").trim().slice(0, MAX_TEXT);
+    const t = textKey(text);
     return {
       text: t,
       label: predictedFraud ? 0 : 1,
@@ -43,6 +43,15 @@
   function addTo(list, entry) {
     if (!entry.text) return list;
     return [entry, ...(list || []).filter((e) => e.text !== entry.text)].slice(0, MAX);
+  }
+
+  // How a message is matched against the user's "not fraud" marks.
+  const textKey = (text) => String(text || "").trim().slice(0, MAX_TEXT);
+
+  // Texts the user marked "not fraud": not flagged again on this computer
+  // (until the marks are cleared in the popup).
+  function notFraudSet(list) {
+    return new Set((list || []).filter((e) => e.label === 0).map((e) => textKey(e.text)));
   }
 
   const CSV_COLUMNS = ["text", "label", "language", "scam_type", "source", "date_collected"];
@@ -75,7 +84,7 @@
     return new Promise((resolve) => chrome.storage.local.set({ [KEY]: [] }, resolve));
   }
 
-  const api = { detectLanguage, makeEntry, addTo, toCsv, list, add, clear, CSV_COLUMNS };
+  const api = { detectLanguage, makeEntry, addTo, toCsv, list, add, clear, textKey, notFraudSet, KEY, CSV_COLUMNS };
   root.Mistakes = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof self !== "undefined" ? self : globalThis);
