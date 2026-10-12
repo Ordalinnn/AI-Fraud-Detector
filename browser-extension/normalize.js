@@ -130,8 +130,13 @@
     const raw = Array.from(String(text));
     if (raw.some((c) => isLetter(c) && c.normalize("NFKC") !== c)) return true;
     const chars = Array.from(String(text).normalize("NFKC"));
+    // invisible character / combining mark INSIDE a word; emoji legitimately
+    // carry joiners and variation selectors ("❤️"), not between two letters
+    for (let k = 1; k < chars.length - 1; k++) {
+      const c = chars[k];
+      if ((INVISIBLE.has(c.codePointAt(0)) || RE_MARK.test(c)) && isLetter(chars[k - 1]) && isLetter(chars[k + 1])) return true;
+    }
     const stripped = chars.filter((c) => !INVISIBLE.has(c.codePointAt(0)) && !RE_MARK.test(c));
-    if (stripped.length !== chars.length) return true;
     const joined = joinSpaced(stripped);
     if (joined.join("") !== stripped.join("")) return true;
     return fixWords(joined).join("") !== joined.join("");

@@ -59,3 +59,11 @@ def test_golden_file_for_kotlin_and_js_is_up_to_date():
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)
     assert m.GOLDEN.read_text(encoding="utf-8") == m.render(), "run python scripts/write_normalize_golden.py"
+
+
+def test_is_disguised():
+    from text_normalize import is_disguised
+    for t in ["Ваша к@рта", "ＳＭＳ", "к о д ы", "к\u200bод", "к̲о̲д", "kаspi", "𝐤𝐨𝐝"]:
+        assert is_disguised(t), t
+    for t in ["Привет ❤️", "семья 👨‍👩‍👧", "площадь 50 м²", "№5", "WhatsAppқа", "Wi-Fi", "текст…", ""]:
+        assert not is_disguised(t), t

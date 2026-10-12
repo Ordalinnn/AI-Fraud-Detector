@@ -36,6 +36,6 @@ test("disguised text gets its own reason, ordinary text does not", () => {
   assert.strictEqual(analyzeText("Ваша к@рта зaблoкирoвана, назовите к0д").reasons[0], "disguised");
   assert.ok(!analyzeText("Привет, урок перенесли на пятницу…").reasons.includes("disguised"));
   const { isDisguised } = require("../normalize.js");
-  for (const t of ["площадь 50 м²", "№5", "WhatsAppқа", "Wi-Fi"]) assert.strictEqual(isDisguised(t), false, t);
+  for (const t of ["площадь 50 м²", "№5", "WhatsAppқа", "Wi-Fi", "Привет ❤️", "семья 👨‍👩‍👧"]) assert.strictEqual(isDisguised(t), false, t);
   for (const t of ["ＳＭＳ", "к о д ы", "к​од", "kаspi"]) assert.strictEqual(isDisguised(t), true, t);
 });

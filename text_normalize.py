@@ -178,9 +178,15 @@ def is_disguised(text) -> bool:
     if any(c.isalpha() and unicodedata.normalize("NFKC", c) != c for c in text):
         return True
     chars = list(unicodedata.normalize("NFKC", text))
+    # an invisible character or combining mark INSIDE a word ("к\u200bод",
+    # "к̲о̲д"); emoji legitimately carry joiners and variation selectors
+    # ("❤️", "👨‍👩‍👧"), which are not between two letters
+    for k in range(1, len(chars) - 1):
+        c = chars[k]
+        if ((ord(c) in INVISIBLE or unicodedata.category(c) == "Mn")
+                and _is_letter(chars[k - 1]) and _is_letter(chars[k + 1])):
+            return True
     stripped = _strip_invisible(chars)
-    if stripped != chars:
-        return True
     joined = _join_spaced(stripped)
     if joined != stripped:
         return True

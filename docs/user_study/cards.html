@@ -1,0 +1,143 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Исследование AI Fraud Detector</title><style>
+body { font-family: Arial, sans-serif; font-size: 11pt; color: #111; max-width: 780px; margin: 24px auto; padding: 0 16px; }
+h1 { font-size: 17pt; } h2 { font-size: 13.5pt; margin: 0 0 4px; }
+.page { page-break-after: always; break-after: page; padding-bottom: 24px; }
+.msg { border: 1px solid #999; border-radius: 8px; padding: 5px 10px; margin: 5px 0; page-break-inside: avoid; }
+.num { font-weight: bold; }
+.text { margin: 2px 0 5px; white-space: pre-wrap; }
+.hint { border-left: 4px solid #555; background: #f3f3f3; padding: 4px 8px; margin: 4px 0 5px; font-size: 10.5pt; }
+.ans { font-size: 10.5pt; }
+.box { display: inline-block; width: 14px; height: 14px; border: 1.5px solid #222; vertical-align: -2px; margin: 0 4px 0 10px; }
+.small { font-size: 11pt; color: #333; }
+table { border-collapse: collapse; } td, th { border: 1px solid #999; padding: 4px 8px; }
+@media print { body { margin: 0 auto; } }
+</style></head><body><div class="page">
+<h1>Исследование: помогает ли AI Fraud Detector распознавать мошенничество</h1>
+<h2>Для проводящего (ученика)</h2>
+<ol>
+<li><b>Участники:</b> 16–20 человек, лучше разного возраста, в том числе старше 50 лет.
+Несовершеннолетних — только с согласия родителей. Имена не записываем: только номер участника и возрастную группу
+(до 18, 18–49, 50+).</li>
+<li><b>Группы:</b> нечётные номера участников — группа 1, чётные — группа 2.
+<br>Группа 1: сначала <b>набор A без подсказки</b>, потом <b>набор B с подсказкой</b>.
+<br>Группа 2: сначала <b>набор B без подсказки</b>, потом <b>набор A с подсказкой</b>.
+<br>Так каждое сообщение проверяется и с подсказкой, и без, а разница между наборами не влияет на результат.</li>
+<li>Не подсказывайте и не обсуждайте ответы. После обоих листов можно рассказать правильные ответы — это тоже польза.</li>
+<li>Ответы перенесите в <code>answers.csv</code> (образец <code>answers_TEMPLATE.csv</code>):
+одна строка = один ответ на одно сообщение. Затем: <code>python scripts/analyze_user_study.py docs/user_study/answers.csv</code></li>
+</ol>
+<h2>Согласие участника (зачитать)</h2>
+<p class="small">«Мы проводим школьное исследование о распознавании мошеннических сообщений. Вам покажут 20 коротких сообщений
+и попросят отметить, какие из них мошеннические. Это займёт около 10 минут. Мы не записываем ваше имя и телефон,
+результаты будут только в обобщённом виде. Вы можете отказаться в любой момент». Участник согласился: да / нет.</p>
+<table><tr><th>№ участника</th><th>Группа</th><th>Возраст: до 18 / 18–49 / 50+</th><th>Согласие</th></tr>
+<tr><td>&nbsp;</td><td></td><td></td><td></td></tr></table>
+</div><div class="page"><h2>Набор A — БЕЗ подсказки</h2>
+<p class="small">Участник №: ______ &nbsp;&nbsp; Группа: ______. Отметьте для каждого сообщения: мошенничество или нет, и насколько вы уверены (1 — совсем не уверен, 5 — полностью уверен).</p>
+<div class="msg"><div class="num">1. (A1)</div><div class="text">Здравствуйте! Служба безопасности банка. С вашей карты пытаются перевести 185 000 ₸. Чтобы отменить операцию, продиктуйте код, который сейчас придёт в SMS.</div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+<div class="msg"><div class="num">2. (A2)</div><div class="text">Покупка 4 590 ₸, MAGNUM, карта *4417. Доступно: 52 310 ₸</div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+<div class="msg"><div class="num">3. (A3)</div><div class="text">Казпочта: ваша посылка задержана на таможне. Оплатите сбор 690 ₸ до 18:00, иначе посылка вернётся отправителю: kazpost-delivery.top/pay</div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+<div class="msg"><div class="num">4. (A4)</div><div class="text">Құрметті ата-ана! Ертең 9 Б сыныбында ата-аналар жиналысы сағат 18:00-де өтеді. Сынып жетекшісі.</div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+<div class="msg"><div class="num">5. (A5)</div><div class="text">Мама, это я, пишу с чужого номера, мой разбился. Попал в неприятную ситуацию, срочно нужно 50 000, переведи на эту карту, потом всё объясню. Только папе не говори</div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+<div class="msg"><div class="num">6. (A6)</div><div class="text">Вы записаны к терапевту 15.10 на 10:30, каб. 214. Для отмены записи позвоните в регистратуру поликлиники.</div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+<div class="msg"><div class="num">7. (A7)</div><div class="text">Сәлем! Жаңа инвестициялық жоба: 20 000 ₸ салып, бір аптада 200 000 ₸ табыңыз. Орын шектеулі, бүгін ғана! Толығырақ Telegram-да жазыңыз</div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+<div class="msg"><div class="num">8. (A8)</div><div class="text">Ваш заказ №58213 передан курьеру. Курьер позвонит за час до доставки. Оплата при получении не требуется.</div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+<div class="msg"><div class="num">9. (A9)</div><div class="text">Ув@жаемый водитель! Н@ вaс оформлен штрaф 30 000 ₸. Оплатите в течение 24 часов со скидкой 50%: egov-shtraf.kz-pay.site</div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+<div class="msg"><div class="num">10. (A10)</div><div class="text">Балам, кешке үйге келгенде нан алып келші. Әжең бізге қонаққа келеді.</div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+</div><div class="page"><h2>Набор B — БЕЗ подсказки</h2>
+<p class="small">Участник №: ______ &nbsp;&nbsp; Группа: ______. Отметьте для каждого сообщения: мошенничество или нет, и насколько вы уверены (1 — совсем не уверен, 5 — полностью уверен).</p>
+<div class="msg"><div class="num">1. (B1)</div><div class="text">Здравствуйте, хочу купить ваш велосипед с OLX. Уже оплатил через безопасную сделку, получите деньги по ссылке, введите данные карты: olx-safe-deal.xyz</div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+<div class="msg"><div class="num">2. (B2)</div><div class="text">Код подтверждения: 4821. Никому не сообщайте этот код, даже сотрудникам банка.</div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+<div class="msg"><div class="num">3. (B3)</div><div class="text">Сіздің картаңыз бұғатталды! Бұғатты алу үшін SMS-тегі кодты осы нөмірге жіберіңіз. Әйтпесе шоттағы ақша жоғалады.</div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+<div class="msg"><div class="num">4. (B4)</div><div class="text">Начислено за сентябрь: 12 480 ₸. Оплатить можно в приложении банка до 25 числа. Спасибо, что пользуетесь нашими услугами.</div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+<div class="msg"><div class="num">5. (B5)</div><div class="text">Требуются сотрудники на удалёнку! 30 000 ₸ в день за лайки и отзывы. Для старта оплатите обучение 5 000 ₸, деньги вернём с первой зарплатой.</div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+<div class="msg"><div class="num">6. (B6)</div><div class="text">Сіздің eGov арқылы берген өтінішіңіз қабылданды. Нәтижесі 3 жұмыс күні ішінде жеке кабинетте пайда болады.</div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+<div class="msg"><div class="num">7. (B7)</div><div class="text">Привет, ты мне очень нравишься, давно хочу встретиться. Но сейчас я застряла в другом городе, не хватает на билет. Можешь занять 25 000? Верну сразу как приеду ❤️</div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+<div class="msg"><div class="num">8. (B8)</div><div class="text">Привет! Завтра у Айгерим день рождения, скидываемся по 2 000 на подарок. Кто может, переводите мне до вечера 🙂</div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+<div class="msg"><div class="num">9. (B9)</div><div class="text">П о з д р а в л я е м! Вы выиграли iPhone 16. Для получения оплатите доставку 3 900 ₸ по ссылке: prize-kz.top</div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+<div class="msg"><div class="num">10. (B10)</div><div class="text">Сіздің тапсырысыңыз дайын. Дүкенге келіп, жеке куәлігіңізді көрсетіп ала аласыз. Дүкен 21:00-ге дейін жұмыс істейді.</div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+</div><div class="page"><h2>Набор A — С ПОДСКАЗКОЙ системы</h2>
+<p class="small">Участник №: ______ &nbsp;&nbsp; Группа: ______. Отметьте для каждого сообщения: мошенничество или нет, и насколько вы уверены (1 — совсем не уверен, 5 — полностью уверен). Под сообщением — что сказала система AI Fraud Detector. Система может ошибаться: решайте сами.</p>
+<div class="msg"><div class="num">1. (A1)</div><div class="text">Здравствуйте! Служба безопасности банка. С вашей карты пытаются перевести 185 000 ₸. Чтобы отменить операцию, продиктуйте код, который сейчас придёт в SMS.</div>
+<div class="hint"><b>Система: ⚠️ Похоже на мошенничество (100%)</b><br>Почему: Возможен запрос кода / пароля / CVV; Есть слова о банке, деньгах или карте; Используется много заглавных букв</div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+<div class="msg"><div class="num">2. (A2)</div><div class="text">Покупка 4 590 ₸, MAGNUM, карта *4417. Доступно: 52 310 ₸</div>
+<div class="hint"><b>Система: ✅ Признаков мошенничества мало (7%)</b></div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+<div class="msg"><div class="num">3. (A3)</div><div class="text">Казпочта: ваша посылка задержана на таможне. Оплатите сбор 690 ₸ до 18:00, иначе посылка вернётся отправителю: kazpost-delivery.top/pay</div>
+<div class="hint"><b>Система: ⚠️ Похоже на мошенничество (100%)</b><br>Почему: Обнаружена ссылка; Есть слова о банке, деньгах или карте; Есть давление или просьба держать всё в секрете</div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+<div class="msg"><div class="num">4. (A4)</div><div class="text">Құрметті ата-ана! Ертең 9 Б сыныбында ата-аналар жиналысы сағат 18:00-де өтеді. Сынып жетекшісі.</div>
+<div class="hint"><b>Система: ✅ Признаков мошенничества мало (7%)</b></div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+<div class="msg"><div class="num">5. (A5)</div><div class="text">Мама, это я, пишу с чужого номера, мой разбился. Попал в неприятную ситуацию, срочно нужно 50 000, переведи на эту карту, потом всё объясню. Только папе не говори</div>
+<div class="hint"><b>Система: ⚠️ Похоже на мошенничество (100%)</b><br>Почему: Есть срочный призыв к действию</div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+<div class="msg"><div class="num">6. (A6)</div><div class="text">Вы записаны к терапевту 15.10 на 10:30, каб. 214. Для отмены записи позвоните в регистратуру поликлиники.</div>
+<div class="hint"><b>Система: ⚠️ Похоже на мошенничество (98%)</b><br>Почему: В тексте много чисел или кодов</div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+<div class="msg"><div class="num">7. (A7)</div><div class="text">Сәлем! Жаңа инвестициялық жоба: 20 000 ₸ салып, бір аптада 200 000 ₸ табыңыз. Орын шектеулі, бүгін ғана! Толығырақ Telegram-да жазыңыз</div>
+<div class="hint"><b>Система: ⚠️ Похоже на мошенничество (100%)</b><br>Почему: В тексте много чисел или кодов; Используется много восклицательных знаков; Используется много заглавных букв</div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+<div class="msg"><div class="num">8. (A8)</div><div class="text">Ваш заказ №58213 передан курьеру. Курьер позвонит за час до доставки. Оплата при получении не требуется.</div>
+<div class="hint"><b>Система: ✅ Признаков мошенничества мало (30%)</b></div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+<div class="msg"><div class="num">9. (A9)</div><div class="text">Ув@жаемый водитель! Н@ вaс оформлен штрaф 30 000 ₸. Оплатите в течение 24 часов со скидкой 50%: egov-shtraf.kz-pay.site</div>
+<div class="hint"><b>Система: ⚠️ Похоже на мошенничество (100%)</b><br>Почему: Текст замаскирован: латинские буквы, цифры или невидимые символы вместо обычных букв (так обходят фильтры); Обнаружена ссылка; Есть слова о банке, деньгах или карте</div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+<div class="msg"><div class="num">10. (A10)</div><div class="text">Балам, кешке үйге келгенде нан алып келші. Әжең бізге қонаққа келеді.</div>
+<div class="hint"><b>Система: ✅ Признаков мошенничества мало (4%)</b></div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+</div><div class="page"><h2>Набор B — С ПОДСКАЗКОЙ системы</h2>
+<p class="small">Участник №: ______ &nbsp;&nbsp; Группа: ______. Отметьте для каждого сообщения: мошенничество или нет, и насколько вы уверены (1 — совсем не уверен, 5 — полностью уверен). Под сообщением — что сказала система AI Fraud Detector. Система может ошибаться: решайте сами.</p>
+<div class="msg"><div class="num">1. (B1)</div><div class="text">Здравствуйте, хочу купить ваш велосипед с OLX. Уже оплатил через безопасную сделку, получите деньги по ссылке, введите данные карты: olx-safe-deal.xyz</div>
+<div class="hint"><b>Система: ⚠️ Похоже на мошенничество (100%)</b><br>Почему: Обнаружена ссылка; Есть слова о банке, деньгах или карте; Обнаружена подозрительная доменная зона</div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+<div class="msg"><div class="num">2. (B2)</div><div class="text">Код подтверждения: 4821. Никому не сообщайте этот код, даже сотрудникам банка.</div>
+<div class="hint"><b>Система: ⚠️ Похоже на мошенничество (100%)</b><br>Почему: Возможен запрос кода / пароля / CVV; Есть слова о банке, деньгах или карте; Есть давление или просьба держать всё в секрете</div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+<div class="msg"><div class="num">3. (B3)</div><div class="text">Сіздің картаңыз бұғатталды! Бұғатты алу үшін SMS-тегі кодты осы нөмірге жіберіңіз. Әйтпесе шоттағы ақша жоғалады.</div>
+<div class="hint"><b>Система: ⚠️ Похоже на мошенничество (100%)</b><br>Почему: Возможен запрос кода / пароля / CVV; Есть слова о банке, деньгах или карте; Есть признаки давления или угрозы</div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+<div class="msg"><div class="num">4. (B4)</div><div class="text">Начислено за сентябрь: 12 480 ₸. Оплатить можно в приложении банка до 25 числа. Спасибо, что пользуетесь нашими услугами.</div>
+<div class="hint"><b>Система: ✅ Признаков мошенничества мало (1%)</b></div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+<div class="msg"><div class="num">5. (B5)</div><div class="text">Требуются сотрудники на удалёнку! 30 000 ₸ в день за лайки и отзывы. Для старта оплатите обучение 5 000 ₸, деньги вернём с первой зарплатой.</div>
+<div class="hint"><b>Система: ⚠️ Похоже на мошенничество (100%)</b><br>Почему: Есть слова о банке, деньгах или карте; В тексте много чисел или кодов</div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+<div class="msg"><div class="num">6. (B6)</div><div class="text">Сіздің eGov арқылы берген өтінішіңіз қабылданды. Нәтижесі 3 жұмыс күні ішінде жеке кабинетте пайда болады.</div>
+<div class="hint"><b>Система: ✅ Признаков мошенничества мало (10%)</b></div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+<div class="msg"><div class="num">7. (B7)</div><div class="text">Привет, ты мне очень нравишься, давно хочу встретиться. Но сейчас я застряла в другом городе, не хватает на билет. Можешь занять 25 000? Верну сразу как приеду ❤️</div>
+<div class="hint"><b>Система: ⚠️ Похоже на мошенничество (68%)</b><br>Почему: Обнаружена просьба одолжить или срочно перевести деньги</div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+<div class="msg"><div class="num">8. (B8)</div><div class="text">Привет! Завтра у Айгерим день рождения, скидываемся по 2 000 на подарок. Кто может, переводите мне до вечера 🙂</div>
+<div class="hint"><b>Система: ⚠️ Похоже на мошенничество (95%)</b><br>Почему: Есть слова о банке, деньгах или карте; Есть обещание выигрыша, бонуса или подарка</div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+<div class="msg"><div class="num">9. (B9)</div><div class="text">П о з д р а в л я е м! Вы выиграли iPhone 16. Для получения оплатите доставку 3 900 ₸ по ссылке: prize-kz.top</div>
+<div class="hint"><b>Система: ⚠️ Похоже на мошенничество (100%)</b><br>Почему: Текст замаскирован: латинские буквы, цифры или невидимые символы вместо обычных букв (так обходят фильтры); Обнаружена ссылка; Есть слова о банке, деньгах или карте</div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+<div class="msg"><div class="num">10. (B10)</div><div class="text">Сіздің тапсырысыңыз дайын. Дүкенге келіп, жеке куәлігіңізді көрсетіп ала аласыз. Дүкен 21:00-ге дейін жұмыс істейді.</div>
+<div class="hint"><b>Система: ⚠️ Похоже на мошенничество (61%)</b><br>Почему: </div>
+<div class="ans">Это мошенничество? <span class="box"></span>Да <span class="box"></span>Нет&nbsp;&nbsp;&nbsp; Уверенность: <span class="box"></span>1<span class="box"></span>2<span class="box"></span>3<span class="box"></span>4<span class="box"></span>5</div></div>
+</div></body></html>
