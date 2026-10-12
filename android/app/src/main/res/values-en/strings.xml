@@ -40,7 +40,8 @@
     <string name="mistake_wrong">The model is wrong</string>
     <string name="mistake_thanks">Thanks! Marked. Saved only on this phone.</string>
     <string name="mistakes_title">Marked mistakes: %1$d</string>
-    <string name="mistakes_note">Marks help improve the model. Before sending them to the team, replace names, phone and card numbers with [NAME], [PHONE], [CARD].</string>
+    <string name="mistakes_note">Marks help improve the model. Messages marked \"not fraud\" get no more warnings; \"Clear marks\" brings them back. Before sending them to the team, replace names, phone and card numbers with [NAME], [PHONE], [CARD].</string>
     <string name="btn_share_csv">Share file (CSV)</string>
     <string name="btn_clear_mistakes">Clear marks</string>
+    <string name="not_fraud_done">Marked as not fraud. No more warnings about this message.</string>
 </resources>

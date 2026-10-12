@@ -107,7 +107,7 @@
   }
 
   // "Why is it suspicious?" panel shown when the label is clicked.
-  function makeDetails(doc, result, strings, text) {
+  function makeDetails(doc, result, strings, text, onNotFraud) {
     const d = mk(doc, "div", "afd-details");
     d.hidden = true;
     d.appendChild(mk(doc, "div", "afd-details-title", strings.detailsTitle));
@@ -150,7 +150,7 @@
         ev.stopPropagation();
         btn.disabled = true;
         root.Mistakes.add({ text, predictedFraud: true, prob: result.prob, source: doc.location ? doc.location.hostname : "page" })
-          .then(() => { btn.textContent = strings.mistakeThanks; })
+          .then(() => { btn.textContent = strings.mistakeThanks; if (onNotFraud) onNotFraud(); })
           .catch(() => { btn.disabled = false; });
       });
       d.appendChild(btn);
@@ -173,7 +173,15 @@
     b.setAttribute("tabindex", "0");
     b.setAttribute("aria-expanded", "false");
     b.title = strings.badgeClickHint;
-    const details = makeDetails(doc, result, strings, text || "");
+    // "Not fraud" -> the red label is replaced by a quiet note right away;
+    // the scanner then skips this text everywhere (Mistakes.notFraudSet)
+    const onNotFraud = () => {
+      clearHighlights(doc);
+      if (msgEl) msgEl.dataset[CHECKED] = "dismissed";
+      while (box.firstChild) box.removeChild(box.firstChild);
+      box.appendChild(mk(doc, "span", "afd-note", strings.notFraudNote));
+    };
+    const details = makeDetails(doc, result, strings, text || "", onNotFraud);
     const toggle = (ev) => {
       // don't let WhatsApp/Telegram treat the click as "select/open message"
       ev.preventDefault();
@@ -204,7 +212,7 @@
 
   // A scanner for one document. `score(texts) -> Promise<[{prob,pct,words}]>`
   // is injected so tests can run it without Chrome.
-  function createScanner({ doc, site, score, strings }) {
+  function createScanner({ doc, site, score, strings, isDismissed = () => false }) {
     const cache = new Map(); // text -> result; WhatsApp re-renders on scroll
     let timer = null;
     let observer = null;
@@ -228,6 +236,7 @@
         if (cache.size > 2000) cache.clear();
         if (!running) return;
         for (const { el, text } of items) {
+          if (isDismissed(text)) { el.dataset[CHECKED] = "dismissed"; continue; }
           const r = cache.get(text);
           if (!r) continue;
           el.dataset[CHECKED] = r.prob >= THRESHOLD ? "fraud" : "ok";
@@ -300,7 +309,11 @@
         });
       } catch (e) { reject(e); }
     });
-    const scanner = createScanner({ doc: document, site, score, strings });
+    // the user's "not fraud" marks (mistakes.js), kept in sync with storage
+    let dismissed = new Set();
+    const isDismissed = (t) => dismissed.has(root.Mistakes.textKey(t));
+    const scanner = createScanner({ doc: document, site, score, strings, isDismissed });
+    chrome.storage.local.get({ [root.Mistakes.KEY]: [] }, (d) => { dismissed = root.Mistakes.notFraudSet(d[root.Mistakes.KEY]); });
 
     chrome.storage.local.get({ autoscan: true, lang }, (data) => {
       lang = data.lang || lang;
@@ -313,6 +326,13 @@
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== "local") return;
       if (changes.lang) lang = changes.lang.newValue || lang;
+      if (changes[root.Mistakes.KEY]) {
+        const next = root.Mistakes.notFraudSet(changes[root.Mistakes.KEY].newValue);
+        const removed = [...dismissed].some((t) => !next.has(t));
+        dismissed = next;
+        // marks cleared in the popup: show the labels again
+        if (removed && scanner.running) { scanner.reset(); scanner.schedule(); }
+      }
       if (changes.autoscan) {
         if (changes.autoscan.newValue === false) { scanner.stop(); scanner.reset(); }
         else { scanner.reset(); scanner.start(); }

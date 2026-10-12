@@ -36,6 +36,7 @@ class FlowTest {
         watcher = Robolectric.buildService(NotificationWatcher::class.java).create().get()
         nm = ctx.getSystemService(NotificationManager::class.java)
         Store(ctx).clearAlerts()
+        Store(ctx).clearMistakes()
     }
 
     private fun messaging(vararg texts: String): Notification {
@@ -71,6 +72,30 @@ class FlowTest {
         // WhatsApp re-posts the whole conversation with the next message:
         post("com.whatsapp", messaging("Привет, как дела?", scam, "Ок, жду"))
         assertEquals("same scam must not be warned about twice", 1, Store(ctx).alerts().size)
+    }
+
+    @Test
+    fun messageMarkedNotFraudIsNotWarnedAboutAgain() {
+        val text = "Ваша карта заблокирована, срочно назовите код из SMS сотруднику банка"
+        val store = Store(ctx)
+        store.addMistake(Mistakes.makeEntry(text, predictedFraud = true, probability = 0.97, source = "test"))
+        post("com.google.android.apps.messaging", plain(text))
+        assertEquals(0, warnings().size)
+        // a different scam is still caught
+        post("com.google.android.apps.messaging", plain("Срочно! Ваша карта заблокирована. Подтвердите данные по ссылке http://kaspi-login.xyz и введите код"))
+        assertEquals(1, warnings().size)
+        // clearing the marks brings warnings back
+        store.clearMistakes()
+        post("com.whatsapp", messaging(text))
+        assertEquals(2, warnings().size)
+    }
+
+    @Test
+    fun removeAlertKeepsTheOthersInOrder() {
+        val store = Store(ctx)
+        for (i in 1..3) store.addAlert(Store.Alert(i, i.toLong(), "SMS", "t$i", 0.9, emptyList()))
+        store.removeAlert(2)
+        assertEquals(listOf(3, 1), store.alerts().map { it.id })
     }
 
     @Test
