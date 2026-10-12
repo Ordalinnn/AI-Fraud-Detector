@@ -20,6 +20,7 @@ from sklearn.metrics import (
 import importlib
 import re
 import sys
+import text_normalize
 import fraud_logic
 import fraud_model
 import speech
@@ -32,7 +33,13 @@ def _reload_changed_local_modules():
     A merge that adds a translation key then crashes with KeyError until
     someone reboots the app (this happened with "share_title"). Reload our
     own modules whenever their file changed since they were loaded."""
-    for mod in (fraud_logic, fraud_model, speech, translations):
+    # In dependency order. If any changed, reload it and everything after it
+    # (fraud_logic does `from text_normalize import ...`, so it must be
+    # reloaded to pick up a new text_normalize).
+    mods = (text_normalize, fraud_logic, fraud_model, speech, translations)
+    changed = False
+    for mod in mods:
+        mod = sys.modules.get(mod.__name__, mod)
         path = getattr(mod, "__file__", None)
         if not path:
             continue
@@ -41,10 +48,11 @@ def _reload_changed_local_modules():
         except OSError:
             continue
         loaded = getattr(mod, "_loaded_mtime", None)
-        if loaded is None:
+        if loaded is None and not changed:
             mod._loaded_mtime = mtime
-        elif mtime != loaded:
-            importlib.reload(sys.modules[mod.__name__])
+        elif changed or mtime != loaded:
+            changed = True
+            importlib.reload(mod)
             sys.modules[mod.__name__]._loaded_mtime = mtime
 
 
@@ -4263,6 +4271,10 @@ if mode != "batch" and analyze:
         pred = int(prob >= threshold)
         risk_label, risk_class, emoji = risk_style(prob, threshold)
         explanations = explain(features)
+        # Disguised text ("к0д", Latin look-alikes, invisible characters) is a
+        # warning sign of its own; the models already read it de-disguised.
+        if text_normalize.is_disguised(input_text):
+            explanations.insert(0, T["feat_disguised"])
 
         # A fresh analysis invalidates any deep-analysis result from a
         # previous message, so it doesn't keep showing stale next to a new

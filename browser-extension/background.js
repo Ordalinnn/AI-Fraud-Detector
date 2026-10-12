@@ -1,4 +1,4 @@
-importScripts("i18n.js", "scorer.js", "detector.js");
+importScripts("i18n.js", "normalize.js", "scorer.js", "detector.js");
 
 // The on-device model (char_model.tsv, ~0.9 MB) is parsed once per service
 // worker life. If it can't be loaded, analysis falls back to the rules.

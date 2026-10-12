@@ -42,7 +42,9 @@ from sklearn.naive_bayes import MultinomialNB
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
+import fraud_logic
 from fraud_logic import extract_features, rule_boost
+from text_normalize import normalize_text
 
 # =========================
 # HYPERPARAMETERS (single source of truth for app + evaluation)
@@ -159,6 +161,14 @@ def _stack_matrix(scores: dict) -> np.ndarray:
     return np.column_stack(cols)
 
 
+def prepare_texts(texts) -> list:
+    """What the text models (TF-IDF, char n-grams) read: the message with
+    disguises undone (text_normalize.py), same in training and checking."""
+    if not fraud_logic.NORMALIZE_INPUT:
+        return list(texts)
+    return [normalize_text(t) for t in texts]
+
+
 class BaseModels:
     """The 5 base models fitted on one training set."""
 
@@ -166,7 +176,7 @@ class BaseModels:
         self.models = build_base_models()
 
     def fit(self, texts, y, feats: pd.DataFrame):
-        texts = list(texts)
+        texts = prepare_texts(texts)
         y = np.asarray(y)
         for k in FEATURE_MODELS:
             self.models[k].fit(feats, y)
@@ -176,7 +186,7 @@ class BaseModels:
         return self
 
     def predict(self, texts, feats: pd.DataFrame) -> dict:
-        texts = list(texts)
+        texts = prepare_texts(texts)
         feats = feats[self.columns_]
         out = {k: self.models[k].predict_proba(feats)[:, 1] for k in FEATURE_MODELS}
         for k in TEXT_MODELS:
