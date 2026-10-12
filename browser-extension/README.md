@@ -16,6 +16,12 @@ entirely on your device — no server, no network request, no data collection.
   fraud/scam" → a notification pops up with the risk level.
 - **Click the extension icon** to open a popup where you can paste any text
   (SMS, email, message) and analyze it manually.
+- **"The model is wrong"**: after a check in the popup and as "Not fraud" in
+  the in-page panel. Reports stay in chrome.storage; the popup downloads them
+  as CSV in the team's real-message format (`data/real/README.md`).
+- **Disguised text** ("к0д", Latin look-alike letters, "к о д ы", invisible
+  characters) is undone before the model reads it (`normalize.js`, same
+  algorithm as the site and the Android app) and shown as a warning sign.
 - **Language switcher** (🇰🇿 KZ / 🇷🇺 RU / 🇬🇧 EN) in the popup header. Until
   you pick one, the browser's language is used.
 
@@ -64,6 +70,8 @@ batches and caches results (WhatsApp redraws messages when you scroll).
 
 - `manifest.json` — Manifest V3 extension config.
 - `scorer.js` + `char_model.tsv` — the on-device ML model (same as Android).
+- `normalize.js` — undoes disguises before the model and the rules read text.
+- `mistakes.js` — "the model is wrong" reports and their CSV export.
 - `content.js` / `content.css` — automatic checks in WhatsApp Web, Telegram
   Web and Gmail, and the red label.
 - `detector.js` — reasons, domain checks and the fallback scoring logic (shared by the popup and the

@@ -19,6 +19,8 @@ An AI-powered prototype that detects fraud and scam patterns in SMS messages, ch
 - [Mobile app (PWA)](#mobile-app-pwa)
 - [Browser extension](#browser-extension)
 - [Dataset & models](#dataset--models)
+- [Robustness to disguised text](#robustness-to-disguised-text)
+- [Learning from mistakes and the user study](#learning-from-mistakes-and-the-user-study)
 - [Limitations & disclaimer](#limitations--disclaimer)
 - [Privacy](#privacy)
 
@@ -96,6 +98,12 @@ The pure detection logic (feature extraction, rule boosting, domain/brand checks
 
 ```
 app.py                        Streamlit app: UI, model training, all pages
+text_normalize.py             Undoes disguises ("к0д", Latin look-alike letters, "к о д ы",
+                               invisible/fullwidth characters) before any model reads a message.
+                               Ported line by line to Android (TextNormalizer.kt) and the
+                               extension (normalize.js); all three checked on one golden file.
+mistakes.py                   One CSV format for "the model was wrong" reports (site, extension,
+                               Android) = the team's real-message template.
 fraud_logic.py                Pure detection logic (no Streamlit dependency) — feature
                                extraction, rule boosting, domain/brand checks, risk levels,
                                text highlighting. Imported by app.py, covered by tests/.
@@ -109,6 +117,12 @@ fraud_eval.py                 Offline evaluation toolkit (dataset loader, metric
                                cluster bootstrap, calibration, threshold costs).
 scripts/run_jury_evaluation.py  Reproduces every number in reports/jury_evaluation/.
 scripts/prepare_external_data.py  Splits the real UCI SMS corpus into train sample / holdout.
+scripts/eval_obfuscation.py   Disguised scams before/after normalization -> reports/obfuscation/.
+scripts/import_mistakes.py    Merges testers' "this is a mistake" CSV exports for evaluation.
+scripts/make_user_study.py    Printable user-study sheets with the model's real verdicts.
+scripts/analyze_user_study.py Result of the user study -> reports/user_study/.
+scripts/eval_conversation_window.py  Tested (not shipped) idea: several messages together.
+docs/user_study/              Messages, sheets (cards.pdf) and protocol for the user study.
 data/external/                Real UCI SMS: full corpus, 400-message train sample, holdout.
 data/real/                    Template for the team's own collected KZ/RU real messages.
 reports/jury_evaluation/      Results, charts and the defense report (Russian).
@@ -212,6 +226,18 @@ A self-contained Chrome/Edge extension in [`browser-extension/`](browser-extensi
 - **+400 real SMS** (300 legitimate, 100 spam) from the public [UCI SMS Spam Collection](https://archive.ics.uci.edu/dataset/228/sms+spam+collection) (CC BY 4.0), added because a model trained only on written examples falsely flagged 12–18% of ordinary real messages. The other half of that corpus (2,574 messages, split by template group) is never trained on and serves as an independent real-message test — see [`scripts/prepare_external_data.py`](scripts/prepare_external_data.py).
 - **Stacked 5-model ensemble**: Logistic Regression, Random Forest, Gradient Boosting (on the 20 hand-engineered features), TF-IDF + Multinomial Naive Bayes and character n-grams + Logistic Regression (on raw text), combined by a logistic-regression stacker — see [`fraud_model.py`](fraud_model.py).
 - **Evaluation**: every number in the app's sidebar comes from one template-grouped held-out test, the same for every model. The full jury evaluation (same-test comparison with McNemar tests, per-language metrics, never-seen scam types, real messages, calibration and threshold costs) is reproducible with `python scripts/run_jury_evaluation.py`; results and charts are in [`reports/jury_evaluation/`](reports/jury_evaluation/). To test on your own collected messages: `python scripts/run_jury_evaluation.py --real data/real/your_file.csv` (columns `text,label[,language]`, template in [`data/real/`](data/real/)).
+
+## Robustness to disguised text
+
+Scammers write "к0д", mix Latin look-alike letters into Russian words ("зaблoкирoвана"), spell words out ("к о д ы") or insert invisible characters so that filters don't recognise the words. [`text_normalize.py`](text_normalize.py) undoes this before any model reads a message, identically on the site, in the Android app and in the extension (one golden file of 352 texts, 0 differences across Python, Kotlin and JavaScript). Domains are still read from the original text, so a look-alike domain ("kаspi.kz" with a Cyrillic "а") stays flagged, and disguised text is shown to the user as a warning sign of its own.
+
+On the jury's test split, scam messages disguised by a program ([`scripts/eval_obfuscation.py`](scripts/eval_obfuscation.py), [report](reports/obfuscation/REPORT_RU.md)): Latin look-alikes 73% → 93% caught, invisible characters 81% → 93%, spelled-out words 83% → 93%, fullwidth characters 46% → 93%, all together 68% → 93%; accuracy and false alarms on ordinary messages unchanged. Digits for letters other than 0 ("3" for "з") are deliberately not undone (it would break real numbers) and remain a gap.
+
+## Learning from mistakes and the user study
+
+- **"This is a mistake"** on the site, in the extension (popup and the in-page panel) and in the Android app. Reports stay on the user's device and are exported as CSV in the team's real-message format, so testers' files go straight into `python scripts/import_mistakes.py` and `python scripts/run_jury_evaluation.py --real data/real/collected_mistakes.csv` — see [`data/real/README.md`](data/real/README.md).
+- **User study kit** ([`docs/user_study/`](docs/user_study/README.md)): does the system help *people* spot scams? 20 new messages, printable sheets with and without the system's real hint (including its 4 mistakes on these messages, to measure over-reliance), counterbalanced A/B design, and an analysis script with a paired test.
+- **An idea tested and not shipped:** judging the last 3 messages from one sender together catches more scams split into pieces, but adds false alarms and misses scams that follow ordinary messages — [report](reports/conversation_window/REPORT_RU.md).
 
 ## Limitations & disclaimer
 
