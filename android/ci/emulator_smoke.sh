@@ -15,11 +15,23 @@ adb shell am start -W -n $PKG/.MainActivity
 sleep 6
 adb exec-out screencap -p > "$OUT/1_main_screen.png"
 
+# The system binds the listener asynchronously after allow_listener; an SMS
+# that arrives before that is never seen (this made the check flaky).
+for i in $(seq 1 30); do
+  adb shell dumpsys notification | grep -A40 "Live notification listeners" | grep -q "$PKG" && break
+  sleep 1
+done
+
+SCAM="Срочно! Ваша карта Kaspi заблокирована. Назовите код из SMS сотруднику службы безопасности или перейдите по ссылке http://kaspi-secure.xyz"
 # A scam SMS and an ordinary one, delivered to the emulator's SMS app.
-adb emu sms send 7001234567 "Срочно! Ваша карта Kaspi заблокирована. Назовите код из SMS сотруднику службы безопасности или перейдите по ссылке http://kaspi-secure.xyz"
+adb emu sms send 7001234567 "$SCAM"
 sleep 4
 adb emu sms send 7007654321 "Привет! Урок математики перенесли на пятницу, не забудь тетрадь"
-sleep 10
+# wait up to 30 s for our warning
+for i in $(seq 1 30); do
+  adb shell dumpsys notification --noredact | grep -q "pkg=$PKG" && break
+  sleep 1
+done
 
 adb shell cmd statusbar expand-notifications
 sleep 3
