@@ -1,0 +1,9 @@
+{
+  "name": "AI Fraud Detector — defense update",
+  "id": "ai-fraud-detector-defense-update",
+  "api": "1.0.0",
+  "main": "code.js",
+  "editorType": ["slides"],
+  "documentAccess": "dynamic-page",
+  "networkAccess": { "allowedDomains": ["none"] }
+}
