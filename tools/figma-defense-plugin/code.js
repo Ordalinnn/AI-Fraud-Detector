@@ -464,23 +464,55 @@ async function main() {
   real.speakerNotes = NOTES_REAL;
 
   // 4. notes, order, skipped backup slides
-  for (const [id, text] of Object.entries(NOTES)) byId[id].speakerNotes = text;
+  for (const [id, text] of Object.entries(NOTES)) {
+    try { byId[id].speakerNotes = text; } catch (e) { miss(`заметки ${id}: ${e.message}`); }
+  }
   const main = [S.title, S.problem, S.goal, S.apparatus, S.data, S.system, S.lr, stack, S.results, real, S.xai, S.demo, S.limits, S.end];
   const backup = [S.tfidf, S.confusion, S.errors, S.oldEnsemble];
-  for (const s of main) s.isSkippedSlide = false;
-  for (const s of backup) s.isSkippedSlide = true;
+  try {
+    for (const s of main) s.isSkippedSlide = false;
+    for (const s of backup) s.isSkippedSlide = true;
+  } catch (e) { miss("скрыть запасные слайды не удалось: " + e.message); }
+  reorder(main, backup);
+}
+
+// Put the slides in the defense order. Figma has changed this API over
+// time, so try several ways and check the result after each one.
+function currentOrder() { return figma.getSlideGrid().flat().map((s) => s.id); }
+function reorder(main, backup) {
   const used = new Set([...main, ...backup].map((s) => s.id));
   const others = figma.getSlideGrid().flat().filter((s) => !used.has(s.id));
-  try {
-    figma.setSlideGrid([main, [...backup, ...others]]);
-    const grid = figma.currentPage.children.find((c) => c.type === "SLIDE_GRID");
-    if (grid && grid.children[0]) grid.children[0].name = "Қорғау · 7 минут";
-    if (grid && grid.children[1]) grid.children[1].name = "Қосымша (сұрақтарға)";
-    ok("порядок: 14 слайдов для защиты + раздел «Қосымша» (скрыт при показе)");
-  } catch (e) {
-    figma.setSlideGrid([[...main, ...backup, ...others]]);
-    ok("порядок: 14 слайдов для защиты, запасные в конце (скрыты при показе)");
+  const extra = [...backup, ...others];
+  const want = [...main, ...extra].map((s) => s.id);
+  const same = () => currentOrder().join() === want.join();
+  if (same()) return ok("порядок слайдов уже правильный");
+  const rowOf = () => figma.currentPage.children.find((c) => c.type === "SLIDE_GRID");
+  const attempts = [
+    ["setSlideGrid, 2 раздела", () => figma.setSlideGrid([main, extra]), true],
+    ["setCanvasGrid, 2 раздела", () => figma.setCanvasGrid([main, extra]), true],
+    ["setSlideGrid, 1 ряд", () => figma.setSlideGrid([[...main, ...extra]]), false],
+    ["setCanvasGrid, 1 ряд", () => figma.setCanvasGrid([[...main, ...extra]]), false],
+    ["insertChild", () => {
+      const row = main[0].parent;
+      [...main, ...extra].forEach((s, i) => row.insertChild(i, s));
+    }, false],
+  ];
+  const errors = [];
+  for (const [name, fn, twoRows] of attempts) {
+    try {
+      fn();
+      if (!same()) { errors.push(`${name}: порядок не изменился`); continue; }
+      if (twoRows) {
+        const grid = rowOf();
+        if (grid && grid.children[0]) grid.children[0].name = "Қорғау · 7 минут";
+        if (grid && grid.children[1]) grid.children[1].name = "Қосымша (сұрақтарға)";
+      }
+      return ok(`порядок слайдов исправлен (${name})`);
+    } catch (e) {
+      errors.push(`${name}: ${e && e.message ? e.message : e}`);
+    }
   }
+  miss("порядок слайдов не изменился — " + errors.join(" | "));
 }
 
 main()
