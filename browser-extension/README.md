@@ -34,19 +34,46 @@ server and no network request.
 
 ## How it detects fraud
 
-`scorer.js` runs **the same model as the Android app**: character n-grams
-(scikit-learn's `char_wb`, 2–5 characters) + TF-IDF + logistic regression,
-the strongest single member of the web app's ensemble (93.6 % on the jury's
-282-message test). The model file `char_model.tsv` (20 000 n-grams, ~0.9 MB)
-is exported by `scripts/export_mobile_model.py` together with the Android
-copy. `tests/scorer.test.js` checks that the JavaScript gives the same
-probabilities as scikit-learn on ~400 texts (difference < 10⁻⁶) and that the
-file is byte-for-byte the Android one.
+The extension runs **the website's own model**, so the same text gets the
+same percentage and the same verdict on the site and in the extension:
 
-`detector.js` adds the human-readable part: reasons (urgency, codes, money,
-threats…) and link/domain checks (look-alike brands, risky TLDs). If the
-model file ever fails to load, it falls back to its older rule-based score,
-so the extension keeps working.
+- the 5 base models — logistic regression, random forest and gradient
+  boosting on the 25 rule features, word TF-IDF + Naive Bayes, and character
+  n-grams + logistic regression;
+- the stacker that combines them with the rule boost.
+
+`scripts/export_extension_model.py` trains exactly what `app.py` trains
+(same data, same order, same settings) and writes every number into
+`ensemble_model.json` (~3 MB); `ensemble.js` computes the same formulas in
+JavaScript, and `detector.js` computes the same 25 features as
+`fraud_logic.py` (including Python's Unicode rules for digits, spaces, word
+boundaries and rounding).
+
+How we know they are the same:
+
+- `tests/ensemble.test.js` — on ~4,500 texts (the whole training set, real
+  SMS, disguised scams, tricky Unicode) every feature is identical to
+  Python, every model's probability and the final one differ from
+  scikit-learn by < 10⁻⁹, and the shown percentage is the same text;
+- `tests/test_extension_ensemble.py` (Python) — the exported model is
+  trained on today's training set, a model trained now gives the same
+  numbers, and the real `app.py`, run headless, shows those numbers.
+
+Both the site (under the result) and the popup (at the bottom) show
+**"model xxxxxxxx"** — a fingerprint of the training set. Same id = same
+model. When the dataset changes, re-run the export script; the tests fail
+until you do.
+
+`detector.js` also adds the human-readable part: reasons (urgency, codes,
+money, threats…) and link/domain checks (look-alike brands, risky TLDs).
+If the model file ever fails to load, it falls back to its older rule-based
+score, so the extension keeps working.
+
+Results can still differ for one reason only: the text itself. On WhatsApp
+Web, Telegram Web and Gmail the extension reads the message from the page,
+which may not be exactly what you paste into the site. The site's threshold
+slider (default 0.5) changes the site's verdict, not the percentage; the
+extension always uses 0.5.
 
 ## Automatic checks: how and limits
 
@@ -72,12 +99,14 @@ batches and caches results (WhatsApp redraws messages when you scroll).
 ## Files
 
 - `manifest.json` — Manifest V3 extension config.
-- `scorer.js` + `char_model.tsv` — the on-device ML model (same as Android).
+- `ensemble_model.json` + `ensemble.js` — the website's model (5 models +
+  stacker), run on the device.
+- `scorer.js` — the character n-gram model inside it (also the Android app's model).
 - `normalize.js` — undoes disguises before the model and the rules read text.
 - `mistakes.js` — "the model is wrong" reports and their CSV export.
 - `content.js` / `content.css` — automatic checks in WhatsApp Web, Telegram
   Web and Gmail, and the red label.
-- `detector.js` — reasons, domain checks and the fallback scoring logic (shared by the popup and the
+- `detector.js` — the 25 rule features, reasons, domain checks and the fallback scoring logic (shared by the popup and the
   right-click context menu). Returns language-agnostic keys (risk level,
   reason keys, domain flag keys) rather than hardcoded text, so the same
   result can be rendered in any supported language.

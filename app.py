@@ -60,8 +60,8 @@ def _reload_changed_local_modules():
 _reload_changed_local_modules()
 fm = fraud_model
 from fraud_logic import (
-    domain_flags, extract_features, risk_level, highlight_text,
-    sanitize_for_csv, derive_feedback_training_examples,
+    domain_flags, extract_features, risk_level, risk_percent, highlight_text,
+    sanitize_for_csv,
 )
 from translations import LANG_OPTIONS, OLD_LANG_MAP, DEFAULT_LANG, get_translations
 
@@ -2488,56 +2488,18 @@ data = [
 ]
 
 # =========================
-# FEEDBACK-DERIVED TRAINING DATA
+# TRAINING DATA
 # =========================
-# Folds prior "was this correct?" feedback (see append_feedback_entry above)
-# back into the training set, so the model actually improves between
-# deploys instead of feedback.json being a write-only log nobody reads.
-#
-# This is deliberately NOT live/online learning. training_data below is
-# built once at module load, and train_models() is wrapped in
-# @st.cache_resource, so the combined dataset only takes effect once when a
-# fresh server process starts up (a redeploy, a manual reboot, or Community
-# Cloud waking from sleep) - never mid-process from a single click. An
-# anonymous visitor clicking "no, wrong" cannot retrain the model that is
-# actively serving other users in that same moment.
-#
-# That distinction matters specifically for a fraud detector: a real
-# scammer has a direct incentive to spam "this was wrong" on true-positive
-# detections of their own template, to teach the model to wave it through.
-# So feedback is treated as weak/unverified signal, never as ground truth:
-#   - capped per browser session (FEEDBACK_MAX_PER_SESSION) so one visitor
-#     re-submitting the same or many messages can't dominate the retrain
-#   - capped in total (FEEDBACK_MAX_EXAMPLES) so the ~1,300 hand-labeled
-#     core examples above always outweigh crowd-submitted ones
-#   - a message that got contradictory feedback (some sessions say it was
-#     correctly flagged, others say it wasn't) is dropped entirely rather
-#     than guessed at
-#   - exact duplicates of a core `data` entry are skipped - nothing new to
-#     learn there
-# None of this makes the feedback trustworthy, just bounded. A human should
-# still skim feedback.json occasionally - this doesn't replace that, it
-# just means good signal in there stops being wasted between reviews.
-FEEDBACK_MAX_PER_SESSION = 20
-FEEDBACK_MAX_EXAMPLES = 300  # stays a minority vs. the ~1,300 core examples
-
-def load_feedback_examples():
-    """Reads feedback.json (if present) and converts it into (text, label)
-    training pairs via derive_feedback_training_examples() in
-    fraud_logic.py (kept there, not here, so it's plain-Python-testable
-    without a Streamlit script context - see test_fraud_logic.py). See the
-    module comment above for why this is capped/filtered instead of
-    trusted outright."""
-    entries = _load_json(FEEDBACK_FILE)
-    core_texts = {text.strip().lower() for text, _ in data}
-    return derive_feedback_training_examples(
-        entries, core_texts, FEEDBACK_MAX_PER_SESSION, FEEDBACK_MAX_EXAMPLES
-    )
-
-# The dataset actually used for training: hand-labeled core + whatever
-# vetted feedback has accumulated since the last restart. train_models()
-# trains on this, not on `data` directly.
-training_data = data + load_feedback_examples()
+# The model is trained on the hand-labeled `data` above (+ the real SMS
+# sample below) and NOTHING collected at runtime. feedback.json used to be
+# folded back in on every restart, but then the site's model depended on a
+# server file nobody can see (and that Streamlit Cloud wipes on redeploy),
+# so the browser extension - which runs an exported copy of this exact
+# model (scripts/export_extension_model.py) - could not be guaranteed to
+# give the same result. "This is a mistake" reports reach the training set
+# the reviewed way instead: scripts/import_mistakes.py -> a person checks
+# them -> `data`.
+training_data = list(data)
 
 def explain(features):
     # Only explain features that are relevant (non-zero and meaningful).
@@ -2623,6 +2585,9 @@ EVAL_TEST_SIZE = fm.EVAL_TEST_SIZE
 # methodology numbers can say exactly how many examples are real.
 real_training_examples = fm.load_real_training_sample()
 training_data = training_data + real_training_examples
+# Identifies the exact training set; the extension's model file carries the
+# same value (shown in both UIs, checked by tests/test_extension_ensemble.py).
+MODEL_FINGERPRINT = fm.training_fingerprint([t for t, _ in training_data], [label for _, label in training_data])
 
 
 @st.cache_resource(show_spinner=False)
@@ -4348,11 +4313,11 @@ if mode != "batch" and "last_result" in st.session_state:
         </script>""", height=1, width=1)
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.markdown(f'<div class="metric-card"><div class="metric-icon">%</div><div class="metric-label">{T["risk"]}</div><div class="metric-value">{r["prob"]*100:.1f}%</div></div>', unsafe_allow_html=True)
+    c1.markdown(f'<div class="metric-card"><div class="metric-icon">%</div><div class="metric-label">{T["risk"]}</div><div class="metric-value">{risk_percent(r["prob"])}%</div></div>', unsafe_allow_html=True)
     c2.markdown(f'<div class="metric-card"><div class="metric-icon">⚠️</div><div class="metric-label">{T["detected"]}</div><div class="metric-value">{len(r["explanations"])}</div></div>', unsafe_allow_html=True)
     c3.markdown(f'<div class="metric-card"><div class="metric-icon">🎚️</div><div class="metric-label">{T["threshold"]}</div><div class="metric-value">{r["threshold"]:.2f}</div></div>', unsafe_allow_html=True)
     c4.markdown(f'<div class="metric-card"><div class="metric-icon">🧠</div><div class="metric-label">{T["model"]}</div><div class="metric-value">5 + stack</div></div>', unsafe_allow_html=True)
-    st.caption(f"ℹ️ {T['model_help']}")
+    st.caption(f"ℹ️ {T['model_help']} · model {MODEL_FINGERPRINT[:8]}")
 
     st.markdown(f'<div class="{r["risk_class"]}">{r["emoji"]} {r["risk_label"]}</div>', unsafe_allow_html=True)
     st.progress(float(r["prob"]))

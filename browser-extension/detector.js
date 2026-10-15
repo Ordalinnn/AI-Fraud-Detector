@@ -1,21 +1,11 @@
-// Self-contained fraud/scam heuristic scorer for the browser extension.
+// Rule features, reasons and domain checks for the browser extension -
+// line-by-line the same as fraud_logic.py on the site.
 //
-// This mirrors the keyword/domain rule logic from the main AI Fraud Detector
-// Streamlit app (app.py), but does NOT run the full trained ML ensemble
-// (Logistic Regression + Random Forest + Gradient Boosting + TF-IDF/NB) —
-// scikit-learn models can't run inside a browser extension. The base score
-// is a blend of two things: a hand-tuned rule-weighted sum (heuristicBaseScore),
-// and the real LogisticRegression member's coefficients ported as a plain
-// dot-product + sigmoid (lrScore — see LR_* constants below, regenerated via
-// scripts/extract_lr_coefficients.py). The LR component is deliberately
-// given a MINORITY weight (see LR_BLEND_WEIGHT): trained in isolation
-// (without the other 3 ensemble members averaging it out), it scores some
-// perfectly ordinary short conversational messages surprisingly high — e.g.
-// an isolated evaluation found it assigns ~0.98 fraud probability to a
-// plain "how are you, see you tomorrow at 9" greeting, a dataset-distribution
-// artifact rather than a real signal. Full rule_boost() logic is also
-// ported unchanged. Treat this whole thing as a lighter, offline
-// approximation of the full web app, not a 1:1 port of its accuracy.
+// extractFeatures() is the feature vector the site's LR/RF/GB models read;
+// tests/ensemble.test.js checks it against Python on ~4,500 texts, so
+// ensemble.js (the site's full model) gets exactly the site's inputs.
+// heuristicBaseScore()/lrScore() below are only the fallback for the
+// unlikely case that ensemble_model.json cannot be loaded.
 //
 // Runs entirely locally: no network request is made, so message text never
 // leaves the user's device.
@@ -176,8 +166,45 @@ function isUpperChar(ch) {
   return ch !== ch.toLowerCase() && ch === ch.toUpperCase();
 }
 
+// Python's str.isspace() / regex \s set. JavaScript's \s differs (it also
+// matches U+FEFF but not \x1c-\x1f or \x85), so a message using those
+// would split into different words and links than on the site.
+const PY_SPACE = "\\t\\n\\x0b\\x0c\\r\\x1c-\\x1f \\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000";
+const PY_SPACES = new RegExp("[" + PY_SPACE + "]+", "u");
+// Python's regex \w for str patterns (letters, numbers, underscore); used to
+// emulate Python's Unicode-aware \b, which JavaScript's ASCII-only \b is not.
+const PY_WORD = "\\p{L}\\p{N}_";
+
+function pySplit(s) {
+  return s.split(PY_SPACES).filter((w) => w.length > 0);
+}
+
+// Python's str.isdigit(): decimal digits (any script) plus the "digit"
+// characters such as superscripts and circled numbers (Numeric_Type=Digit),
+// listed here because JavaScript has no property for them.
+const PY_DIGIT = /[\p{Nd}\u00b2\u00b3\u00b9\u1369-\u1371\u19da\u2070\u2074-\u2079\u2080-\u2089\u2460-\u2468\u2474-\u247c\u2488-\u2490\u24ea\u24f5-\u24fd\u24ff\u2776-\u277e\u2780-\u2788\u278a-\u2792\u{10a40}-\u{10a43}\u{10e60}-\u{10e68}\u{11052}-\u{1105a}\u{1f100}-\u{1f10a}]/u;
+
+function countDigits(s) {
+  let n = 0;
+  for (const ch of s) if (PY_DIGIT.test(ch)) n++;
+  return n;
+}
+
+// Python's round(x, 2): the exact binary value rounded half to even.
+// toFixed() is exact too but rounds a tie up; ties at 2 decimals happen
+// only for multiples of 1/8 (x.125, x.375, ...), e.g. 41 letters / 8 words.
+function pyRound2(x) {
+  if (Number.isInteger(x * 8) && !Number.isInteger(x * 4)) {
+    const lo = Math.floor(x * 100);
+    return (lo % 2 === 0 ? lo : lo + 1) / 100;
+  }
+  return Number(x.toFixed(2));
+}
+
+const URL_PATTERN = new RegExp("https?://[^" + PY_SPACE + "]+|www\\.[^" + PY_SPACE + "]+", "gu");
+
 function extractUrls(textLower) {
-  const matches = textLower.match(/https?:\/\/[^\s]+|www\.[^\s]+/g);
+  const matches = textLower.match(URL_PATTERN);
   return matches || [];
 }
 
@@ -185,7 +212,14 @@ function extractUrls(textLower) {
 // base.ru") instead of a clickable http(s):// or www. link, specifically
 // to dodge filters that only look for literal links. This catches those
 // bare mentions so they still register as a domain.
-const BARE_DOMAIN_PATTERN = /\b[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9-]+)*\.(?:ru|kz|com|net|org|info|xyz|top|site|online|live|icu|click|by|ua|io|me|co)\b/g;
+// Python's \b and re.IGNORECASE are Unicode-aware, so the same pattern
+// written with JavaScript's \b would see a word start in "жkaspi.kz"
+// where Python does not.
+const BARE_DOMAIN_PATTERN = new RegExp(
+  "(?<![" + PY_WORD + "])[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9-]+)*\\."
+  + "(?:ru|kz|com|net|org|info|xyz|top|site|online|live|icu|click|by|ua|io|me|co)(?![" + PY_WORD + "])",
+  "giu"
+);
 
 function extractBareDomains(textLower, urls) {
   let masked = textLower;
@@ -247,7 +281,7 @@ function domainFlags(domain) {
   if (WORD_LISTS.suspiciousZones.some((z) => domain.endsWith(z))) {
     flags.push({ labelKey: "suspiciousTld", severity: "critical" });
   }
-  if (/\d/.test(domain)) flags.push({ labelKey: "containsDigits", severity: "warn" });
+  if (countDigits(domain)) flags.push({ labelKey: "containsDigits", severity: "warn" });
   return flags;
 }
 
@@ -273,7 +307,7 @@ function extractFeatures(text) {
     if (WORD_LISTS.suspiciousDomainWords.some((w) => d.includes(w))) suspiciousDomain = 1;
     if (d.length > 20) longDomain = 1;
     if (WORD_LISTS.suspiciousZones.some((z) => d.endsWith(z))) suspiciousZone = 1;
-    if (/\d/.test(d)) digitDomain = 1;
+    if (countDigits(d)) digitDomain = 1;
     if (brandImpersonation(d)) brandFlag = 1;
     if (!isAscii(d)) homoglyphDomain = 1;
   }
@@ -287,14 +321,14 @@ function extractFeatures(text) {
   // digit_count/exclamation_count/uppercase_count/text_length/word_count/
   // avg_word_length. uppercaseCount is measured against the ORIGINAL
   // (non-lowercased) text, same as the Python version.
-  const words = normLower.split(/\s+/).filter((w) => w.length > 0);
-  const digitCount = (normLower.match(/\d/g) || []).length;
+  const words = pySplit(normLower);
+  const digitCount = countDigits(normLower);
   const exclamationCount = (normLower.match(/!/g) || []).length;
   const uppercaseCount = Array.from(norm).filter(isUpperChar).length;
   const textLength = Array.from(norm).length;
   const wordCount = words.length;
   const avgWordLength = wordCount
-    ? Math.round((words.reduce((sum, w) => sum + Array.from(w).length, 0) / wordCount) * 100) / 100
+    ? pyRound2(words.reduce((sum, w) => sum + Array.from(w).length, 0) / wordCount)
     : 0;
 
   return {
@@ -468,21 +502,34 @@ function riskStyle(prob) {
   return { levelKey: "critical", cssClass: "risk-critical", emoji: "🔴" };
 }
 
-// `scorer` (optional): the on-device ML model from scorer.js. When given,
-// the risk percentage comes from it - the same model as the Android app,
-// checked against scikit-learn - and the rules below only supply the
-// human-readable reasons and domain checks. Without it (model file failed
-// to load) the older rules + LR blend is used, so the extension never
-// stops working.
+// The risk percentage as text, exactly as the site shows it
+// (fraud_logic.risk_percent: one decimal, Python's round-half-even, at most
+// 99.9 - no model is that certain).
+function riskPercent(prob) {
+  const x = Math.min(prob * 100, 99.9);
+  if (Number.isInteger(x * 4) && !Number.isInteger(x * 2)) {
+    const lo = Math.floor(x * 10);
+    return ((lo % 2 === 0 ? lo : lo + 1) / 10).toFixed(1);
+  }
+  return x.toFixed(1);
+}
+
+// `scorer` (optional): the site's full model (ensemble.js), so the
+// percentage is the same as on the site for the same text; the rules below
+// also supply the human-readable reasons and domain checks. Without it
+// (model file failed to load) the older rules + LR blend is used, so the
+// extension never stops working.
 function analyzeText(text, scorer) {
   const f = extractFeatures(text);
   let prob;
   let modelWords = [];
   let engine = "rules";
+  let scores = null;
   if (scorer) {
-    const r = scorer.analyze(String(text == null ? "" : text));
+    const r = scorer.analyze(String(text == null ? "" : text), f, ruleBoost(f));
     prob = r.probability;
     modelWords = r.suspiciousWords;
+    scores = r.scores;
     engine = "model";
   } else {
     const base = (1 - LR_BLEND_WEIGHT) * heuristicBaseScore(f) + LR_BLEND_WEIGHT * lrScore(f);
@@ -496,13 +543,13 @@ function analyzeText(text, scorer) {
   const domainInfo = f.domains.map((d) => ({ domain: d, flags: domainFlags(d) }));
   return {
     prob,
-    // never show 100 %: no model is that certain
-    pct: Math.min(99, Math.round(prob * 100)),
+    pct: riskPercent(prob),
     isFraud: prob >= 0.5,
     ...style,
     reasons,
     domainInfo,
     modelWords,
+    scores,
     engine
   };
 }
@@ -519,7 +566,7 @@ if (typeof self !== "undefined") {
 // no `module` global.
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
-    analyzeText, extractFeatures, lrScore, heuristicBaseScore, ruleBoost,
+    analyzeText, extractFeatures, lrScore, heuristicBaseScore, ruleBoost, riskPercent, pySplit, countDigits, pyRound2,
     brandImpersonation, domainFlags, getDomain, levenshtein, riskStyle,
     extractUrls, extractBareDomains, LR_FEATURE_ORDER
   };

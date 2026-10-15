@@ -1,11 +1,8 @@
-// On-device ML model: character n-grams + logistic regression.
-//
-// The same model as the Android app (android/.../FraudScorer.kt) and the
-// strongest single member of the web app's ensemble (93.6% on the jury's
-// 282-message test). Exported from scikit-learn by
-// scripts/export_mobile_model.py into char_model.tsv; this file is a port
-// of that script's `reference_proba`, and tests/scorer.test.js checks it
-// against scikit-learn's own probabilities on ~400 texts.
+// Character n-grams + logistic regression: the "char" member of the site's
+// ensemble (ensemble.js builds it from ensemble_model.json) and the same
+// algorithm as the Android app's model (android/.../FraudScorer.kt). A port
+// of scripts/export_mobile_model.py's `reference_proba`;
+// tests/scorer.test.js checks it against scikit-learn on ~400 texts.
 //
 // Text is processed as Unicode code points (like Python strings), so emoji
 // and other characters outside the BMP produce the same n-grams as on the

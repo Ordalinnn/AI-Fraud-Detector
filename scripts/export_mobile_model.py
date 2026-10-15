@@ -14,8 +14,6 @@ hand-written examples + 400 real UCI SMS.
 
 Writes:
   android/app/src/main/assets/char_model.tsv   the model
-  browser-extension/char_model.tsv             the same file for the browser
-                                               extension (scorer.js)
   android/app/src/test/resources/golden.tsv    texts + sklearn probabilities;
                                                the Kotlin unit test must match
   reports/mobile_model.json                    accuracy of exactly this model
@@ -52,7 +50,6 @@ NORMALIZE_TAG = "text_normalize_v1"
 MAX_FEATURES = 20_000
 MODEL_PATH = ROOT / "android" / "app" / "src" / "main" / "assets" / "char_model.tsv"
 GOLDEN_PATH = ROOT / "android" / "app" / "src" / "test" / "resources" / "golden.tsv"
-EXTENSION_MODEL_PATH = ROOT / "browser-extension" / "char_model.tsv"
 REPORT_PATH = ROOT / "reports" / "mobile_model.json"
 
 # Python's str.split() whitespace set (FraudScorer.kt uses the same list).
@@ -165,7 +162,6 @@ def main():
     all_y = np.concatenate([y, [label for _, label in real]])
     pipe = build_pipeline().fit(all_texts, all_y)
     model = write_model(pipe, MODEL_PATH)
-    EXTENSION_MODEL_PATH.write_bytes(MODEL_PATH.read_bytes())
 
     ph = pipe.predict_proba(hold["text"].tolist())[:, 1]
     ham = hold["label"].to_numpy() == 0

@@ -422,6 +422,12 @@ def risk_level(prob, threshold=0.5):
         return "high", "risk-high", "🟠"
     return "critical", "risk-critical", "🔴"
 
+def risk_percent(prob):
+    """The risk percentage as shown to people, e.g. "87.3": one decimal, at
+    most 99.9 (no model is that certain). The browser extension formats it
+    the same way (detector.js riskPercent), so both show the same number."""
+    return f"{min(prob * 100, 99.9):.1f}"
+
 # =========================
 # TEXT HIGHLIGHTING
 # =========================
