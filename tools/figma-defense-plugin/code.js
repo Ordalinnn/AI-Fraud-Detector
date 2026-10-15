@@ -473,21 +473,29 @@ async function main() {
   let real = reals[0];
   if (!real) { real = buildRealWorldSlide(); ok("создан слайд «Шынайы өмірде тексеру»"); }
   await repair(S);
-  stack.speakerNotes = NOTES_STACK;
-  real.speakerNotes = NOTES_REAL;
+  setNotes(stack, NOTES_STACK);
+  setNotes(real, NOTES_REAL);
 
   // 4. notes, order, skipped backup slides
-  for (const [id, text] of Object.entries(NOTES)) {
-    try { byId[id].speakerNotes = text; } catch (e) { miss(`заметки ${id}: ${e.message}`); }
-  }
+  for (const [id, text] of Object.entries(NOTES)) setNotes(byId[id], text);
+  if (notesFailed) miss("заметки докладчика: эта версия Figma не даёт плагину их записать — вставьте их вручную из docs/presentation_update_kz.md (раздел 4)");
   const main = [S.title, S.problem, S.goal, S.apparatus, S.data, S.system, S.lr, stack, S.results, real, S.xai, S.demo, S.limits, S.end];
   const backup = [S.tfidf, S.confusion, S.errors, S.oldEnsemble];
-  try {
-    for (const s of main) s.isSkippedSlide = false;
-    for (const s of backup) s.isSkippedSlide = true;
-  } catch (e) { miss("скрыть запасные слайды не удалось: " + e.message); }
+  let skipped = true;
+  for (const s of main) skipped = trySet(s, "isSkippedSlide", false) && skipped;
+  for (const s of backup) skipped = trySet(s, "isSkippedSlide", true) && skipped;
+  if (!skipped) miss("скрыть запасные слайды плагин не может — в разделе «Қосымша» нажмите на каждый правой кнопкой → Skip slide");
   reorder(main, backup);
 }
+
+// Some Figma versions don't let plugins set every slide property (the
+// object is "not extensible"): skip it and say so instead of stopping.
+function trySet(obj, prop, value) {
+  if (!(prop in obj)) return false;
+  try { obj[prop] = value; return obj[prop] === value; } catch (e) { return false; }
+}
+let notesFailed = false;
+function setNotes(slide, text) { if (!trySet(slide, "speakerNotes", text)) notesFailed = true; }
 
 // Texts a second run of the first version broke (it repeated replacements).
 async function repair(S) {
