@@ -24,6 +24,13 @@ const LABEL_STACK = "07 · СТЕКИНГ: ЕСЕПТЕУ МЫСАЛЫ";
 const LABEL_REAL = "09 · ШЫНАЙЫ ӨМІРДЕ ТЕКСЕРУ";
 const hasLabel = (slide, label) => slide.findAllWithCriteria({ types: ["TEXT"] }).some((t) => t.characters === label);
 
+// Stacking example, recomputed on the site's model (z = 9.7246):
+// weights to 3 decimals so every product on the slide checks out.
+const STACK_CALC = "z = 0,56 + 0,85 − 0,02 + 0,09\n    + 2,08 + 6,09 + 0,07 ≈ 9,72";
+const STACK_P = "P = σ(9,72) ≈ 0,9999";
+const STACK_NOTE = "RF (0,48) мен GB (0,55) екіұдай, бірақ стекинг сенімдірек мәтіндік модельдерге көбірек салмақ береді. " +
+  "5 модельдің қарапайым орташасы осы жерде 0,76 болар еді. Пайыз 99,9%-дан аспайды: жүйе ешқашан «100% сенімдімін» демейді.";
+
 // Final texts that a repeated run must not change again.
 const DATA_NOTE = "Негіз: FTC, FBI IC3 2025 есебі және Kaspi, Halyk атынан жасалған нақты алаяқтық жағдайлары. Шаблондар әртүрлі банк атауларымен кеңейтілді. Оған қоса 400 нақты SMS (UCI корпусы) — модель шынайы хабарламалар стилін де көрсін.";
 const RESULTS_NOTE = "Сол 282 хабарлама (group-aware 80/20: 1116 / 282), бір сценарийдің нұсқалары тек бір жаққа түседі. Жазбаша жұмыстағы ансамбль: 82,3% · ең жақсы жалғыз модель (символдық n-грам): 93,6% · 15 бөлініс бойынша орташа: 96,1% ± 1,4.";
@@ -284,12 +291,12 @@ function buildStackingSlide() {
   const head = ["", "МОДЕЛЬ", "pᵢ", "logit pᵢ", "салмақ wᵢ"];
   head.forEach((h, i) => h && addText(s, F.mono, 18, C.faint, h, cols[i], 304, 0, { track: 6 }));
   const rows = [
-    ["M₁", "Логистикалық регрессия", "0,9998", "8,33", "0,10"],
-    ["M₂", "Кездейсоқ орман", "0,480", "−0,08", "0,23"],
-    ["M₃", "Градиенттік бустинг", "0,555", "0,22", "0,40"],
-    ["M₄", "TF-IDF + Байес", "0,811", "1,45", "1,43"],
-    ["M₅", "Символдық n-грамдар", "0,974", "3,63", "1,68"],
-    ["ΔR", "Ережелер (.top, kazpost)", "0,25", "—", "0,29"],
+    ["M₁", "Логистикалық регрессия", "0,99976", "8,33", "0,102"],
+    ["M₂", "Кездейсоқ орман", "0,480", "−0,08", "0,228"],
+    ["M₃", "Градиенттік бустинг", "0,5545", "0,22", "0,396"],
+    ["M₄", "TF-IDF + Байес", "0,8106", "1,45", "1,434"],
+    ["M₅", "Символдық n-грамдар", "0,9742", "3,63", "1,677"],
+    ["ΔR", "Ережелер (.top, kazpost)", "0,25", "—", "0,289"],
   ];
   rows.forEach((r, k) => {
     const y = 344 + k * 76;
@@ -307,14 +314,13 @@ function buildStackingSlide() {
   addText(card, F.semi, 26, C.ink, "z = b + Σ wᵢ · logit pᵢ + w_R · ΔR", 40, 80, 540);
   addText(card, F.reg, 22, C.faint, "logit p = ln(p / (1 − p)),  b = 0,56", 40, 128, 540);
   addRect(card, 40, 176, 540, 1.5, C.line);
-  addText(card, F.med, 26, C.body, "z = 0,56 + 0,83 − 0,02 + 0,09\n    + 2,07 + 6,10 + 0,07 ≈ 9,71", 40, 200, 540, { lh: 140 });
-  addText(card, F.head, 38, C.ink, "P = σ(9,71) ≈ 0,9999", 40, 306, 540);
+  addText(card, F.med, 26, C.body, STACK_CALC, 40, 200, 540, { lh: 140 });
+  addText(card, F.head, 38, C.ink, STACK_P, 40, 306, 540);
   const chip = addFrame(card, 40, 392, 330, 56, "#ffe4e8", 14);
   addText(chip, F.bold, 26, C.red, "99,9% → Критикалық", 20, 12);
 
   addText(s, F.reg, 24, C.muted,
-    "RF (0,48) мен GB (0,55) екіұдай, бірақ стекинг сенімдірек мәтіндік модельдерге көбірек салмақ береді. " +
-    "Ескі формула — қарапайым орташа — осы жерде небәрі 0,76 беретін еді. Пайыз 99,9%-дан аспайды: жүйе ешқашан «100% сенімдімін» демейді.",
+    STACK_NOTE,
     120, 870, 1680, { lh: 140 });
   return s;
 }
@@ -328,13 +334,13 @@ function buildRealWorldSlide() {
   const cards = [
     ["бұрын 18,2%", "0,3%", "жалған дабыл 2 242 нақты қарапайым SMS-та (оқытуда болмаған)", C.blue],
     ["бұрын 73,6%", "88,4%", "қазақ тіліндегі дәлдік", C.blue],
-    ["бұрын 46–83%", "93%", "жасырылған алаяқтық ұсталды: «к0д», латын әріптері, көрінбейтін таңбалар", C.blue],
-    ["бұрын 8,2%", "0,7%", "калибрлеу қатесі (ECE): «80% қауіп» шынымен ~80% дегенді білдіреді", C.teal],
+    ["бұрын 46–92%", "92–93%", "жасырылған алаяқтық ұсталды: «к0д», латын әріптері, көрінбейтін таңбалар", C.blue],
+    ["бұрын 8,2%", "0,8%", "калибрлеу қатесі (ECE): «80% қауіп» шынымен ~80% дегенді білдіреді", C.teal],
   ];
   cards.forEach((c, i) => {
     const f = addFrame(s, 120 + i * 430, 380, 390, 420, C.card, 24, true);
     addText(f, F.med, 24, C.faint, c[0], 36, 36);
-    addText(f, F.head, 92, c[3], c[1], 32, 80);
+    addText(f, F.head, c[1].length > 5 ? 76 : 92, c[3], c[1], 32, c[1].length > 5 ? 92 : 80);
     addText(f, F.med, 24, C.body, c[2], 36, 214, 318, { lh: 140 });
   });
   addText(s, F.med, 26, C.body, "Оқытуда мүлдем болмаған алаяқтық түрлері: 76,0% → 84,1% ұсталды", 120, 860, 1680);
@@ -473,6 +479,7 @@ async function main() {
   let real = reals[0];
   if (!real) { real = buildRealWorldSlide(); ok("создан слайд «Шынайы өмірде тексеру»"); }
   await repair(S);
+  await corrections(stack, real, S);
   setNotes(stack, NOTES_STACK);
   setNotes(real, NOTES_REAL);
 
@@ -506,6 +513,34 @@ async function repair(S) {
   await fix(S.data, (n) => n.characters.startsWith("Негіз: FTC"), DATA_NOTE, "сноска на слайде «Деректер»");
   await fix(S.results, (n) => n.characters.startsWith("Сол 282 хабарлама"), RESULTS_NOTE, "сноска на слайде «Нәтижелер»");
   await fix(S.errors, (n) => n.characters.startsWith("Жазбаша жұмыстағы жүйе"), ERRORS_NOTE, "текст на слайде «Қателерді талдау»");
+}
+
+// Fact-check fixes (October 2026), safe to repeat.
+async function corrections(stack, real, S) {
+  const exact = async (slide, from, to, what) => {
+    const t = texts(slide).find((n) => n.characters.trim() === from);
+    if (t) { await sub(t, t.characters, to); ok("исправлено: " + what); }
+  };
+  const starts = async (slide, head, to, what) => {
+    const t = texts(slide).find((n) => n.characters.startsWith(head) && n.characters !== to);
+    if (t) { await sub(t, t.characters, to); ok("исправлено: " + what); }
+  };
+  const pairs = [["0,9998", "0,99976"], ["0,555", "0,5545"], ["0,811", "0,8106"], ["0,974", "0,9742"],
+    ["0,10", "0,102"], ["0,23", "0,228"], ["0,40", "0,396"], ["1,43", "1,434"], ["1,68", "1,677"], ["0,29", "0,289"]];
+  for (const [a, b] of pairs) await exact(stack, a, b, `стекинг ${a} → ${b}`);
+  await starts(stack, "z = 0,56", STACK_CALC, "стекинг: слагаемые и z = 9,72");
+  await starts(stack, "P = σ(", STACK_P, "стекинг: P = σ(9,72)");
+  await starts(stack, "RF (0,48)", STACK_NOTE, "стекинг: «простое среднее 0,76»");
+
+  await exact(real, "0,7%", "0,8%", "ECE 0,8% (пересчитано на текущем коде)");
+  await exact(real, "бұрын 46–83%", "бұрын 46–92%", "маскировка: было 46–92%");
+  const big = texts(real).find((n) => n.characters.trim() === "93%");
+  if (big) { await sub(big, big.characters, "92–93%"); big.fontSize = 76; big.y += 12; ok("исправлено: маскировка 92–93%"); }
+
+  await starts(S.errors, "Шұғылдық пен ақша сомасы бар",
+    "Қауіпті сөздері бар қарапайым хабарламалар: мысалы, курьердің «есік коды жұмыс істемеді» деген хабары", "ложные тревоги (описание)");
+  await starts(S.errors, "Оқыту жиынында аз кездескен",
+    "Ақша, сілтеме немесе код ашық сұралмайтын, жұмсақ жазылған алаяқтық: «жалақылы жұмыс», инвестиция, «ертеңге дейін қарызға бер»", "пропуски (описание)");
 }
 
 // Put the slides in the defense order. Figma has changed this API over
