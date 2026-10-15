@@ -144,9 +144,8 @@ function escapeRegExp(s) {
 // Deliberately NOT a plain `\b`: JavaScript's regex `\b` only recognizes
 // ASCII `[A-Za-z0-9_]` as "word" characters, so it fails to see a boundary
 // between whitespace and a Cyrillic/Kazakh letter - and the vast majority
-// of every word list here is Cyrillic/Kazakh. `(?<![\p{L}\p{N}_])` is a
-// Unicode-aware negative lookbehind (via the `u` flag's \p{} property
-// escapes, ES2018+) that correctly treats any Unicode letter/number as a
+// of every word list here is Cyrillic/Kazakh. `(?:^|[^\p{L}\p{N}_])` (the
+// `u` flag's \p{} property escapes) treats any Unicode letter/number as a
 // "word" character, matching Python's `\b` (Unicode-aware by default).
 //
 // Also deliberately NOT right-boundary-anchored, i.e. this is prefix
@@ -155,9 +154,13 @@ function escapeRegExp(s) {
 // (see the comments above WORD_LISTS.money/loan/verificationService/threat):
 // "оплат" must still match "оплатите"/"оплата", "займ" must still match
 // "займы".
+//
+// Not a lookbehind (?<!...): Safari only understands lookbehind since
+// iOS 16.4, and on an older iPhone the whole script would fail to load
+// (the offline phone page, static/check/, runs this file).
 function countMatches(textLower, words) {
   return words.reduce((n, w) => {
-    const pattern = new RegExp("(?<![\\p{L}\\p{N}_])" + escapeRegExp(w.toLowerCase()), "u");
+    const pattern = new RegExp("(?:^|[^\\p{L}\\p{N}_])" + escapeRegExp(w.toLowerCase()), "u");
     return n + (pattern.test(textLower) ? 1 : 0);
   }, 0);
 }
@@ -214,10 +217,13 @@ function extractUrls(textLower) {
 // bare mentions so they still register as a domain.
 // Python's \b and re.IGNORECASE are Unicode-aware, so the same pattern
 // written with JavaScript's \b would see a word start in "жkaspi.kz"
-// where Python does not.
+// where Python does not. The word start is matched as "string start or a
+// non-word character" and the domain is group 1 (no lookbehind: see
+// countMatches). A match always ends before a non-word character, so
+// consuming the character in front of the next one never skips a domain.
 const BARE_DOMAIN_PATTERN = new RegExp(
-  "(?<![" + PY_WORD + "])[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9-]+)*\\."
-  + "(?:ru|kz|com|net|org|info|xyz|top|site|online|live|icu|click|by|ua|io|me|co)(?![" + PY_WORD + "])",
+  "(?:^|[^" + PY_WORD + "])([a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9-]+)*\\."
+  + "(?:ru|kz|com|net|org|info|xyz|top|site|online|live|icu|click|by|ua|io|me|co))(?![" + PY_WORD + "])",
   "giu"
 );
 
@@ -226,8 +232,11 @@ function extractBareDomains(textLower, urls) {
   for (const u of urls) {
     masked = masked.split(u).join(" ");
   }
-  const matches = masked.match(BARE_DOMAIN_PATTERN);
-  return matches || [];
+  const out = [];
+  BARE_DOMAIN_PATTERN.lastIndex = 0;
+  let m;
+  while ((m = BARE_DOMAIN_PATTERN.exec(masked)) !== null) out.push(m[1]);
+  return out;
 }
 
 function getDomain(url) {

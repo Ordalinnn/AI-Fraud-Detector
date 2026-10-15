@@ -19,5 +19,6 @@ def test_install_panel_renders(tmp_path, monkeypatch, lang):
     assert not at.exception, at.exception
     md = "\n".join(m.value for m in at.markdown)
     assert "AI-Fraud-Detector.apk" in md          # Android tab links the APK
-    assert "?text=" in md                          # iPhone tab has the shortcut URL
+    assert "#text=" in md                          # iPhone tab has the shortcut URL
+    assert "app/static/check/index.html" in md     # ...pointing at the offline check page
     assert len(at.tabs) >= 3

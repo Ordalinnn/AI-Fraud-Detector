@@ -1,0 +1,14 @@
+{
+  "id": "./index.html",
+  "name": "AI Fraud Detector — проверка сообщения",
+  "short_name": "Fraud Check",
+  "description": "Checks a message for scam on your phone, even offline. The text is not sent anywhere.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#1e3a8a",
+  "icons": [
+    { "src": "icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

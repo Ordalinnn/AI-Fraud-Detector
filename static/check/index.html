@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>AI Fraud Detector</title>
+  <meta name="description" content="Checks a message for scam on your phone. The text is not sent anywhere.">
+  <meta name="theme-color" content="#1e3a8a">
+  <meta name="color-scheme" content="light">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Fraud Check">
+  <meta name="format-detection" content="telephone=no">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.png" type="image/png">
+  <link rel="apple-touch-icon" href="icon.png">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <main class="wrap">
+    <header class="top">
+      <img class="logo" src="icon.png" alt="" width="44" height="44">
+      <div class="heading">
+        <h1 id="pageTitle">AI Fraud Detector</h1>
+        <p id="subtitle" class="subtitle"></p>
+      </div>
+      <select id="lang" class="lang" aria-label="Language">
+        <option value="kz">KZ</option>
+        <option value="ru">RU</option>
+        <option value="en">EN</option>
+      </select>
+    </header>
+
+    <label for="input" id="inputLabel" class="visually-hidden">Message</label>
+    <textarea id="input" rows="6" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+    <div id="notice" class="notice hidden" role="alert"></div>
+
+    <div class="buttons">
+      <button id="pasteBtn" class="btn btn-light" type="button"></button>
+      <button id="clearBtn" class="btn btn-light" type="button"></button>
+      <button id="checkBtn" class="btn btn-primary" type="button"></button>
+    </div>
+
+    <section id="result" class="result hidden" aria-live="polite">
+      <div id="banner" class="banner"></div>
+      <div class="meter" aria-hidden="true"><div id="meterFill" class="meter-fill"></div></div>
+      <p id="advice" class="advice"></p>
+      <p id="words" class="words hidden"></p>
+      <ul id="reasons" class="list"></ul>
+      <ul id="domains" class="list domains"></ul>
+      <div class="actions">
+        <button id="shareBtn" class="btn btn-light hidden" type="button"></button>
+        <button id="mistakeBtn" class="btn btn-light" type="button"></button>
+      </div>
+      <p id="mistakeThanks" class="small hidden" role="status"></p>
+      <a id="siteLink" class="site-link" href="../../../" target="_blank" rel="noopener"></a>
+    </section>
+
+    <section id="mistakes" class="card hidden">
+      <p id="mistakesTitle" class="card-title"></p>
+      <div class="actions">
+        <button id="mistakesDownload" class="btn btn-light" type="button"></button>
+        <button id="mistakesClear" class="btn btn-link" type="button"></button>
+      </div>
+      <p id="mistakesNote" class="small"></p>
+    </section>
+
+    <p id="installHint" class="card small hidden"></p>
+    <p id="status" class="small status"></p>
+    <footer id="footer" class="small footer"></footer>
+  </main>
+
+  <script src="lib/i18n.js"></script>
+  <script src="lib/mistakes.js"></script>
+  <script src="lib/normalize.js"></script>
+  <script src="lib/scorer.js"></script>
+  <script src="lib/ensemble.js"></script>
+  <script src="lib/detector.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
