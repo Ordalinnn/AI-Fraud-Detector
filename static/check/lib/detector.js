@@ -1,0 +1,582 @@
+// Rule features, reasons and domain checks for the browser extension -
+// line-by-line the same as fraud_logic.py on the site.
+//
+// extractFeatures() is the feature vector the site's LR/RF/GB models read;
+// tests/ensemble.test.js checks it against Python on ~4,500 texts, so
+// ensemble.js (the site's full model) gets exactly the site's inputs.
+// heuristicBaseScore()/lrScore() below are only the fallback for the
+// unlikely case that ensemble_model.json cannot be loaded.
+//
+// Runs entirely locally: no network request is made, so message text never
+// leaves the user's device.
+
+// Undo disguises ("к0д", Latin look-alike letters, "к о д ы") before
+// counting keywords - same step as the web app (text_normalize.py).
+const normalizeForRules = (typeof self !== "undefined" && self.normalizeText)
+  || (typeof require === "function" ? require("./normalize.js").normalizeText : (t) => t);
+const isDisguisedText = (typeof self !== "undefined" && self.isDisguised)
+  || (typeof require === "function" ? require("./normalize.js").isDisguised : () => false);
+
+const WORD_LISTS = {
+  urgent: [
+    "срочно", "шұғыл", "быстро", "немедленно", "қазір", "тез",
+    "urgent", "now", "immediately", "asap", "прямо сейчас",
+    "сейчас же", "без промедления"
+  ],
+  secret: [
+    "код", "пароль", "cvv", "sms", "құпия", "password",
+    "пин", "pin", "код подтверждения", "verification code",
+    "one time code", "otp"
+  ],
+  money: [
+    "карта", "счет", "банк", "ақша", "төле", "оплат", "перевод",
+    "баланс", "средства", "деньги", "transfer", "payment", "pay",
+    "wallet", "iban"
+  ],
+  // "оплат" (not "оплата") is a stem: it also catches "оплатить"/
+  // "оплатите"/"оплачивает" since matching is substring-based and doesn't
+  // handle Russian verb conjugation otherwise. Same idea for "pay".
+  //
+  // Personal "lend/borrow me money" phrasing - distinct from money above,
+  // which is generic banking vocabulary a hacked-account loan request often
+  // *doesn't* use at all (no "card"/"account"/"bank", just "can you lend me
+  // some money, I'll pay you back"). This is the dominant pattern behind the
+  // "hacked WhatsApp/Telegram, message a relative/friend asking to urgently
+  // borrow money" scam widely reported in Kazakhstan/the wider CIS region.
+  loan: [
+    "займ", "занять", "одолж", "в долг", "взаймы", "до зарплаты",
+    "выручи", "перекинь", "закинь", "borrow", "lend me", "spot me"
+  ],
+  // Emotionally-manipulative "click this link to vote/support someone you
+  // know" pretext - a real, actively-reported Kazakhstan/Russia WhatsApp/
+  // Telegram account-hijack vector distinct from loan above: loan covers the
+  // *already-hijacked* account asking a contact for money; this covers how
+  // the account gets hijacked in the first place (the linked page asks for
+  // a phone number and the SMS code that arrives next, which is actually
+  // the victim's own account login code).
+  voteLink: [
+    "проголосу", "голосование", "дауыс бер", "конкурс",
+    "vote for", "please vote", "support my", "cast your vote"
+  ],
+  verificationService: [
+    "провер", "справк", "сертификат", "реестр", "registry",
+    "verif", "certificate"
+  ],
+  threat: [
+    "заблокирована", "удален", "штраф", "угрозой", "бұғатталды", "жабылады",
+    "blocked", "suspended", "terminated", "penalty", "freeze",
+    "ограничен", "будет закрыт"
+  ],
+  identity: [
+    "паспорт", "иин", "удостоверение", "личность", "identity",
+    "document", "id card", "жсн", "құжат"
+  ],
+  reward: [
+    "выиграли", "приз", "бонус", "подарок", "акция", "компенсация",
+    "won", "prize", "gift", "bonus", "reward", "ұтыс", "сыйлық"
+  ],
+  pressure: [
+    "не говорите никому", "никому не сообщайте", "это секретно",
+    "только сейчас", "последний шанс", "иначе", "do not tell anyone",
+    "last chance", "only now", "қазір ғана"
+  ],
+  suspiciousDomainWords: [
+    "login", "verify", "secure", "bonus", "gift",
+    "account", "support", "confirm", "prize", "payment", "wallet",
+    "security", "update", "auth", "free", "check", "registry"
+  ],
+  suspiciousZones: [".xyz", ".top", ".click", ".site", ".online", ".live", ".info", ".icu"],
+  knownBrands: [
+    "kaspi.kz", "halykbank.kz", "sberbank.kz", "sberbank.ru",
+    "tinkoff.ru", "vtb.ru", "egov.kz", "kazpost.kz", "dhl.com",
+    "paypal.com", "amazon.com", "apple.com", "google.com", "microsoft.com",
+    "instagram.com", "whatsapp.com", "facebook.com", "netflix.com",
+    "temu.com", "shein.com", "aliexpress.com"
+  ]
+};
+
+// Cyrillic characters that render visually identical (or near-identical) to
+// a Latin letter in most fonts — the basis of IDN homograph phishing, e.g.
+// "kаspi.kz" with a Cyrillic а (U+0430) looks exactly like kaspi.kz to a
+// human but is a completely different domain that substring matching alone
+// would miss.
+const CONFUSABLES = {
+  "а": "a", "е": "e", "о": "o", "р": "p", "с": "c", "у": "y", "х": "x",
+  "і": "i", "ѕ": "s", "һ": "h", "ј": "j"
+};
+
+function deconfuse(domain) {
+  return domain.replace(/./gu, (ch) => CONFUSABLES[ch] || ch);
+}
+
+function isAscii(s) {
+  return /^[\x00-\x7F]*$/.test(s);
+}
+
+function levenshtein(a, b) {
+  if (a === b) return 0;
+  if (!a) return b.length;
+  if (!b) return a.length;
+  let prevRow = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const curRow = [i];
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      curRow[j] = Math.min(prevRow[j] + 1, curRow[j - 1] + 1, prevRow[j - 1] + cost);
+    }
+    prevRow = curRow;
+  }
+  return prevRow[b.length];
+}
+
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// Counts how many entries from `words` appear in `textLower` as a match
+// starting at a word boundary - NOT plain substring matching (what this
+// function used to do), which let short whole words like "now" (in
+// WORD_LISTS.urgent) or "pin" (in WORD_LISTS.secret) spuriously match
+// *inside* unrelated words: "now" inside "know"/"known"/"snow", "pin"
+// inside "shopping"/"opinion"/"spin". Mirrors fraud_logic.count_matches()'s
+// fix for the exact same bug.
+//
+// Deliberately NOT a plain `\b`: JavaScript's regex `\b` only recognizes
+// ASCII `[A-Za-z0-9_]` as "word" characters, so it fails to see a boundary
+// between whitespace and a Cyrillic/Kazakh letter - and the vast majority
+// of every word list here is Cyrillic/Kazakh. `(?:^|[^\p{L}\p{N}_])` (the
+// `u` flag's \p{} property escapes) treats any Unicode letter/number as a
+// "word" character, matching Python's `\b` (Unicode-aware by default).
+//
+// Also deliberately NOT right-boundary-anchored, i.e. this is prefix
+// matching from a word start, not whole-word matching - several entries are
+// intentional word *stems* covering Russian/Kazakh conjugation/suffix forms
+// (see the comments above WORD_LISTS.money/loan/verificationService/threat):
+// "оплат" must still match "оплатите"/"оплата", "займ" must still match
+// "займы".
+//
+// Not a lookbehind (?<!...): Safari only understands lookbehind since
+// iOS 16.4, and on an older iPhone the whole script would fail to load
+// (the offline phone page, static/check/, runs this file).
+function countMatches(textLower, words) {
+  return words.reduce((n, w) => {
+    const pattern = new RegExp("(?:^|[^\\p{L}\\p{N}_])" + escapeRegExp(w.toLowerCase()), "u");
+    return n + (pattern.test(textLower) ? 1 : 0);
+  }, 0);
+}
+
+function isUpperChar(ch) {
+  return ch !== ch.toLowerCase() && ch === ch.toUpperCase();
+}
+
+// Python's str.isspace() / regex \s set. JavaScript's \s differs (it also
+// matches U+FEFF but not \x1c-\x1f or \x85), so a message using those
+// would split into different words and links than on the site.
+const PY_SPACE = "\\t\\n\\x0b\\x0c\\r\\x1c-\\x1f \\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000";
+const PY_SPACES = new RegExp("[" + PY_SPACE + "]+", "u");
+// Python's regex \w for str patterns (letters, numbers, underscore); used to
+// emulate Python's Unicode-aware \b, which JavaScript's ASCII-only \b is not.
+const PY_WORD = "\\p{L}\\p{N}_";
+
+function pySplit(s) {
+  return s.split(PY_SPACES).filter((w) => w.length > 0);
+}
+
+// Python's str.isdigit(): decimal digits (any script) plus the "digit"
+// characters such as superscripts and circled numbers (Numeric_Type=Digit),
+// listed here because JavaScript has no property for them.
+const PY_DIGIT = /[\p{Nd}\u00b2\u00b3\u00b9\u1369-\u1371\u19da\u2070\u2074-\u2079\u2080-\u2089\u2460-\u2468\u2474-\u247c\u2488-\u2490\u24ea\u24f5-\u24fd\u24ff\u2776-\u277e\u2780-\u2788\u278a-\u2792\u{10a40}-\u{10a43}\u{10e60}-\u{10e68}\u{11052}-\u{1105a}\u{1f100}-\u{1f10a}]/u;
+
+function countDigits(s) {
+  let n = 0;
+  for (const ch of s) if (PY_DIGIT.test(ch)) n++;
+  return n;
+}
+
+// Python's round(x, 2): the exact binary value rounded half to even.
+// toFixed() is exact too but rounds a tie up; ties at 2 decimals happen
+// only for multiples of 1/8 (x.125, x.375, ...), e.g. 41 letters / 8 words.
+function pyRound2(x) {
+  if (Number.isInteger(x * 8) && !Number.isInteger(x * 4)) {
+    const lo = Math.floor(x * 100);
+    return (lo % 2 === 0 ? lo : lo + 1) / 100;
+  }
+  return Number(x.toFixed(2));
+}
+
+const URL_PATTERN = new RegExp("https?://[^" + PY_SPACE + "]+|www\\.[^" + PY_SPACE + "]+", "gu");
+
+function extractUrls(textLower) {
+  const matches = textLower.match(URL_PATTERN);
+  return matches || [];
+}
+
+// Real scams increasingly write a domain as plain text (e.g. "check-tech-
+// base.ru") instead of a clickable http(s):// or www. link, specifically
+// to dodge filters that only look for literal links. This catches those
+// bare mentions so they still register as a domain.
+// Python's \b and re.IGNORECASE are Unicode-aware, so the same pattern
+// written with JavaScript's \b would see a word start in "жkaspi.kz"
+// where Python does not. The word start is matched as "string start or a
+// non-word character" and the domain is group 1 (no lookbehind: see
+// countMatches). A match always ends before a non-word character, so
+// consuming the character in front of the next one never skips a domain.
+const BARE_DOMAIN_PATTERN = new RegExp(
+  "(?:^|[^" + PY_WORD + "])([a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9-]+)*\\."
+  + "(?:ru|kz|com|net|org|info|xyz|top|site|online|live|icu|click|by|ua|io|me|co))(?![" + PY_WORD + "])",
+  "giu"
+);
+
+function extractBareDomains(textLower, urls) {
+  let masked = textLower;
+  for (const u of urls) {
+    masked = masked.split(u).join(" ");
+  }
+  const out = [];
+  BARE_DOMAIN_PATTERN.lastIndex = 0;
+  let m;
+  while ((m = BARE_DOMAIN_PATTERN.exec(masked)) !== null) out.push(m[1]);
+  return out;
+}
+
+function getDomain(url) {
+  return url.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
+}
+
+function brandImpersonation(domain) {
+  // Also catches two patterns plain substring matching misses: homograph
+  // domains that swap in look-alike Cyrillic characters (deconfused before
+  // comparison), and single-character typosquats like "kasp1.kz" or
+  // "paypa1.com" (caught via edit distance against each domain token).
+  //
+  // Checked up front against the RAW (not deconfused) domain, against ALL
+  // brands at once: some brand cores repeat across TLDs (sberbank.kz vs
+  // sberbank.ru), so a per-brand-loop skip would still flag one as
+  // impersonating the other. A homoglyph domain that only equals a brand
+  // after deconfusion isn't the real domain — it must NOT be caught here.
+  if (WORD_LISTS.knownBrands.some((b) => domain === b || domain.endsWith("." + b))) return null;
+  const normalized = deconfuse(domain);
+  for (const brand of WORD_LISTS.knownBrands) {
+    const brandCore = brand.split(".")[0];
+    if (normalized.includes(brandCore)) return brand;
+    // Short cores (e.g. "vtb", "dhl") are skipped — a 1-edit match against
+    // a 3-letter word is too likely to be a false positive.
+    if (brandCore.length >= 5) {
+      for (const token of normalized.split(/[^a-z0-9]+/)) {
+        if (token.length >= 4 && levenshtein(token, brandCore) === 1) return brand;
+      }
+    }
+  }
+  return null;
+}
+
+function domainFlags(domain) {
+  // Returns language-agnostic flag keys; popup.js resolves labelKey (and
+  // {brand} for "impersonates") to the current UI language's text.
+  const flags = [];
+  const impersonated = brandImpersonation(domain);
+  if (impersonated) {
+    flags.push({ labelKey: "impersonates", brand: impersonated, severity: "critical" });
+  } else if (!isAscii(domain)) {
+    // No known brand matched, but non-Latin characters in a domain are
+    // themselves a classic IDN homograph phishing signal even when the
+    // impersonated brand isn't in knownBrands.
+    flags.push({ labelKey: "nonLatinDomain", severity: "critical" });
+  }
+  if (WORD_LISTS.suspiciousDomainWords.some((w) => domain.includes(w))) {
+    flags.push({ labelKey: "suspiciousKeyword", severity: "warn" });
+  }
+  if (domain.length > 20) flags.push({ labelKey: "longDomain", severity: "warn" });
+  if (WORD_LISTS.suspiciousZones.some((z) => domain.endsWith(z))) {
+    flags.push({ labelKey: "suspiciousTld", severity: "critical" });
+  }
+  if (countDigits(domain)) flags.push({ labelKey: "containsDigits", severity: "warn" });
+  return flags;
+}
+
+function extractFeatures(text) {
+  if (text === null || text === undefined) {
+    text = "";
+  } else if (typeof text !== "string") {
+    text = String(text);
+  }
+  const textLower = text.toLowerCase();
+  // Everything is counted in the de-disguised text EXCEPT links/domains,
+  // which come from the original, so "kаspi.kz" with a Cyrillic "а" is
+  // still flagged as a look-alike domain.
+  const norm = normalizeForRules(text);
+  const normLower = norm.toLowerCase();
+  const urls = extractUrls(textLower);
+  const bareDomains = extractBareDomains(textLower, urls);
+  const domains = urls.map(getDomain).concat(bareDomains);
+  const linkCount = urls.length + bareDomains.length;
+
+  let suspiciousDomain = 0, longDomain = 0, suspiciousZone = 0, digitDomain = 0, brandFlag = 0, homoglyphDomain = 0;
+  for (const d of domains) {
+    if (WORD_LISTS.suspiciousDomainWords.some((w) => d.includes(w))) suspiciousDomain = 1;
+    if (d.length > 20) longDomain = 1;
+    if (WORD_LISTS.suspiciousZones.some((z) => d.endsWith(z))) suspiciousZone = 1;
+    if (countDigits(d)) digitDomain = 1;
+    if (brandImpersonation(d)) brandFlag = 1;
+    if (!isAscii(d)) homoglyphDomain = 1;
+  }
+
+  const urgentCount = countMatches(normLower, WORD_LISTS.urgent);
+  const loanCount = countMatches(normLower, WORD_LISTS.loan);
+  const voteLinkCount = countMatches(normLower, WORD_LISTS.voteLink);
+  const threatCount = countMatches(normLower, WORD_LISTS.threat);
+
+  // Basic text statistics — mirrors fraud_logic.extract_features()'s
+  // digit_count/exclamation_count/uppercase_count/text_length/word_count/
+  // avg_word_length. uppercaseCount is measured against the ORIGINAL
+  // (non-lowercased) text, same as the Python version.
+  const words = pySplit(normLower);
+  const digitCount = countDigits(normLower);
+  const exclamationCount = (normLower.match(/!/g) || []).length;
+  const uppercaseCount = Array.from(norm).filter(isUpperChar).length;
+  const textLength = Array.from(norm).length;
+  const wordCount = words.length;
+  const avgWordLength = wordCount
+    ? pyRound2(words.reduce((sum, w) => sum + Array.from(w).length, 0) / wordCount)
+    : 0;
+
+  return {
+    hasLink: linkCount > 0 ? 1 : 0,
+    urgentCount,
+    secretCount: countMatches(normLower, WORD_LISTS.secret),
+    moneyCount: countMatches(normLower, WORD_LISTS.money),
+    loanCount,
+    voteLinkCount,
+    threatCount,
+    identityCount: countMatches(normLower, WORD_LISTS.identity),
+    rewardCount: countMatches(normLower, WORD_LISTS.reward),
+    verificationCount: countMatches(normLower, WORD_LISTS.verificationService),
+    pressureCount: countMatches(normLower, WORD_LISTS.pressure),
+    suspiciousDomain,
+    longDomain,
+    suspiciousZone,
+    digitDomain,
+    brandFlag,
+    homoglyphDomain,
+    digitCount,
+    exclamationCount,
+    uppercaseCount,
+    textLength,
+    wordCount,
+    avgWordLength,
+    urlCount: linkCount,
+    hasMultipleWarnings: urgentCount > 0 && threatCount > 0 ? 1 : 0,
+    domains
+  };
+}
+
+function heuristicBaseScore(f) {
+  let score = 0.03; // small baseline so neutral text isn't exactly 0%
+  score += f.hasLink ? 0.08 : 0;
+  score += Math.min(f.urgentCount * 0.06, 0.18);
+  score += Math.min(f.secretCount * 0.15, 0.30);
+  score += Math.min(f.moneyCount * 0.04, 0.12);
+  score += Math.min(f.loanCount * 0.08, 0.16);
+  score += Math.min(f.voteLinkCount * 0.08, 0.16);
+  score += Math.min(f.threatCount * 0.08, 0.16);
+  score += Math.min(f.identityCount * 0.10, 0.20);
+  score += Math.min(f.rewardCount * 0.07, 0.14);
+  score += Math.min(f.pressureCount * 0.10, 0.20);
+  score += Math.min(f.verificationCount * 0.05, 0.15);
+  score += f.suspiciousDomain ? 0.10 : 0;
+  score += f.suspiciousZone ? 0.10 : 0;
+  score += f.longDomain ? 0.05 : 0;
+  score += f.digitDomain ? 0.05 : 0;
+  score += f.brandFlag ? 0.15 : 0;
+  score += f.homoglyphDomain ? 0.15 : 0;
+  // Weights below are informed by the coefficients a LogisticRegression
+  // trained on the real app.py dataset actually learned for these features
+  // (digitCount, uppercaseCount, wordCount, avgWordLength all had
+  // meaningfully positive coefficients — several bigger than threatCount's).
+  // wordCount and textLength are highly collinear (both just measure
+  // message verbosity), so only wordCount is scored to avoid double
+  // counting the same signal. exclamationCount is intentionally excluded:
+  // the trained model learned an ~0 coefficient for it (co-occurs with
+  // urgentCount, which already carries the signal) — still tracked in the
+  // feature object for parity/explainability, just not scored here.
+  score += Math.min(f.digitCount * 0.01, 0.08);
+  score += Math.min(f.uppercaseCount * 0.01, 0.08);
+  score += Math.min(f.wordCount * 0.002, 0.08);
+  score += Math.min(f.avgWordLength * 0.01, 0.08);
+  return Math.min(score, 0.95);
+}
+
+// StandardScaler + LogisticRegression(C=1.0, max_iter=1000, random_state=42)
+// coefficients, trained on app.py's full training dataset via the exact
+// same extractFeatures()/extract_features() vector used below. Regenerate
+// with `python scripts/extract_lr_coefficients.py` from the repo root
+// whenever fraud_logic.extract_features() changes shape or app.py's
+// training dataset changes, and paste the output back in here.
+const LR_FEATURE_ORDER = ["hasLink", "urgentCount", "secretCount", "moneyCount", "loanCount", "voteLinkCount", "threatCount", "identityCount", "rewardCount", "pressureCount", "verificationCount", "suspiciousDomain", "longDomain", "suspiciousZone", "digitDomain", "brandFlag", "homoglyphDomain", "digitCount", "exclamationCount", "uppercaseCount", "textLength", "wordCount", "avgWordLength", "urlCount", "hasMultipleWarnings"];
+const LR_MEAN = [0.020744, 0.155222, 0.066524, 0.41917, 0.02432, 0.01073, 0.05794, 0.029328, 0.045064, 0.013591, 0.045064, 0.002146, 0.001431, 0.001431, 0.0, 0.000715, 0.0, 0.126609, 0.0, 0.015021, 66.691702, 10.33691, 5.766981, 0.020744, 0.010014];
+const LR_SCALE = [0.142526, 0.37378, 0.276413, 0.640975, 0.163065, 0.133295, 0.23363, 0.168723, 0.220808, 0.115785, 0.210865, 0.046274, 0.037796, 0.037796, 1.0, 0.026736, 1.0, 0.627568, 1.0, 0.18274, 16.158021, 3.194496, 1.176732, 0.142526, 0.099569];
+const LR_COEF = [-0.230047, 1.527335, 0.632888, 0.448915, -0.402915, -0.238641, 0.316637, 0.428902, 0.328203, 0.688496, 0.215165, 0.186959, 0.285781, 0.133263, 0.0, 0.109507, 0.0, -0.095838, 0.0, 0.062743, 1.415033, 0.068449, 0.210868, -0.230047, 0.175177];
+const LR_INTERCEPT = 0.257836;
+
+function sigmoid(z) {
+  return 1 / (1 + Math.exp(-z));
+}
+
+function lrScore(f) {
+  let z = LR_INTERCEPT;
+  for (let i = 0; i < LR_FEATURE_ORDER.length; i++) {
+    const x = f[LR_FEATURE_ORDER[i]];
+    z += ((x - LR_MEAN[i]) / LR_SCALE[i]) * LR_COEF[i];
+  }
+  return sigmoid(z);
+}
+
+// Minority weight for the ported LR component in the blended base score
+// (see the file header comment for why: evaluated on its own, the LR model
+// over-scores some plain conversational messages that never appear near
+// its training templates). Meaningfully influences the result without
+// being able to single-handedly flip a message the heuristic scores as safe.
+const LR_BLEND_WEIGHT = 0.2;
+
+function ruleBoost(f) {
+  let boost = 0;
+  if (f.hasLink && f.secretCount) boost += 0.15;
+  if (f.urgentCount && f.moneyCount) boost += 0.12;
+  if (f.loanCount && f.urgentCount) boost += 0.12;
+  if (f.voteLinkCount && f.hasLink) boost += 0.10;
+  if (f.secretCount && f.moneyCount) boost += 0.15;
+  if (f.threatCount && f.hasLink) boost += 0.10;
+  if (f.rewardCount && f.moneyCount) boost += 0.12;
+  if (f.verificationCount && (f.moneyCount || f.hasLink)) boost += 0.15;
+  if (f.pressureCount) boost += 0.10;
+  if (f.suspiciousZone || f.suspiciousDomain) boost += 0.10;
+  if (f.brandFlag) boost += 0.15;
+  if (f.homoglyphDomain) boost += 0.15;
+  if (f.hasMultipleWarnings) boost += 0.08;
+  if (f.urlCount > 1) boost += 0.05;
+  return Math.min(boost, 0.30);
+}
+
+// Reason keys, in display order. popup.js/background.js resolve each to
+// the current UI language's text via I18N.strings(lang).reasonLabels.
+// wordCount/textLength/avgWordLength are deliberately excluded (mirrors
+// fraud_logic.explain()'s `irrelevant` set): they're near-always non-zero
+// for any message, so surfacing them as "reasons" would be noise rather
+// than a meaningful signal.
+const EXPLAIN_KEYS = [
+  "hasLink", "urgentCount", "secretCount", "moneyCount", "loanCount",
+  "voteLinkCount", "threatCount", "identityCount", "rewardCount",
+  "pressureCount", "verificationCount", "suspiciousDomain", "longDomain",
+  "suspiciousZone", "digitDomain", "brandFlag", "homoglyphDomain",
+  "digitCount", "exclamationCount", "uppercaseCount", "hasMultipleWarnings",
+  "urlCount"
+];
+
+// digitCount/exclamationCount/uppercaseCount are raw character counts, not
+// keyword-list matches - a bare ">0" bar is too low for them: virtually
+// every message has >=1 uppercase letter just from starting a sentence, and
+// most ordinary messages mention at least one number (a price, a time), which
+// contradicts their own reasonLabels wording ("many numbers", "many
+// uppercase letters" - see i18n.js). urlCount is similar: its own label says
+// "Multiple links were detected", which a single link would contradict.
+// Every other count feature matches a specific word from a curated list,
+// where even one match (e.g. one loan-request phrase) is meaningful on its
+// own, so those keep the default ">0" bar. Mirrors app.py's explain()
+// min_thresholds dict exactly.
+const MIN_THRESHOLDS = { digitCount: 8, exclamationCount: 2, uppercaseCount: 5, urlCount: 2 };
+
+function explain(f) {
+  const reasonKeys = [];
+  for (const key of EXPLAIN_KEYS) {
+    const value = f[key];
+    if (value && value >= (MIN_THRESHOLDS[key] || 1)) reasonKeys.push(key);
+  }
+  return reasonKeys;
+}
+
+function riskStyle(prob) {
+  // levelKey is resolved to translated text by the caller (popup.js /
+  // background.js), same pattern as fraud_logic.risk_level() in the Python app.
+  //
+  // The mid/high boundary is pinned to 0.5 - the same cutoff analyzeText()'s
+  // `isFraud: prob >= 0.5` verdict uses - so the colored badge can never
+  // contradict the binary verdict. This used to be 0.6, so a prob in
+  // [0.5, 0.6) showed a yellow "mid/Suspicious" badge right next to an
+  // already-FRAUD verdict/advice. Mirrors fraud_logic.risk_level(prob,
+  // threshold=0.5), which computes this generally as
+  // low_cut=threshold*0.6=0.3, high_cut=threshold+(1-threshold)*0.6=0.8.
+  if (prob < 0.3) return { levelKey: "low", cssClass: "risk-low", emoji: "🟢" };
+  if (prob < 0.5) return { levelKey: "mid", cssClass: "risk-mid", emoji: "🟡" };
+  if (prob < 0.8) return { levelKey: "high", cssClass: "risk-high", emoji: "🟠" };
+  return { levelKey: "critical", cssClass: "risk-critical", emoji: "🔴" };
+}
+
+// The risk percentage as text, exactly as the site shows it
+// (fraud_logic.risk_percent: one decimal, Python's round-half-even, at most
+// 99.9 - no model is that certain).
+function riskPercent(prob) {
+  const x = Math.min(prob * 100, 99.9);
+  if (Number.isInteger(x * 4) && !Number.isInteger(x * 2)) {
+    const lo = Math.floor(x * 10);
+    return ((lo % 2 === 0 ? lo : lo + 1) / 10).toFixed(1);
+  }
+  return x.toFixed(1);
+}
+
+// `scorer` (optional): the site's full model (ensemble.js), so the
+// percentage is the same as on the site for the same text; the rules below
+// also supply the human-readable reasons and domain checks. Without it
+// (model file failed to load) the older rules + LR blend is used, so the
+// extension never stops working.
+function analyzeText(text, scorer) {
+  const f = extractFeatures(text);
+  let prob;
+  let modelWords = [];
+  let engine = "rules";
+  let scores = null;
+  if (scorer) {
+    const r = scorer.analyze(String(text == null ? "" : text), f, ruleBoost(f));
+    prob = r.probability;
+    modelWords = r.suspiciousWords;
+    scores = r.scores;
+    engine = "model";
+  } else {
+    const base = (1 - LR_BLEND_WEIGHT) * heuristicBaseScore(f) + LR_BLEND_WEIGHT * lrScore(f);
+    prob = Math.min(0.99, base + ruleBoost(f));
+  }
+  const style = riskStyle(prob);
+  const reasons = explain(f);
+  // Disguised text ("к0д", Latin look-alikes, invisible characters) is a
+  // warning sign of its own - shown first; not a model input.
+  if (isDisguisedText(text)) reasons.unshift("disguised");
+  const domainInfo = f.domains.map((d) => ({ domain: d, flags: domainFlags(d) }));
+  return {
+    prob,
+    pct: riskPercent(prob),
+    isFraud: prob >= 0.5,
+    ...style,
+    reasons,
+    domainInfo,
+    modelWords,
+    scores,
+    engine
+  };
+}
+
+// Exposed for popup.js / background.js (classic scripts, no ES modules,
+// for maximum compatibility with Manifest V3 service workers).
+if (typeof self !== "undefined") {
+  self.FraudDetector = { analyzeText };
+}
+
+// Also exposed via CommonJS exports (Node's `require`) so the test suite
+// can exercise internal helpers directly instead of only indirectly through
+// analyzeText(). Guarded because classic browser/service-worker scripts have
+// no `module` global.
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = {
+    analyzeText, extractFeatures, lrScore, heuristicBaseScore, ruleBoost, riskPercent, pySplit, countDigits, pyRound2,
+    brandImpersonation, domainFlags, getDomain, levenshtein, riskStyle,
+    extractUrls, extractBareDomains, LR_FEATURE_ORDER
+  };
+}

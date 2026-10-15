@@ -536,6 +536,38 @@ def public_app_url() -> str:
         pass
     return "https://ai-fraud-detector-p6jkftqrssphfcsxxepipo.streamlit.app/"
 
+
+# The offline checker for phones: static/check/ (scripts/build_web_checker.py),
+# served by Streamlit itself (server.enableStaticServing). Streamlit Community
+# Cloud only serves app static files under its own "/~/+/" prefix (see the
+# PWA comment near PWA_ASSET_VERSION), other hosts at the plain path.
+CHECKER_PATH = "app/static/check/index.html"
+
+
+def _serving_url() -> str:
+    """The address this app is actually served from ("" if unknown)."""
+    try:
+        return st.context.url or ""
+    except Exception:
+        return ""
+
+
+def checker_url(lang_key: str | None = None, serving_url: str | None = None) -> str:
+    """On Streamlit Cloud the static file is only reachable on the
+    *.streamlit.app host itself (with the "/~/+/" prefix), so that host wins
+    over a vanity APP_PUBLIC_URL that merely forwards to it."""
+    from urllib.parse import urlsplit
+    served = urlsplit(_serving_url() if serving_url is None else serving_url)
+    if served.netloc.endswith(".streamlit.app"):
+        base, prefix = f"{served.scheme or 'https'}://{served.netloc}/", "~/+/"
+    else:
+        base = public_app_url()
+        prefix = "~/+/" if urlsplit(base).netloc.endswith(".streamlit.app") else ""
+    url = base + prefix + CHECKER_PATH
+    if lang_key:
+        url += "?lang=" + lang_key.split()[-1].lower()
+    return url
+
 # =========================
 # EXPANDED TRAINING DATA
 # =========================
@@ -3913,7 +3945,10 @@ if st.session_state.get("show_install_instructions"):
     with tab_android:
         st.markdown(T["howto_android"].format(apk_url=ANDROID_APK_URL))
     with tab_iphone:
-        st.markdown(T["howto_iphone"].format(url=public_app_url()))
+        st.link_button(T["checker_button"], checker_url(lang), type="primary", width="stretch")
+        # with ?lang=: a Kazakh/English reader gets the page in their language
+        # (an iPhone has no Kazakh system language to fall back on)
+        st.markdown(T["howto_iphone"].format(url=public_app_url(), checker=checker_url(lang)))
     with tab_pc:
         st.markdown(T["howto_pc"])
         ext_version = extension_version()

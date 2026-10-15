@@ -13,8 +13,6 @@ data/real/collected_mistakes.csv for the evaluation (--real).
 """
 from __future__ import annotations
 
-import csv
-import io
 import re
 from datetime import date
 
@@ -62,13 +60,18 @@ def _cell(v) -> str:
     return s
 
 
+def _quoted(s: str) -> str:
+    # same rule as browser-extension/mistakes.js: also quote ";" and tab,
+    # because Excel with Russian/Kazakh regional settings splits cells on
+    # ";" and an unquoted "...;=cmd|..." would become a formula
+    return '"' + s.replace('"', '""') + '"' if any(c in s for c in '",;\t\n\r') else s
+
+
 def to_csv(rows: list) -> str:
-    buf = io.StringIO()
-    w = csv.writer(buf, lineterminator="\n")
-    w.writerow(CSV_COLUMNS)
+    lines = [",".join(CSV_COLUMNS)]
     for r in rows:
-        w.writerow([_cell(r.get(c, "")) for c in CSV_COLUMNS])
-    return buf.getvalue()
+        lines.append(",".join(_quoted(_cell(r.get(c, ""))) for c in CSV_COLUMNS))
+    return "\n".join(lines) + "\n"
 
 
 def unguard(text: str) -> str:

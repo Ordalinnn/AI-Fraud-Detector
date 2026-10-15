@@ -42,3 +42,9 @@ test("CSV has the template's columns, quotes commas/newlines, guards formulas", 
   assert.equal(lines[2], 'срочно",1,ru,,web.whatsapp.com,2026-10-12');
   assert.equal(lines[3], "'=HYPERLINK(1),0,en,,popup,2026-10-12");
 });
+
+test("CSV quotes ';' and tabs (Excel with Russian/Kazakh settings splits on ';')", () => {
+  const M = require("../mistakes.js");
+  const csv = M.toCsv([{ text: "Привет;=cmd|' /C calc'!A0", label: 1, language: "ru", source: "x", date: "2026-10-15" }]);
+  assert.match(csv.split("\n")[1], /^"Привет;=cmd\|' \/C calc'!A0",1,ru,,x,2026-10-15$/);
+});

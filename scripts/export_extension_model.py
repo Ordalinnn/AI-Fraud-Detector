@@ -9,6 +9,8 @@ Trains exactly what app.py trains (app.py's `data` + the real SMS sample,
 same order, same hyperparameters, same random_state), then writes:
 
   browser-extension/ensemble_model.json        every number score() uses
+  static/check/lib/ (scripts/build_web_checker.py) the same model for the
+                                               offline phone page
   browser-extension/tests/ensemble_golden.json texts + scikit-learn's
                                                features and probabilities;
                                                tests/ensemble.test.js must
@@ -115,6 +117,12 @@ def main():
     GOLDEN_PATH.write_text(json.dumps(golden, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
     print(f"{MODEL_PATH.relative_to(ROOT)}: {MODEL_PATH.stat().st_size:,} bytes, fingerprint {fp}")
     print(f"{GOLDEN_PATH.relative_to(ROOT)}: {len(golden_texts)} texts")
+
+    # the phone page (static/check/) runs the same model: refresh its copy
+    spec = importlib.util.spec_from_file_location("build_web_checker", ROOT / "scripts" / "build_web_checker.py")
+    web = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(web)
+    web.main(check=False)
 
 
 if __name__ == "__main__":
