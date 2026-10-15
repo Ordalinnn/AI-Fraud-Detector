@@ -42,18 +42,48 @@ def test_manifest_scope_is_the_checker_folder():
     assert all((CHECK / i["src"]).is_file() for i in m["icons"])
 
 
-def test_checker_url_uses_the_streamlit_cloud_prefix_only_there(monkeypatch):
+def _checker_url_fn(public):
     import ast
-    tree = ast.parse((ROOT / "app.py").read_text(encoding="utf-8"))
-    src = "\n".join(ast.get_source_segment((ROOT / "app.py").read_text(encoding="utf-8"), n)
-                    for n in tree.body
+    src_all = (ROOT / "app.py").read_text(encoding="utf-8")
+    tree = ast.parse(src_all)
+    src = "\n".join(ast.get_source_segment(src_all, n) for n in tree.body
                     if (isinstance(n, ast.FunctionDef) and n.name == "checker_url")
                     or (isinstance(n, ast.Assign) and any(getattr(t, "id", "") == "CHECKER_PATH" for t in n.targets)))
+    ns = {"public_app_url": lambda: public, "_serving_url": lambda: ""}
+    exec(src, ns)
+    return ns["checker_url"]
+
+
+def test_checker_url_uses_the_streamlit_cloud_prefix_only_there():
     for base, want in [
         ("https://x.streamlit.app/", "https://x.streamlit.app/~/+/app/static/check/index.html"),
         ("http://localhost:8501/", "http://localhost:8501/app/static/check/index.html"),
     ]:
-        ns = {"public_app_url": lambda b=base: b}
-        exec(src, ns)
-        assert ns["checker_url"]() == want
-        assert ns["checker_url"]("🇰🇿 KZ") == want + "?lang=kz"
+        f = _checker_url_fn(base)
+        assert f() == want
+        assert f("🇰🇿 KZ") == want + "?lang=kz"
+
+
+def test_checker_url_prefers_the_streamlit_host_over_a_vanity_domain():
+    f = _checker_url_fn("https://fraud.example.kz/")
+    assert f(serving_url="https://x.streamlit.app/") == "https://x.streamlit.app/~/+/app/static/check/index.html"
+    assert f(serving_url="") == "https://fraud.example.kz/app/static/check/index.html"
+
+
+def test_version_is_the_same_on_a_windows_crlf_checkout(tmp_path, monkeypatch):
+    import importlib.util
+    import shutil
+    spec = importlib.util.spec_from_file_location("bwc", ROOT / "scripts" / "build_web_checker.py")
+    bwc = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(bwc)
+    want = bwc.version(bwc.assets())
+    crlf = tmp_path / "check"
+    shutil.copytree(CHECK, crlf)
+    for p in crlf.rglob("*"):
+        if p.is_file() and p.suffix != ".png":
+            p.write_bytes(p.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n"))
+    (crlf / ".DS_Store").write_bytes(b"junk")  # never part of the asset list
+    monkeypatch.setattr(bwc, "CHECK", crlf)
+    monkeypatch.setattr(bwc, "SW", crlf / "sw.js")
+    assert ".DS_Store" not in bwc.assets()
+    assert bwc.version(bwc.assets()) == want

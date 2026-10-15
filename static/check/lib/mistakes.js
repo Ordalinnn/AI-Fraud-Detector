@@ -60,7 +60,9 @@
     let s = String(v == null ? "" : v);
     // spreadsheet formula injection guard
     if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
-    return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    // ";" and tab too: Excel with Russian/Kazakh regional settings splits
+    // cells on ";", and an unquoted "...;=cmd|..." would become a formula
+    return /[",;\t\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
   }
 
   function toCsv(list) {

@@ -42,7 +42,7 @@ h1 { font-size: 21px; line-height: 1.2; margin: 0; color: var(--navy); }
 .lang {
   flex: none;
   font: inherit;
-  font-size: 15px;
+  font-size: 16px; /* under 16px iOS Safari zooms the page when it is tapped */
   padding: 6px 8px;
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -95,6 +95,9 @@ textarea:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px
 }
 
 .result {
+  overflow-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: anywhere; /* long dotted domains must not widen the page */
   margin-top: 16px;
   padding: 16px;
   border-radius: var(--radius);

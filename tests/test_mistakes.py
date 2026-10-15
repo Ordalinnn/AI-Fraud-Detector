@@ -60,3 +60,13 @@ def test_import_merges_dedupes_drops_conflicts_and_training_texts(tmp_path):
     assert texts["-50% скидка только сегодня"]["label"] == 0, "formula guard undone"
     assert conflicts == ["спорное сообщение"]
     assert in_training == 1
+
+
+def test_csv_quotes_semicolons_and_tabs_like_the_extension():
+    import csv as _csv
+    import io as _io
+    row = mistakes.make_row("Привет;=cmd|' /C calc'!A0\tx", False, 0.03, "site")
+    out = mistakes.to_csv([row])
+    assert out.split("\n")[1].startswith('"Привет;=cmd|')
+    back = list(_csv.reader(_io.StringIO(out)))
+    assert back[1][0] == "Привет;=cmd|' /C calc'!A0\tx"

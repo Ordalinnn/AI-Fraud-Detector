@@ -20,7 +20,7 @@ class DiskLoader extends ResourceLoader {
   fetch(url) { return Promise.resolve(fs.readFileSync(localFile(url))); }
 }
 
-async function open(url, { storage } = {}) {
+async function open(url, { storage, session, modelGate } = {}) {
   const dom = await JSDOM.fromFile(path.join(CHECK, "index.html"), {
     url,
     runScripts: "dangerously",
@@ -29,9 +29,11 @@ async function open(url, { storage } = {}) {
     beforeParse(window) {
       window.fetch = async (u) => {
         assert.match(String(u), /ensemble_model\.json$/);
+        if (modelGate) await modelGate;
         return { ok: true, status: 200, json: async () => JSON.parse(MODEL) };
       };
       if (storage) for (const [k, v] of Object.entries(storage)) window.localStorage.setItem(k, v);
+      if (session) for (const [k, v] of Object.entries(session)) window.sessionStorage.setItem(k, v);
     },
   });
   await new Promise((resolve) => dom.window.addEventListener("load", resolve));
@@ -58,8 +60,9 @@ test("a Shortcut link (#text=...) is checked at once with the website's percenta
   // the message is not left in the address bar / history
   assert.equal(dom.window.location.hash, "");
   assert.equal(dom.window.location.search, "?lang=ru");
-  // "Full analysis on the website" goes to the site itself, not to the /~/+/ path
-  assert.ok($(dom, "siteLink").href.startsWith(SITE + "/#text="), $(dom, "siteLink").href);
+  // "Full analysis on the website" goes to the site itself (not the /~/+/
+  // path) with ?text=, the form the website reads on its host
+  assert.ok($(dom, "siteLink").href.startsWith(SITE + "/?text="), $(dom, "siteLink").href);
   assert.match($(dom, "footer").textContent, new RegExp(golden.training_fingerprint.slice(0, 8)));
   dom.window.close();
 });
@@ -149,4 +152,91 @@ test("no regex lookbehind in what the phone page runs (Safari has it only since 
     const code = fs.readFileSync(path.join(CHECK, f), "utf8").split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n");
     assert.ok(!/\(\?<[!=]/.test(code), `${f} uses a lookbehind`);
   }
+});
+
+
+const detector = require("../detector.js");
+const { EnsembleScorer } = require("../ensemble.js");
+const extScorer = EnsembleScorer.parse(MODEL);
+
+test("text is scored as typed (no trim), like the website's text box", async () => {
+  const raw = "\n😀 Ваша карта заблокирована 😀\n\n";
+  const want = detector.analyzeText(raw, extScorer).pct;
+  assert.notEqual(want, detector.analyzeText(raw.trim(), extScorer).pct, "example must depend on the line breaks");
+  const dom = await open(PAGE_URL + "?lang=en");
+  await dom.window.AFDCheck.modelReady;
+  $(dom, "input").value = raw;
+  await dom.window.AFDCheck.check();
+  assert.ok($(dom, "banner").textContent.includes(want + "%"), $(dom, "banner").textContent + " vs " + want);
+  dom.window.close();
+});
+
+test("long messages: the website's 8000-character cap, never half an emoji", async () => {
+  const long = "a" + "😀".repeat(9000) + " срочно код";
+  const dom = await open(PAGE_URL + "?lang=en#text=" + encodeURIComponent(long));
+  await waitFor(() => shown(dom, "result"));
+  const kept = $(dom, "input").value;
+  assert.equal(Array.from(kept).length, 8000);
+  assert.ok(!/[\uD800-\uDBFF]$/.test(kept), "ends with half a surrogate pair");
+  assert.ok($(dom, "siteLink").href.includes("?text="), "site link was not built");
+  dom.window.close();
+});
+
+test("the Shortcut's own setup link in the clipboard is explained, not checked", async () => {
+  const own = PAGE_URL + "#text=";
+  const dom = await open(PAGE_URL + "?lang=ru#text=" + encodeURIComponent(own));
+  assert.ok(shown(dom, "notice"));
+  assert.match($(dom, "notice").textContent, /ссылка на эту страницу/);
+  assert.ok(!shown(dom, "result"));
+  assert.equal($(dom, "input").value, "");
+  // and a language switch re-translates the notice
+  $(dom, "lang").value = "en";
+  $(dom, "lang").dispatchEvent(new dom.window.Event("change"));
+  assert.match($(dom, "notice").textContent, /link to this page/);
+  dom.window.close();
+});
+
+test("a new #text= in an already open tab is checked", async () => {
+  const dom = await open(PAGE_URL + "?lang=en#text=" + encodeURIComponent("Привет, как дела? Увидимся завтра"));
+  await waitFor(() => shown(dom, "result"));
+  const before = $(dom, "banner").textContent;
+  dom.window.location.hash = "#text=" + encodeURIComponent("Срочно! Ваша карта заблокирована, назовите код из SMS http://kaspi-login.xyz");
+  await waitFor(() => $(dom, "banner").textContent !== before);
+  assert.match($(dom, "input").value, /карта заблокирована/);
+  dom.window.close();
+});
+
+test("Clear while the model is loading cancels the pending check", async () => {
+  let release;
+  const gate = new Promise((r) => { release = r; });
+  const dom = await open(PAGE_URL + "?lang=en#text=" + encodeURIComponent("Срочно! Назовите код из SMS"), { modelGate: gate });
+  assert.ok($(dom, "checkBtn").disabled, "button should wait for the model");
+  $(dom, "clearBtn").click();
+  assert.ok(!$(dom, "checkBtn").disabled);
+  release();
+  await dom.window.AFDCheck.modelReady;
+  await new Promise((r) => setTimeout(r, 50));
+  assert.ok(!shown(dom, "result"), "a cleared message must not show a result");
+  dom.window.close();
+});
+
+test("a reloaded tab brings back the message checked in it", async () => {
+  const dom = await open(PAGE_URL + "?lang=en", { session: { "afd-last-text": "Срочно! Назовите код из SMS" } });
+  await waitFor(() => shown(dom, "result"));
+  assert.equal($(dom, "input").value, "Срочно! Назовите код из SMS");
+  $(dom, "clearBtn").click();
+  assert.equal(dom.window.sessionStorage.getItem("afd-last-text"), null);
+  dom.window.close();
+});
+
+test("'Warn family' never forwards a live phishing link", async () => {
+  const dom = await open(PAGE_URL);
+  await dom.window.AFDCheck.modelReady;
+  const text = "Kaspi: счёт заблокирован, подтвердите по ссылке https://Kaspi-Secure-Login.top/verify?id=8812 или www.kaspi-help.xyz";
+  const result = dom.window.FraudDetector.analyzeText(text, null);
+  const safe = dom.window.AFDCheck.defang(text, result);
+  assert.ok(!/https?:\/\//i.test(safe), safe);
+  assert.ok(!/kaspi-secure-login\.top/i.test(safe) && !/kaspi-help\.xyz/i.test(safe), safe);
+  assert.match(safe, /hxxps:\/\/Kaspi-Secure-Login\[\.\]top/);
+  dom.window.close();
 });

@@ -41,18 +41,29 @@ SW = CHECK / "sw.js"
 BEGIN, END = "// BEGIN GENERATED (scripts/build_web_checker.py)", "// END GENERATED"
 
 
+ASSET_TYPES = {".html", ".js", ".css", ".json", ".png"}
+BINARY = {".png"}
+
+
 def assets() -> list[str]:
-    """Every file the page needs, relative to static/check/ (sw.js itself excluded)."""
-    # (not "./": Streamlit does not serve directories; sw.js answers a
-    # navigation to the folder with index.html instead)
-    return sorted(p.relative_to(CHECK).as_posix() for p in CHECK.rglob("*") if p.is_file() and p != SW)
+    """Every file the page needs, relative to static/check/ (sw.js itself
+    excluded). Hidden files (.DS_Store) and other stray files are left out:
+    one file the server does not have would make the whole offline install
+    fail on phones. Not "./": Streamlit does not serve folders; sw.js answers
+    a navigation to the folder with index.html instead."""
+    return sorted(p.relative_to(CHECK).as_posix() for p in CHECK.rglob("*")
+                  if p.is_file() and p != SW and p.suffix in ASSET_TYPES
+                  and not any(part.startswith(".") for part in p.relative_to(CHECK).parts))
 
 
 def version(files: list[str]) -> str:
     h = hashlib.sha256()
     for rel in files:
+        data = (CHECK / rel).read_bytes()
+        if Path(rel).suffix not in BINARY:
+            data = data.replace(b"\r\n", b"\n")  # same hash on a Windows (CRLF) checkout
         h.update(rel.encode())
-        h.update((CHECK / rel).read_bytes())
+        h.update(data)
     return h.hexdigest()[:16]
 
 

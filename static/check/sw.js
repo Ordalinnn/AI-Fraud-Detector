@@ -9,7 +9,7 @@
 // sw.js, installs the new files and deletes the old ones.
 
 // BEGIN GENERATED (scripts/build_web_checker.py)
-const VERSION = "ed80b3f3b57b1d9e";
+const VERSION = "21b8295d00704b83";
 const ASSETS = [
   "app.css",
   "app.js",
@@ -28,12 +28,34 @@ const ASSETS = [
 
 const CACHE = "afd-check-" + VERSION;
 
+// What each file must be. On Streamlit Community Cloud a wrong path, or an
+// app that is asleep, can answer with an HTML page and status 200: such a
+// response must never replace a good cached file, so the install fails and
+// the previous version stays.
+const TYPES = { html: "text/html", js: "javascript", css: "text/css", json: "json", png: "image/png" };
+
+async function fetchChecked(path) {
+  const res = await fetch(new Request(path, { cache: "no-cache" }));
+  const ext = path.split(".").pop();
+  const type = res.headers.get("content-type") || "";
+  if (!res.ok || !type.includes(TYPES[ext] || "")) {
+    throw new Error(`${path}: ${res.status} ${type}`);
+  }
+  // Safari refuses a page served by a service worker from a redirected
+  // response: store a fresh copy without the redirect.
+  if (res.redirected) {
+    return new Response(await res.blob(), { status: res.status, statusText: res.statusText, headers: res.headers });
+  }
+  return res;
+}
+
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE)
-      .then((cache) => cache.addAll(ASSETS.map((a) => new Request(a, { cache: "reload" }))))
-      .then(() => self.skipWaiting())
-  );
+  event.waitUntil((async () => {
+    const files = await Promise.all(ASSETS.map(fetchChecked)); // all or nothing
+    const cache = await caches.open(CACHE);
+    await Promise.all(files.map((res, i) => cache.put(ASSETS[i], res)));
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener("activate", (event) => {

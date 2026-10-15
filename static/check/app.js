@@ -21,17 +21,20 @@
       check: "🔍 Тексеру",
       loading: "Модель жүктелуде…",
       modelFailed: "Модель жүктелмеді — тексеру тек ережелер бойынша (дәлдігі төменірек).",
-      pasteFailed: "Қою мүмкін болмады: өрісті басып тұрып, «Қою» таңдаңыз.",
-      emptyShortcut: "Команда мәтінсіз іске қосылды: хабарламаны көшіріңіз немесе «Бөлісу» арқылы жіберіңіз.",
+      pasteFailed: "Қою мүмкін болмады: шыққан «Вставить» (Paste) батырмасын басыңыз немесе өрісті басып тұрып, «Вставить» таңдаңыз.",
+      emptyShortcut: "Команда мәтінсіз іске қосылды: хабарламаны көшіріңіз немесе «Поделиться» (Share) арқылы жіберіңіз.",
       offlineReady: "✅ Интернетсіз де жұмыс істейді.",
+      offlineReadyTab: "✅ Телефонға сақталды: бұл бет соңғы күндері ашылса, интернетсіз де ашылады. Әрқашан интернетсіз — басты экрандағы белгішеден.",
       offlineSaving: "Интернетсіз жұмыс істеу үшін сақталуда…",
       offlineNone: "Бұл браузерде интернетсіз режим жоқ — тексеру бәрібір телефонда жүреді.",
-      installHint: "📲 Белгіше ретінде қосыңыз: Safari-де «Бөлісу» → «Басты экранға қосу». Сонда интернетсіз де бір рет басып ашылады.",
-      siteLink: "Сайтта толық талдау ↗",
+      offlineFailed: "Интернетсіз жұмыс үшін сақталмады — тексеру бәрібір телефонда жүреді.",
+      installHint: "📲 Белгіше ретінде қосыңыз: Safari-де «Поделиться» (Share; көрінбесе — алдымен «•••») → «На экран „Домой“» (Add to Home Screen). Белгішені бір рет интернет бар кезде ашыңыз — содан кейін ол интернетсіз де бір басумен ашылады.",
+      siteLink: "Сайтта толық талдау (мәтін серверге жіберіледі) ↗",
+      copiedLink: "⚠️ Алмасу буферінде хабарлама емес, осы беттің сілтемесі тұр (команданы баптау кезінде көшірілген). Тексергіңіз келетін хабарламаны көшіріп, команданы қайта іске қосыңыз.",
       share: "📤 Жақындарды ескерту",
       shareText: "⚠️ Абай болыңыз: бұл хабарлама алаяқтыққа ұқсайды ({pct}%). Кодты, құпиясөзді, карта деректерін ешкімге айтпаңыз.\n\n«{text}»",
       mistakeThanks: "Рахмет! Белгіленді. Тек осы телефонда сақталады.",
-      mistakesNote: "Белгілер тек осы телефонда сақталады. CSV-ді жүктеп, жоба командасына жіберіңіз; алдымен аттарды, телефон мен карта нөмірлерін [NAME], [PHONE], [CARD] деп ауыстырыңыз.",
+      mistakesNote: "Белгілер тек осы телефонда сақталады, ал Safari бетті 7 күн ашпаса оларды өшіріп тастауы мүмкін — CSV файлын бірден жүктеп, жоба командасына жіберіңіз. Алдымен аттарды, телефон мен карта нөмірлерін [АТЫ], [ТЕЛЕФОН], [КАРТА] деп ауыстырыңыз.",
       modelLine: "Сайттағы модель (5 модель + стекинг) · model {id} · ресми қауіпсіздік құралы емес",
     },
     ru: {
@@ -43,17 +46,20 @@
       check: "🔍 Проверить",
       loading: "Загружаем модель…",
       modelFailed: "Модель не загрузилась — проверка только по правилам (менее точная).",
-      pasteFailed: "Не удалось вставить: нажмите и подержите поле, затем «Вставить».",
+      pasteFailed: "Не удалось вставить: нажмите «Вставить» во всплывающей подсказке или нажмите и подержите поле и выберите «Вставить».",
       emptyShortcut: "Команда запустилась без текста: скопируйте сообщение или поделитесь им.",
       offlineReady: "✅ Работает и без интернета.",
+      offlineReadyTab: "✅ Сохранено на телефоне: страница откроется и без интернета, если вы открывали её в последние дни. Всегда без интернета — со значка на экране «Домой».",
       offlineSaving: "Сохраняем для работы без интернета…",
       offlineNone: "В этом браузере нет режима без интернета — но проверка всё равно идёт на телефоне.",
-      installHint: "📲 Добавьте значок: в Safari «Поделиться» → «На экран „Домой“». Тогда проверка открывается в одно касание, даже без интернета.",
-      siteLink: "Подробный анализ на сайте ↗",
+      offlineFailed: "Не удалось сохранить для работы без интернета — проверка всё равно идёт на телефоне.",
+      installHint: "📲 Добавьте значок: в Safari «Поделиться» (если её не видно — сначала «•••») → «На экран „Домой“». Откройте значок один раз при интернете — дальше проверка открывается в одно касание даже без интернета.",
+      siteLink: "Подробный анализ на сайте (текст уйдёт на сервер) ↗",
+      copiedLink: "⚠️ В буфере обмена лежало не сообщение, а ссылка на эту страницу (её копировали, когда настраивали команду). Скопируйте само подозрительное сообщение и запустите команду ещё раз.",
       share: "📤 Предупредить близких",
       shareText: "⚠️ Осторожно: это сообщение похоже на мошенничество ({pct}%). Никому не сообщайте коды, пароли и данные карты.\n\n«{text}»",
       mistakeThanks: "Спасибо! Отмечено. Хранится только на этом телефоне.",
-      mistakesNote: "Отметки хранятся только на этом телефоне. Скачайте CSV и отправьте команде проекта; перед отправкой замените имена, телефоны и номера карт на [NAME], [PHONE], [CARD].",
+      mistakesNote: "Отметки хранятся только на этом телефоне, а Safari может стереть их, если страницу не открывать 7 дней, — скачайте CSV сразу и отправьте команде проекта. Перед отправкой замените имена, телефоны и номера карт на [ИМЯ], [ТЕЛЕФОН], [КАРТА].",
       modelLine: "Модель сайта (5 моделей + стекинг) · model {id} · не сертифицированный инструмент безопасности",
     },
     en: {
@@ -65,35 +71,52 @@
       check: "🔍 Check",
       loading: "Loading the model…",
       modelFailed: "The model didn't load — rules-only check (less accurate).",
-      pasteFailed: "Couldn't paste: press and hold the box, then tap “Paste”.",
+      pasteFailed: "Couldn't paste: tap “Paste” in the bubble, or press and hold the box and choose “Paste”.",
       emptyShortcut: "The shortcut ran without text: copy the message or share it.",
       offlineReady: "✅ Works offline too.",
+      offlineReadyTab: "✅ Saved on the phone: the page opens offline too if you used it in the last few days. Always offline — from the Home Screen icon.",
       offlineSaving: "Saving for offline use…",
       offlineNone: "This browser has no offline mode — the check still runs on your phone.",
-      installHint: "📲 Add it as an icon: in Safari tap Share → “Add to Home Screen”. Then it opens with one tap, even offline.",
-      siteLink: "Full analysis on the website ↗",
+      offlineFailed: "Couldn't save for offline use — the check still runs on your phone.",
+      installHint: "📲 Add it as an icon: in Safari tap Share (if you can't see it, tap “•••” first) → “Add to Home Screen”. Open the icon once while online — after that it opens with one tap, even offline.",
+      siteLink: "Full analysis on the website (sends the text to the server) ↗",
+      copiedLink: "⚠️ The clipboard held a link to this page (copied while setting up the shortcut), not a message. Copy the suspicious message itself and run the shortcut again.",
       share: "📤 Warn family",
       shareText: "⚠️ Careful: this message looks like a scam ({pct}%). Never share codes, passwords or card details.\n\n“{text}”",
       mistakeThanks: "Thanks! Marked. Saved only on this phone.",
-      mistakesNote: "Marks are stored only on this phone. Download the CSV and send it to the project team; first replace names, phone and card numbers with [NAME], [PHONE], [CARD].",
+      mistakesNote: "Marks are stored only on this phone, and Safari may erase them if the page isn't opened for 7 days — download the CSV right away and send it to the project team. First replace names, phone and card numbers with [NAME], [PHONE], [CARD].",
       modelLine: "The website's model (5 models + stacking) · model {id} · not a certified security tool",
     },
   };
   const LANGS = ["kz", "ru", "en"];
   const LANG_KEY = "afd-lang";
   const MISTAKES_KEY = "afd-mistakes";
-  const MAX_CHARS = 4000;
+  // Same cap as the website (app.py MAX_INPUT_CHARS), counted in code
+  // points like Python, so an emoji is never cut in half.
+  const MAX_CHARS = 8000;
+  const SITE_LINK_CHARS = 1500; // as the extension's "open on the website" link
+  const cut = (s, n) => Array.from(String(s)).slice(0, n).join("");
+  const LAST_KEY = "afd-last-text"; // this tab only: survives an iOS tab reload
 
   const $ = (id) => document.getElementById(id);
   const store = {
     get(key) { try { return window.localStorage.getItem(key); } catch (e) { return null; } },
     set(key, value) { try { window.localStorage.setItem(key, value); } catch (e) { /* private mode */ } },
+    // sessionStorage: read with one argument, write with two (null removes)
+    session(key, value) {
+      try {
+        if (arguments.length === 1) return window.sessionStorage.getItem(key);
+        if (value === null) window.sessionStorage.removeItem(key);
+        else window.sessionStorage.setItem(key, value);
+      } catch (e) { /* storage blocked */ }
+      return null;
+    },
   };
 
   // ---------- language ----------
   function pickLang() {
     const fromUrl = new URLSearchParams(location.search).get("lang");
-    if (LANGS.includes(fromUrl)) return fromUrl;
+    if (LANGS.includes(fromUrl)) { store.set(LANG_KEY, fromUrl); return fromUrl; }
     const saved = store.get(LANG_KEY);
     if (LANGS.includes(saved)) return saved;
     const nav = String(navigator.language || "").toLowerCase();
@@ -120,8 +143,12 @@
       if (q.has("text")) raw = q.get("text");
     }
     if (raw === null) return null;
-    return raw.trim().slice(0, MAX_CHARS);
+    return cut(raw.trim(), MAX_CHARS); // the website strips shared text too
   }
+
+  // The Shortcut's "Get Clipboard" fallback sent the setup link itself
+  // (copied from the instructions), not a message: same rule as the site.
+  const isOwnLink = (text) => /^https?:\/\/\S+[?&#]text=\S*$/.test(text);
 
   // The website's address, for "Full analysis on the website": this page is
   // <site>/app/static/check/index.html (on Streamlit Cloud with a "/~/+/"
@@ -144,10 +171,27 @@
     .catch(() => { modelState = "failed"; })
     .then(() => applyText());
 
-  // ---------- rendering ----------
-  let last = null; // { text, result }
+  // ---------- state ----------
+  let last = null;      // { text, result, marked }
+  let notice = null;    // key of the shown notice (re-translated on a language switch)
+  let checking = 0;     // number of the latest check: a newer one or Clear wins
+  let pending = false;  // a check is waiting for the model
+  // none (no service workers) | saving | ready | failed
+  let offline = ("serviceWorker" in navigator && window.isSecureContext) ? "saving" : "none";
+  // opened by the Shortcut: then the "add an icon" hint is not repeated
+  const openedByShortcut = sharedText(location) !== null;
 
+  // ---------- rendering ----------
   function setText(id, value) { $(id).textContent = value; }
+
+  function noticeText(key) { return P()[key] || S()[key] || ""; }
+
+  function showNotice(key) {
+    notice = key || null;
+    const el = $("notice");
+    el.textContent = notice ? noticeText(notice) : "";
+    el.classList.toggle("hidden", !notice);
+  }
 
   function applyText() {
     const p = P();
@@ -159,7 +203,9 @@
     setText("inputLabel", p.pageTitle);
     setText("pasteBtn", p.paste);
     setText("clearBtn", p.clear);
-    setText("checkBtn", modelState === "loading" && pendingCheck ? p.loading : p.check);
+    const waiting = pending && modelState === "loading";
+    setText("checkBtn", waiting ? p.loading : p.check);
+    $("checkBtn").disabled = waiting;
     setText("siteLink", p.siteLink);
     setText("shareBtn", p.share);
     setText("mistakesNote", p.mistakesNote);
@@ -168,22 +214,17 @@
     setText("installHint", p.installHint);
     setText("footer", modelState === "ready" ? p.modelLine.replace("{id}", modelId) : "");
     $("lang").value = lang;
+    if (notice) setText("notice", noticeText(notice));
     renderStatus();
     renderMistakes();
-    if (last) render(last.result);
-  }
-
-  function showNotice(msg) {
-    const el = $("notice");
-    el.textContent = msg;
-    el.classList.toggle("hidden", !msg);
+    if (last) render();
   }
 
   function clearChildren(el) { while (el.firstChild) el.removeChild(el.firstChild); }
 
-  function render(result) {
+  function render() {
+    const { result, text, marked } = last;
     const s = S();
-    const p = P();
     $("result").classList.remove("hidden");
     const banner = $("banner");
     banner.className = "banner " + result.cssClass;
@@ -220,34 +261,45 @@
     $("shareBtn").classList.toggle("hidden", !(result.isFraud && typeof navigator.share === "function"));
     const mistake = $("mistakeBtn");
     mistake.textContent = result.isFraud ? s.mistakeFlaggedBtn : s.mistakeMissedBtn;
-    mistake.disabled = !!(last && last.marked);
-    $("mistakeThanks").classList.toggle("hidden", !(last && last.marked));
-    setText("mistakeThanks", p.mistakeThanks);
-    $("siteLink").href = siteRoot(location) + "#text=" + encodeURIComponent(last ? last.text : "");
+    mistake.disabled = marked;
+    $("mistakeThanks").classList.toggle("hidden", !marked);
+    setText("mistakeThanks", P().mistakeThanks);
+    // ?text= (not #text=): the website only reads the query string on its host
+    $("siteLink").href = siteRoot(location) + "?text=" + encodeURIComponent(cut(text, SITE_LINK_CHARS));
   }
 
   // ---------- checking ----------
-  let pendingCheck = false;
-
+  // The text is scored exactly as typed, like the website's text box
+  // (leading/trailing line breaks count for the length features).
   async function check() {
-    const text = $("input").value.trim().slice(0, MAX_CHARS);
-    if (!text) { showNotice(S().emptyInputError); return; }
-    showNotice("");
+    const text = cut($("input").value, MAX_CHARS);
+    if (!text.trim()) { showNotice("emptyInputError"); return; }
+    showNotice(null);
+    const id = ++checking;
     if (modelState === "loading") {
-      pendingCheck = true;
-      $("checkBtn").disabled = true;
+      pending = true;
       applyText();
       await modelReady;
-      pendingCheck = false;
-      $("checkBtn").disabled = false;
+      if (id !== checking) return; // cleared or replaced while the model loaded
+      pending = false;
     }
-    if (modelState === "failed") showNotice(P().modelFailed);
-    const result = self.FraudDetector.analyzeText(text, scorer);
-    last = { text, result, marked: false };
-    render(result);
+    if (modelState === "failed") showNotice("modelFailed");
+    last = { text, result: self.FraudDetector.analyzeText(text, scorer), marked: false };
+    store.session(LAST_KEY, text);
     applyText();
     const box = $("result");
     if (box.scrollIntoView) box.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function clearAll() {
+    checking++;
+    pending = false;
+    $("input").value = "";
+    last = null;
+    store.session(LAST_KEY, null);
+    $("result").classList.add("hidden");
+    showNotice(null);
+    applyText();
   }
 
   // ---------- "the model is wrong" (kept on this phone) ----------
@@ -261,44 +313,80 @@
   }
 
   // ---------- offline status / install hint ----------
-  let offline = "none"; // none | saving | ready
   function renderStatus() {
     const p = P();
-    setText("status", offline === "ready" ? p.offlineReady : offline === "saving" ? p.offlineSaving : p.offlineNone);
     const ios = /iphone|ipad|ipod/i.test(navigator.userAgent)
       || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
     const standalone = navigator.standalone === true
       || (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
-    $("installHint").classList.toggle("hidden", !(ios && !standalone));
+    // Safari may erase a tab's saved copy after 7 days without the page
+    // being used; the Home Screen app is exempt (WebKit storage policy)
+    const ready = ios && !standalone ? p.offlineReadyTab : p.offlineReady;
+    setText("status", { ready, saving: p.offlineSaving, failed: p.offlineFailed }[offline] || p.offlineNone);
+    $("installHint").classList.toggle("hidden", !(ios && !standalone && !openedByShortcut));
   }
 
+  function setOffline(state) { offline = state; renderStatus(); }
+
+  // Registered after the model has loaded, so a first visit on mobile data
+  // does not download the 3 MB model twice at the same time.
   function registerServiceWorker() {
     if (!("serviceWorker" in navigator) || !window.isSecureContext) return;
-    offline = "saving";
-    navigator.serviceWorker.register("sw.js")
-      .then(() => navigator.serviceWorker.ready)
-      .then(() => { offline = "ready"; renderStatus(); })
-      .catch(() => { offline = "none"; renderStatus(); });
+    setOffline("saving");
+    navigator.serviceWorker.register("sw.js").then((reg) => {
+      if (reg.active && !reg.installing) { setOffline("ready"); return; }
+      const sw = reg.installing || reg.waiting;
+      if (!sw) return;
+      sw.addEventListener("statechange", () => {
+        if (sw.state === "activated") setOffline("ready");
+        if (sw.state === "redundant") setOffline(reg.active ? "ready" : "failed"); // a download failed
+      });
+    }).catch(() => setOffline("failed"));
+    // ask Safari/Chrome not to evict the saved page and marks (best effort)
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+  }
+
+  // A link may not carry a working phishing address to relatives: the
+  // shared quote has "hxxp://" and "[.]" instead of live links.
+  function defang(text, result) {
+    let t = text.replace(/\bhttp(s?):\/\//gi, "hxxp$1://").replace(/\bwww\./gi, "www[.]");
+    for (const d of result.domainInfo) {
+      if (!d.domain) continue;
+      const re = new RegExp(d.domain.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+      t = t.replace(re, (m) => m.replace(/\./g, "[.]"));
+    }
+    return t;
+  }
+
+  // ---------- text shared by the Shortcut ----------
+  function takeShared() {
+    const shared = sharedText(location);
+    if (shared === null) return false;
+    // keep the message out of the address bar / history once it is read
+    try {
+      const clean = new URL(location.href);
+      clean.hash = "";
+      clean.searchParams.delete("text");
+      history.replaceState(null, "", clean.pathname + clean.search);
+    } catch (e) { /* ignore */ }
+    if (!shared) { showNotice("emptyShortcut"); return true; }
+    if (isOwnLink(shared)) { showNotice("copiedLink"); return true; }
+    $("input").value = shared;
+    check();
+    return true;
   }
 
   // ---------- events ----------
   $("checkBtn").addEventListener("click", check);
-  $("input").addEventListener("input", () => showNotice(""));
-  $("clearBtn").addEventListener("click", () => {
-    $("input").value = "";
-    last = null;
-    $("result").classList.add("hidden");
-    showNotice("");
-    $("input").focus();
-  });
+  $("input").addEventListener("input", () => { if (notice === "emptyInputError") showNotice(null); });
+  $("clearBtn").addEventListener("click", () => { clearAll(); $("input").focus(); });
   $("pasteBtn").addEventListener("click", async () => {
-    try {
-      const text = await navigator.clipboard.readText();
-      if (text && text.trim()) { $("input").value = text.trim().slice(0, MAX_CHARS); showNotice(""); check(); }
-      else showNotice(P().pasteFailed);
-    } catch (e) {
-      showNotice(P().pasteFailed);
-    }
+    let text = "";
+    try { text = await navigator.clipboard.readText(); } catch (e) { text = ""; }
+    if (!text || !text.trim()) { showNotice("pasteFailed"); return; }
+    if (isOwnLink(text.trim())) { showNotice("copiedLink"); return; }
+    $("input").value = cut(text, MAX_CHARS);
+    check();
   });
   $("lang").addEventListener("change", () => {
     lang = $("lang").value;
@@ -307,7 +395,8 @@
   });
   $("shareBtn").addEventListener("click", () => {
     if (!last) return;
-    const text = P().shareText.replace("{pct}", last.result.pct).replace("{text}", last.text.slice(0, 300));
+    const quote = defang(cut(last.text.trim(), 300), last.result);
+    const text = P().shareText.replace("{pct}", last.result.pct).replace("{text}", quote);
     navigator.share({ text }).catch(() => {});
   });
   $("mistakeBtn").addEventListener("click", () => {
@@ -317,7 +406,7 @@
     });
     store.set(MISTAKES_KEY, JSON.stringify(self.Mistakes.addTo(mistakes(), entry)));
     last.marked = true;
-    render(last.result);
+    render();
     renderMistakes();
   });
   $("mistakesDownload").addEventListener("click", () => {
@@ -335,21 +424,17 @@
     store.set(MISTAKES_KEY, "[]");
     renderMistakes();
   });
+  // a new #text=... in a tab that is already open (no reload happens)
+  window.addEventListener("hashchange", takeShared);
 
   // ---------- start ----------
   applyText();
-  registerServiceWorker();
-  const shared = sharedText(location);
-  if (shared !== null) {
-    // keep the message out of the address bar / history once it is read
-    try {
-      const clean = new URL(location.href);
-      clean.hash = "";
-      clean.searchParams.delete("text");
-      history.replaceState(null, "", clean.pathname + clean.search);
-    } catch (e) { /* ignore */ }
-    if (shared) { $("input").value = shared; check(); } else showNotice(P().emptyShortcut);
+  modelReady.then(registerServiceWorker);
+  if (!takeShared()) {
+    // iOS reloads background tabs: bring back the message checked in this tab
+    const again = store.session(LAST_KEY);
+    if (again) { $("input").value = again; check(); }
   }
 
-  window.AFDCheck = { PAGE, sharedText, siteRoot, check, modelReady };
+  window.AFDCheck = { PAGE, sharedText, siteRoot, check, modelReady, defang, cut };
 })();
