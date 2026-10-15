@@ -6,12 +6,12 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { JSDOM } = require("jsdom");
 
-const { CharScorer } = require("../scorer.js");
+const { EnsembleScorer } = require("../ensemble.js");
 const { analyzeText } = require("../detector.js");
 const I18N = require("../i18n.js");
 const { siteFor, createScanner, findCandidates } = require("../content.js");
 
-const scorer = CharScorer.parse(fs.readFileSync(path.join(__dirname, "..", "char_model.tsv"), "utf8"));
+const scorer = EnsembleScorer.parse(fs.readFileSync(path.join(__dirname, "..", "ensemble_model.json"), "utf8"));
 const SCAM = "Здравствуйте, это служба безопасности банка. Ваша карта заблокирована, назовите код из SMS";
 const OK = "Привет, урок перенесли на пятницу, не забудь учебник";
 
@@ -51,7 +51,7 @@ test("WhatsApp: scam messages get a label (incoming and own), normal ones don't"
   await sc.scan();
   const badges = doc.querySelectorAll(".afd-badge");
   assert.equal(badges.length, 2);
-  assert.match(badges[0].textContent, /^⚠️ Похоже на мошенничество · \d+% · почему\? ▾$/);
+  assert.match(badges[0].textContent, /^⚠️ Похоже на мошенничество · \d+\.\d% · почему\? ▾$/);
   assert.deepEqual(sc.status(), { host: "web.whatsapp.com", running: true, checked: 3, flagged: 2 });
   assert.ok(badges[0].parentElement.previousElementSibling.textContent.includes("заблокирована"));
   sc.stop();

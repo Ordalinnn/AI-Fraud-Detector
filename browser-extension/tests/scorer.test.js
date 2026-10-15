@@ -1,15 +1,14 @@
-// The extension's on-device model must give the SAME probabilities as the
-// scikit-learn model it was exported from (golden.tsv, shared with the
-// Android app's test), and must be the very same model file as the app's.
+// scorer.js (the character n-gram model: the site's "char" member inside
+// ensemble.js, and the Android app's whole model) must give the SAME
+// probabilities as scikit-learn (golden.tsv, shared with the Android test).
 const test = require("node:test");
 const assert = require("node:assert");
 const fs = require("node:fs");
 const path = require("node:path");
-const crypto = require("node:crypto");
 const { CharScorer } = require("../scorer.js");
 
 const ROOT = path.join(__dirname, "..", "..");
-const MODEL = path.join(__dirname, "..", "char_model.tsv");
+const MODEL = path.join(ROOT, "android/app/src/main/assets/char_model.tsv");
 const scorer = CharScorer.parse(fs.readFileSync(MODEL, "utf8"));
 
 function unescape(s) {
@@ -29,11 +28,6 @@ test("matches scikit-learn on the golden texts", () => {
     if (diff > worst) { worst = diff; worstText = text; }
   }
   assert.ok(worst < 1e-6, `max difference ${worst} on ${JSON.stringify(worstText)}`);
-});
-
-test("is the same model file as the Android app", () => {
-  const sha = (p) => crypto.createHash("sha256").update(fs.readFileSync(p)).digest("hex");
-  assert.strictEqual(sha(MODEL), sha(path.join(ROOT, "android/app/src/main/assets/char_model.tsv")));
 });
 
 test("char_wb n-grams match scikit-learn", () => {

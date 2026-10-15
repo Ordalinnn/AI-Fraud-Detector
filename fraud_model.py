@@ -239,3 +239,78 @@ class FraudEnsemble:
         out["average"] = np.mean([out[k] for k in BASE_MODELS], axis=0)
         out["final"] = self.stacker.predict_proba(_stack_matrix(out))[:, 1]
         return out
+
+
+# =========================
+# EXPORT FOR THE BROWSER EXTENSION
+# =========================
+# The extension (browser-extension/ensemble.js) re-implements score() in
+# JavaScript from these numbers, so the site and the extension give the
+# same probability for the same text. scripts/export_extension_model.py
+# writes the file and checks the JavaScript against scikit-learn.
+EXPORT_FORMAT = "fraud_ensemble_v1"
+
+
+def training_fingerprint(texts, y) -> str:
+    """Short hash of the exact training set (texts, labels, order). The app
+    and the exported extension model carry it, so a test can tell when the
+    extension's copy is out of date."""
+    import hashlib
+    import json
+    payload = json.dumps([[str(t), int(label)] for t, label in zip(texts, y)], ensure_ascii=False)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
+
+def _export_tree(tree, value) -> dict:
+    t = tree.tree_
+    return {
+        "feature": [int(f) for f in t.feature],
+        "threshold": [float(x) for x in t.threshold],
+        "left": [int(x) for x in t.children_left],
+        "right": [int(x) for x in t.children_right],
+        "value": [float(x) for x in value],
+    }
+
+
+def export_ensemble(model: FraudEnsemble, fingerprint: str) -> dict:
+    """Every number FraudEnsemble.score() uses, as plain JSON."""
+    m = model.base.models
+    out = {"format": EXPORT_FORMAT, "training_fingerprint": fingerprint,
+           "normalize": bool(fraud_logic.NORMALIZE_INPUT), "features": list(model.base.columns_)}
+
+    sc, lr = m["lr"].named_steps["scaler"], m["lr"].named_steps["clf"]
+    out["lr"] = {"mean": sc.mean_.tolist(), "scale": sc.scale_.tolist(),
+                 "coef": lr.coef_[0].tolist(), "intercept": float(lr.intercept_[0])}
+
+    sc, rf = m["rf"].named_steps["scaler"], m["rf"].named_steps["clf"]
+    trees = []
+    for e in rf.estimators_:
+        v = e.tree_.value[:, 0, :]
+        # DecisionTreeClassifier.predict_proba divides each leaf by its sum
+        p = v[:, 1] / np.where(v.sum(axis=1) == 0, 1.0, v.sum(axis=1))
+        trees.append(_export_tree(e, p))
+    out["rf"] = {"mean": sc.mean_.tolist(), "scale": sc.scale_.tolist(), "trees": trees}
+
+    sc, gb = m["gb"].named_steps["scaler"], m["gb"].named_steps["clf"]
+    init = float(gb._raw_predict_init(np.zeros((1, len(sc.mean_)), dtype=np.float32))[0, 0])
+    out["gb"] = {"mean": sc.mean_.tolist(), "scale": sc.scale_.tolist(), "init": init,
+                 "learning_rate": float(gb.learning_rate),
+                 "trees": [_export_tree(e, e.tree_.value[:, 0, 0]) for e in gb.estimators_[:, 0]]}
+
+    tf, nb = m["tfidf"].named_steps["tfidf"], m["tfidf"].named_steps["clf"]
+    assert tf.analyzer == "word" and tf.norm == "l2" and not tf.sublinear_tf and tf.lowercase
+    assert tf.token_pattern == r"(?u)\b\w\w+\b" and tf.ngram_range == TFIDF_NGRAM_RANGE
+    delta = nb.feature_log_prob_[1] - nb.feature_log_prob_[0]
+    out["tfidf"] = {"ngram_range": list(tf.ngram_range),
+                    "prior": float(nb.class_log_prior_[1] - nb.class_log_prior_[0]),
+                    "vocab": {g: [float(tf.idf_[i]), float(delta[i])] for g, i in sorted(tf.vocabulary_.items())}}
+
+    tf, clf = m["char"].named_steps["tfidf"], m["char"].named_steps["clf"]
+    assert tf.analyzer == "char_wb" and tf.norm == "l2" and tf.sublinear_tf and tf.lowercase
+    out["char"] = {"ngram_range": list(tf.ngram_range), "intercept": float(clf.intercept_[0]),
+                   "vocab": {g: [float(tf.idf_[i]), float(clf.coef_[0][i])] for g, i in sorted(tf.vocabulary_.items())}}
+
+    w = model.stacker.coef_[0]
+    out["stacker"] = {"inputs": list(STACK_INPUTS), "coef": [float(x) for x in w],
+                      "intercept": float(model.stacker.intercept_[0])}
+    return out

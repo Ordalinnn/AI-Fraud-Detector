@@ -31,7 +31,7 @@ def test_everything_the_extension_loads_is_packaged():
         needed |= set(cs["js"]) | set(cs.get("css", []))
     needed |= set(re.findall(r'importScripts\(([^)]*)\)', (EXT / "background.js").read_text())[0].replace('"', "").replace(" ", "").split(","))
     needed |= set(re.findall(r'<script src="([^"]+)"', (EXT / "popup.html").read_text()))
-    needed.add("char_model.tsv")
+    needed.add("ensemble_model.json")
     for rel in sorted(needed):
         assert (EXT / rel).is_file(), rel
         assert _packaged(rel), rel
@@ -42,7 +42,3 @@ def test_dev_files_are_not_packaged():
     assert not _packaged("tests/content.test.js")
     assert not _packaged("package-lock.json")
 
-
-def test_extension_model_is_the_android_model():
-    android = ROOT / "android" / "app" / "src" / "main" / "assets" / "char_model.tsv"
-    assert (EXT / "char_model.tsv").read_bytes() == android.read_bytes()

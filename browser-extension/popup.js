@@ -15,14 +15,18 @@ const mistakesBoxEl = document.getElementById("mistakesBox");
 let lastText = "";
 const AUTOSCAN_HOSTS = ["web.whatsapp.com", "web.telegram.org", "mail.google.com"];
 
-// The on-device ML model (same as the Android app). Loaded once; if it
-// cannot be loaded, analyzeText falls back to the rules.
-const scorerPromise = fetch(chrome.runtime.getURL("char_model.tsv"))
-  .then((r) => r.text())
-  .then((tsv) => self.CharScorer.parse(tsv))
+// The site's full model, run on the device (ensemble.js). Loaded once; if
+// it cannot be loaded, analyzeText falls back to the rules.
+const scorerPromise = fetch(chrome.runtime.getURL("ensemble_model.json"))
+  .then((r) => r.json())
+  .then((m) => self.EnsembleScorer.parse(m))
+  // the site shows the same "model ..." id, so anyone can check both run
+  // the same model version
+  .then((sc) => { modelId = sc.fingerprint.slice(0, 8); applyStaticText(); return sc; })
   .catch(() => null);
 
 let currentLang = self.I18N.DEFAULT_LANG;
+let modelId = "";
 let lastResult = null;
 
 function applyStaticText() {
@@ -30,7 +34,8 @@ function applyStaticText() {
   document.documentElement.lang = currentLang;
   document.getElementById("appTitle").textContent = s.appTitle;
   document.getElementById("appSubtitle").textContent = s.appSubtitle;
-  document.getElementById("footerText").textContent = `${s.footer} · v${chrome.runtime.getManifest().version}`;
+  document.getElementById("footerText").textContent = `${s.footer} · v${chrome.runtime.getManifest().version}`
+    + (modelId ? ` · model ${modelId}` : "");
   document.getElementById("analyzeBtn").textContent = s.analyzeBtn;
   document.getElementById("autoscanLabel").textContent = s.autoscanLabel;
   document.getElementById("mistakesDownload").textContent = s.mistakesDownload;

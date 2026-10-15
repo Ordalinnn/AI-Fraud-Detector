@@ -1,13 +1,13 @@
-importScripts("i18n.js", "normalize.js", "scorer.js", "detector.js");
+importScripts("i18n.js", "normalize.js", "scorer.js", "ensemble.js", "detector.js");
 
-// The on-device model (char_model.tsv, ~0.9 MB) is parsed once per service
-// worker life. If it can't be loaded, analysis falls back to the rules.
+// The site's full model (ensemble_model.json, ~3 MB) is parsed once per
+// service worker life. If it can't be loaded, analysis falls back to the rules.
 let scorerPromise = null;
 function getScorer() {
   if (!scorerPromise) {
-    scorerPromise = fetch(chrome.runtime.getURL("char_model.tsv"))
-      .then((r) => r.text())
-      .then((t) => self.CharScorer.parse(t))
+    scorerPromise = fetch(chrome.runtime.getURL("ensemble_model.json"))
+      .then((r) => r.json())
+      .then((m) => self.EnsembleScorer.parse(m))
       .catch((e) => { console.warn("AI Fraud Detector: model not loaded", e); scorerPromise = null; return null; });
   }
   return scorerPromise;

@@ -137,7 +137,8 @@ static/
   icon.png                     App icon
 
 browser-extension/            Standalone Chrome/Edge extension (Manifest V3)
-  scorer.js + char_model.tsv    On-device ML model (same file as the Android app)
+  ensemble.js + ensemble_model.json  The website's model (5 models + stacker), run on the device
+  scorer.js                     Character n-gram model (one member; also the Android app's model)
   content.js / content.css      Automatic checks + red label in WhatsApp Web, Telegram Web, Gmail
   detector.js                   Reasons, domain checks, rule-based fallback (port of fraud_logic.py)
   i18n.js                       KZ/RU/EN translations shared by the popup and background script
@@ -217,7 +218,7 @@ It still needs an internet connection to reach the server — installing it skip
 
 ## Browser extension
 
-A self-contained Chrome/Edge extension in [`browser-extension/`](browser-extension/) — see its own [README](browser-extension/README.md) for install steps. Runs entirely on-device: your text is never sent anywhere, and it works even without the main web app running. It runs the same character n-gram + logistic regression model as the Android app (the strongest single member of the web ensemble, checked against scikit-learn to < 10⁻⁶), automatically labels suspicious incoming messages in WhatsApp Web, Telegram Web and Gmail, and checks any selected text via right-click.
+A self-contained Chrome/Edge extension in [`browser-extension/`](browser-extension/) — see its own [README](browser-extension/README.md) for install steps. Runs entirely on-device: your text is never sent anywhere, and it works even without the main web app running. It runs the website's own model — the same 5 models and stacker, exported by [`scripts/export_extension_model.py`](scripts/export_extension_model.py) — so a text gets the same percentage on the site and in the extension (checked on ~4,500 texts: identical features, probabilities within 10⁻⁹; both show the same "model xxxxxxxx" id), automatically labels suspicious incoming messages in WhatsApp Web, Telegram Web and Gmail, and checks any selected text via right-click.
 
 ## Dataset & models
 
