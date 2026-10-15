@@ -18,6 +18,16 @@ const ID = {
 };
 const NEW_STACK = "NEW · Стекинг";
 const NEW_REAL = "NEW · Шынайы өмір";
+// Figma does not always keep a slide name set by a plugin, so the new
+// slides are recognised by their section label instead.
+const LABEL_STACK = "07 · СТЕКИНГ: ЕСЕПТЕУ МЫСАЛЫ";
+const LABEL_REAL = "09 · ШЫНАЙЫ ӨМІРДЕ ТЕКСЕРУ";
+const hasLabel = (slide, label) => slide.findAllWithCriteria({ types: ["TEXT"] }).some((t) => t.characters === label);
+
+// Final texts that a repeated run must not change again.
+const DATA_NOTE = "Негіз: FTC, FBI IC3 2025 есебі және Kaspi, Halyk атынан жасалған нақты алаяқтық жағдайлары. Шаблондар әртүрлі банк атауларымен кеңейтілді. Оған қоса 400 нақты SMS (UCI корпусы) — модель шынайы хабарламалар стилін де көрсін.";
+const RESULTS_NOTE = "Сол 282 хабарлама (group-aware 80/20: 1116 / 282), бір сценарийдің нұсқалары тек бір жаққа түседі. Жазбаша жұмыстағы ансамбль: 82,3% · ең жақсы жалғыз модель (символдық n-грам): 93,6% · 15 бөлініс бойынша орташа: 96,1% ± 1,4.";
+const ERRORS_NOTE = "Жазбаша жұмыстағы жүйе 0,42 берген (Күдікті). Символдық n-грам моделі мен стекинг қосылғаннан кейін — 0,99 (Критикалық)";
 
 const report = { done: [], missed: [] };
 const ok = (m) => report.done.push(m);
@@ -168,6 +178,7 @@ async function sub(node, from, to) {
 // Replace `from` -> `to` in the first text of the slide containing it
 // (or the n-th one, top to bottom, when `nth` is given).
 async function edit(slide, from, to, nth) {
+  if (texts(slide).some((t) => t.characters.includes(to))) return ok(`уже сделано: ${to.slice(0, 40)}`);
   let hits = texts(slide).filter((t) => t.characters.includes(from));
   if (nth !== undefined) hits = hits.sort((a, b) => a.absoluteTransform[1][2] - b.absoluteTransform[1][2]).slice(nth, nth + 1);
   if (!hits.length) {
@@ -265,7 +276,7 @@ function buildStackingSlide() {
   const s = figma.createSlide();
   s.name = NEW_STACK;
   s.fills = [solid(C.bgB)];
-  label(s, "07 · СТЕКИНГ: ЕСЕПТЕУ МЫСАЛЫ");
+  label(s, LABEL_STACK);
   const q = addFrame(s, 120, 168, 1680, 96, C.card, 20, true);
   addText(q, F.med, 30, C.ink, "«Ваша посылка задержана. Оплатите доставку 350 тг по ссылке kazpost-delivery.top»", 40, 27, 1600);
 
@@ -312,7 +323,7 @@ function buildRealWorldSlide() {
   const s = figma.createSlide();
   s.name = NEW_REAL;
   s.fills = [solid(C.bgA)];
-  label(s, "09 · ШЫНАЙЫ ӨМІРДЕ ТЕКСЕРУ");
+  label(s, LABEL_REAL);
   addText(s, F.head, 56, C.ink, "Жюри ескертулерінен кейін — жүйені шынайы жағдайда тексердік", 120, 168, 1500, { lh: 115 });
   const cards = [
     ["бұрын 18,2%", "0,3%", "жалған дабыл 2 242 нақты қарапайым SMS-та (оқытуда болмаған)", C.blue],
@@ -370,12 +381,13 @@ async function main() {
   ok(`перекрашено элементов: ${n}`);
 
   // 2. text edits — only on the first run (they look for the old texts)
-  if (all.some((s) => s.name === NEW_STACK)) {
+  const stacks = all.filter((s) => hasLabel(s, LABEL_STACK));
+  const reals = all.filter((s) => hasLabel(s, LABEL_REAL));
+  if (stacks.length || reals.length) {
     ok("тексты уже обновлены прошлым запуском");
   } else {
   await edit(S.apparatus, "нәтижелерін ережелер негізінде біріктірсек", "нәтижелерін стекинг арқылы біріктірсек");
-  await edit(S.data, "Шаблондар әртүрлі банк атауларымен кеңейтілді.",
-    "Шаблондар әртүрлі банк атауларымен кеңейтілді. Оған қоса 400 нақты SMS (UCI корпусы) — модель шынайы хабарламалар стилін де көрсін.");
+  await setText(S.data, "Негіз: FTC", DATA_NOTE);
 
   await edit(S.system, "төрт модельдің", "бес модельдің");
   await setText(S.system, "SMS, чат немесе қоңырау транскрипті", "SMS, чат немесе транскрипт · «к0д» → «код»");
@@ -408,8 +420,7 @@ async function main() {
   await setText(S.results, "78,5%", "93,1%", true);
   await setText(S.results, "80,3%", "94,2%", true);
   await setText(S.results, "93,0%", "99,1%", true);
-  await setText(S.results, "Бір сценарийден",
-    "Сол 282 хабарлама (group-aware 80/20: 1116 / 282), бір сценарийдің нұсқалары тек бір жаққа түседі. Жазбаша жұмыстағы ансамбль: 82,3% · ең жақсы жалғыз модель (символдық n-грам): 93,6% · 15 бөлініс бойынша орташа: 96,1% ± 1,4.");
+  await setText(S.results, "Бір сценарийден", RESULTS_NOTE);
 
   await setText(S.confusion, "10 · ШАТАСУ", "ҚОСЫМША · ШАТАСУ МАТРИЦАСЫ");
   await setText(S.confusion, "130", "146", true);
@@ -430,8 +441,7 @@ async function main() {
   await setText(S.errors, "28", "9", true);
   await edit(S.errors, "0,42", "0,99");
   await edit(S.errors, "Күдікті", "Критикалық");
-  await setText(S.errors, "Шын мәнінде алаяқтық",
-    "Жазбаша жұмыстағы жүйе 0,42 берген (Күдікті). Символдық n-грам моделі мен стекинг қосылғаннан кейін — 0,99 (Критикалық)");
+  await setText(S.errors, "Шын мәнінде алаяқтық", ERRORS_NOTE);
   await setText(S.errors, "Қорытынды: модель сөз",
     "Енді әлсіз жерлер: оқытуда болмаған романтикалық (41%) және инвестициялық (66%) алаяқтық — бүкіл хат алмасуды талдау керек");
 
@@ -456,10 +466,13 @@ async function main() {
   }
 
   // 3. new slides (once)
-  let stack = all.find((s) => s.name === NEW_STACK);
+  // copies left by an earlier run (identical, made by this plugin) are removed
+  for (const extra of [...stacks.slice(1), ...reals.slice(1)]) { extra.remove(); ok("удалён лишний дубль нового слайда"); }
+  let stack = stacks[0];
   if (!stack) { stack = buildStackingSlide(); ok("создан слайд «Стекинг: есептеу мысалы»"); }
-  let real = all.find((s) => s.name === NEW_REAL);
+  let real = reals[0];
   if (!real) { real = buildRealWorldSlide(); ok("создан слайд «Шынайы өмірде тексеру»"); }
+  await repair(S);
   stack.speakerNotes = NOTES_STACK;
   real.speakerNotes = NOTES_REAL;
 
@@ -476,6 +489,17 @@ async function main() {
   reorder(main, backup);
 }
 
+// Texts a second run of the first version broke (it repeated replacements).
+async function repair(S) {
+  const fix = async (slide, test, want, what) => {
+    const t = texts(slide).find(test);
+    if (t && t.characters !== want) { await sub(t, t.characters, want); ok("исправлено: " + what); }
+  };
+  await fix(S.data, (n) => n.characters.startsWith("Негіз: FTC"), DATA_NOTE, "сноска на слайде «Деректер»");
+  await fix(S.results, (n) => n.characters.startsWith("Сол 282 хабарлама"), RESULTS_NOTE, "сноска на слайде «Нәтижелер»");
+  await fix(S.errors, (n) => n.characters.startsWith("Жазбаша жұмыстағы жүйе"), ERRORS_NOTE, "текст на слайде «Қателерді талдау»");
+}
+
 // Put the slides in the defense order. Figma has changed this API over
 // time, so try several ways and check the result after each one.
 function currentOrder() { return figma.getSlideGrid().flat().map((s) => s.id); }
@@ -487,7 +511,14 @@ function reorder(main, backup) {
   const same = () => currentOrder().join() === want.join();
   if (same()) return ok("порядок слайдов уже правильный");
   const rowOf = () => figma.currentPage.children.find((c) => c.type === "SLIDE_GRID");
+  // nodes fresh from the grid (some Figma versions ignore stale ones)
+  const fresh = () => {
+    const by = Object.fromEntries(figma.getSlideGrid().flat().map((s) => [s.id, s]));
+    return [main.map((s) => by[s.id]), extra.map((s) => by[s.id])];
+  };
   const attempts = [
+    ["setSlideGrid, 2 раздела (свежие узлы)", () => figma.setSlideGrid(fresh()), true],
+    ["setSlideGrid, 1 ряд (свежие узлы)", () => { const [m, e] = fresh(); figma.setSlideGrid([[...m, ...e]]); }, false],
     ["setSlideGrid, 2 раздела", () => figma.setSlideGrid([main, extra]), true],
     ["setCanvasGrid, 2 раздела", () => figma.setCanvasGrid([main, extra]), true],
     ["setSlideGrid, 1 ряд", () => figma.setSlideGrid([[...main, ...extra]]), false],
@@ -495,6 +526,10 @@ function reorder(main, backup) {
     ["insertChild", () => {
       const row = main[0].parent;
       [...main, ...extra].forEach((s, i) => row.insertChild(i, s));
+    }, false],
+    ["createSlideRow + appendChild", () => {
+      const row = figma.createSlideRow();
+      for (const s of [...main, ...extra]) row.appendChild(s);
     }, false],
   ];
   const errors = [];
@@ -515,11 +550,19 @@ function reorder(main, backup) {
   miss("порядок слайдов не изменился — " + errors.join(" | "));
 }
 
+function show(title) {
+  const esc = (x) => String(x).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  const order = figma.getSlideGrid().map((r, i) => `раздел ${i + 1}: ` + r.map((sl) => {
+    const lab = sl.findAllWithCriteria({ types: ["TEXT"] }).map((t) => t.characters).find((c) => /^\S+ · /.test(c)) || sl.name;
+    return (sl.isSkippedSlide ? "(скрыт) " : "") + lab.slice(0, 28);
+  }).join(" → ")).join("\n");
+  const html = `<div style="font:12px/1.45 Inter,sans-serif;padding:12px;white-space:pre-wrap">` +
+    `<b>${esc(title)}</b>\n\n` +
+    (report.missed.length ? `<b style="color:#e11d48">Не получилось:</b>\n${esc(report.missed.join("\n"))}\n\n` : "") +
+    `<b>Порядок сейчас:</b>\n${esc(order)}\n\n<b>Сделано:</b>\n${esc(report.done.join("\n"))}</div>`;
+  figma.showUI(html, { width: 460, height: 520, title: "AI Fraud Detector — отчёт" });
+}
+
 main()
-  .then(() => {
-    const msg = report.missed.length
-      ? `Готово, но ${report.missed.length} правок не найдено: ${report.missed.join(" | ")}`
-      : `Готово: ${report.done.length} изменений, без ошибок`;
-    figma.closePlugin(msg);
-  })
-  .catch((e) => figma.closePlugin("Ошибка: " + (e && e.message ? e.message : e)));
+  .then(() => show(report.missed.length ? `Готово, но ${report.missed.length} пунктов не получилось` : "Готово, без ошибок"))
+  .catch((e) => { report.missed.push(e && e.message ? e.message : String(e)); show("Ошибка"); });
