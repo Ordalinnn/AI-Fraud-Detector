@@ -2572,21 +2572,75 @@ def risk_style(prob, threshold=0.5):
     level_key, css_class, emoji = risk_level(prob, threshold)
     return T[level_key], css_class, emoji
 
-def render_risk_meter(prob, threshold, title):
+# Lucide icon paths (MIT) used instead of emoji for structural icons, so
+# they render identically on every OS and inherit the surrounding colour.
+ICON_PATHS = {
+    "text": '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>',
+    "report": '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="m9 15 2 2 4-4"/>',
+    "globe": '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
+    "link": '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+    "cpu": '<rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9" rx="1"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/>',
+    "search": '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+    "highlighter": '<path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/>',
+    "gauge": '<path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/>',
+    "table": '<path d="M12 3v18"/><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/>',
+    "download": '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>',
+    "alert": '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+    "zap": '<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>',
+    "pen": '<path d="M12 20h9"/><path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z"/>',
+    "chart": '<path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="m19 9-5 5-4-4-3 3"/>',
+    "bulb": '<path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/>',
+    "sparkles": '<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>',
+    "smartphone": '<rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/>',
+    "shield-check": '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
+    "shield-alert": '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M12 8v4"/><path d="M12 16h.01"/>',
+    "siren": '<path d="M7 18v-6a5 5 0 1 1 10 0v6"/><path d="M5 21a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-1a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2z"/><path d="M21 12h1"/><path d="M18.5 4.5 18 5"/><path d="M2 12h1"/><path d="M12 2v1"/><path d="m4.929 4.929.707.707"/><path d="M12 12v6"/>',
+    "grid": '<rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/>',
+    "sliders": '<line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/>',
+    "layers": '<path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>',
+    "database": '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/>',
+    "target": '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+}
+
+
+def icon(name, cls=""):
+    """Inline Lucide SVG, decorative (aria-hidden) - always used beside text."""
+    return (f'<svg class="ico {cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+            f'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+            f'{ICON_PATHS[name]}</svg>')
+
+
+def section_title(icon_name, text, tone="blue", el_id=None):
+    id_attr = f' id="{el_id}"' if el_id else ""
+    return (f'<div class="section-title"{id_attr}><span class="sec-ico tone-{tone}">{icon(icon_name)}</span>'
+            f'<span>{text}</span></div>')
+
+
+def metric_card(icon_name, tone, label, value):
+    return (f'<div class="metric-card tone-{tone}"><div class="metric-icon tone-{tone}">{icon(icon_name)}</div>'
+            f'<div class="metric-label">{label}</div><div class="metric-value">{value}</div></div>')
+
+
+def render_risk_meter(prob, threshold, title, score_label="", threshold_label="", aria_label=""):
     """Pure CSS/HTML risk meter (no charting library needed): a gradient
     track from green to red, a pointer at the current score, and a dashed
     line marking the decision threshold."""
     pct = max(0.0, min(1.0, prob)) * 100
     threshold_pct = max(0.0, min(1.0, threshold)) * 100
+    aria = html.escape(aria_label.format(score=risk_percent(prob), threshold=f"{threshold_pct:.0f}"), quote=True)
     return f"""
-    <div class="meter-wrap">
+    <div class="meter-wrap" role="img" aria-label="{aria}">
         <div class="meter-title">{title}</div>
-        <div class="meter-track">
-            <div class="meter-value-label" style="left:{pct:.1f}%;">{pct:.0f}%</div>
+        <div class="meter-track" aria-hidden="true">
+            <div class="meter-value-label" style="left:{pct:.1f}%;">{risk_percent(prob)}%</div>
             <div class="meter-pointer" style="left:{pct:.1f}%;"></div>
             <div class="meter-threshold-line" style="left:{threshold_pct:.1f}%;"></div>
         </div>
-        <div class="meter-scale"><span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span></div>
+        <div class="meter-scale" aria-hidden="true"><span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span></div>
+        <div class="meter-legend" aria-hidden="true">
+            <span><i class="meter-key-score"></i>{score_label}: <b>{risk_percent(prob)}%</b></span>
+            <span><i class="meter-key-threshold"></i>{threshold_label}: <b>{threshold_pct:.0f}%</b></span>
+        </div>
     </div>
     """
 
@@ -2691,55 +2745,98 @@ def ensemble_predict(feats_list, texts):
 # =========================
 st.markdown("""
 <style>
+/* Design system: "Trust, rich" - navy/cobalt/teal brand with gradient depth,
+   colour-coded icon tiles and layered cards. See
+   design-system/ai-fraud-detector/MASTER.md. Light only, matching
+   .streamlit/config.toml's forced light theme. Montserrat (headings) and
+   IBM Plex Sans (body) both cover Kazakh + Russian Cyrillic. */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
 :root {
-    --clr-navy: #1e3a8a;
-    --clr-cobalt: #1d4ed8;
-    --clr-teal: #0d9488;
+    /* Brand */
+    --clr-navy: #0a1a44;
+    --clr-navy-2: #12307a;
+    --clr-cobalt: #1d4ed8;      /* = primaryColor in .streamlit/config.toml */
+    --clr-cobalt-hover: #1e40af;
+    --clr-cyan: #0e7490;
+    --clr-teal: #0f766e;
+    --clr-teal-soft: #5eead4;
     --clr-slate: #1e293b;
-    --ease-snap: cubic-bezier(.22,1,.36,1);
-    --dur-fast: .22s;
-    --dur-med: .5s;
+    --grad-brand: linear-gradient(135deg, #1d4ed8 0%, #2563eb 45%, #0e7490 100%);
+    --grad-hero: linear-gradient(125deg, #081436 0%, #0f2a6b 38%, #1d4ed8 72%, #0e7490 100%);
+    /* Neutrals */
+    --clr-ink: #0f172a;
+    --clr-ink-2: #334155;
+    --clr-muted: #475569;       /* 7.5:1 on white */
+    --clr-bg: #f3f6fb;
+    --clr-surface: #ffffff;
+    --clr-subtle: #f8fafc;
+    --clr-border: #e3e9f2;
+    --clr-border-strong: #cbd5e1;
+    --clr-focus: #2563eb;
+    /* Scale */
+    --radius-sm: 10px;
+    --radius-md: 14px;
+    --radius-lg: 20px;
+    --radius-xl: 28px;
+    --shadow-sm: 0 1px 2px rgba(15,23,42,0.05), 0 2px 8px rgba(15,23,42,0.04);
+    --shadow-md: 0 2px 4px rgba(15,23,42,0.04), 0 10px 24px rgba(15,23,42,0.07);
+    --shadow-lg: 0 4px 8px rgba(15,23,42,0.05), 0 24px 48px rgba(15,23,42,0.12);
+    --shadow-brand: 0 8px 22px rgba(29,78,216,0.28);
+    /* Motion */
+    --ease-snap: cubic-bezier(.2,.8,.2,1);
+    --dur-fast: .2s;
+    --dur-med: .4s;
+    --font-head: "Montserrat", "IBM Plex Sans", -apple-system, "Segoe UI", sans-serif;
 }
 
-html, body, [class*="css"] {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+html, body, [class*="css"], .stApp, button, input, textarea, select {
+    font-family: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
-/* Slow-drifting aurora background — purely decorative, GPU-cheap since it
-   only repaints a full-viewport gradient once every animation frame. */
 .stApp {
+    color: var(--clr-ink);
     background:
-        radial-gradient(circle at 15% 15%, rgba(30,58,138,0.14), transparent 30%),
-        radial-gradient(circle at 85% 5%, rgba(13,148,136,0.20), transparent 34%),
-        radial-gradient(circle at 50% 100%, rgba(30,41,59,0.13), transparent 40%),
-        linear-gradient(135deg, #f8fafc 0%, #eef2ff 45%, #f0f9ff 100%);
-    background-size: 180% 180%, 180% 180%, 180% 180%, 100% 100%;
-    animation: aurora-drift 22s ease-in-out infinite;
-}
-
-@keyframes aurora-drift {
-    0%, 100% { background-position: 0% 0%, 100% 0%, 50% 100%, 0 0; }
-    50%      { background-position: 20% 30%, 70% 20%, 40% 80%, 0 0; }
+        radial-gradient(1100px 520px at 0% -8%, rgba(29,78,216,0.11), transparent 62%),
+        radial-gradient(900px 480px at 100% 0%, rgba(14,116,144,0.11), transparent 60%),
+        radial-gradient(800px 600px at 50% 110%, rgba(37,99,235,0.06), transparent 60%),
+        var(--clr-bg);
+    background-attachment: fixed;
 }
 
 @keyframes fade-slide-up {
-    from { opacity: 0; transform: translateY(10px); }
+    from { opacity: 0; transform: translateY(8px); }
     to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes glow-drift {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50%      { transform: translate(-30px, 18px) scale(1.06); }
+}
+@keyframes ring-pulse {
+    0%   { transform: scale(.85); opacity: .55; }
+    100% { transform: scale(1.35); opacity: 0; }
 }
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, var(--clr-navy), var(--clr-teal));
+    background: linear-gradient(180deg, #93a8d6, #7fb4c4);
     border-radius: 999px;
     border: 2px solid transparent;
     background-clip: padding-box;
 }
 
 .block-container {
-    padding-top: 1.4rem;
+    padding-top: 1.5rem;
     padding-bottom: 3rem;
-    max-width: 1280px;
+    max-width: 1240px;
+}
+
+/* Visible keyboard focus everywhere (WCAG 2.4.7) */
+a:focus-visible, button:focus-visible, [role="tab"]:focus-visible,
+summary:focus-visible, input:focus-visible, [tabindex]:focus-visible {
+    outline: 2px solid var(--clr-focus) !important;
+    outline-offset: 2px !important;
 }
 
 /* Force readable text for native Streamlit widgets in the main area,
@@ -2747,18 +2844,22 @@ html, body, [class*="css"] {
 .main h1, .main h2, .main h3, .main h4, .main h5, .main h6,
 [data-testid="stMain"] h1, [data-testid="stMain"] h2, [data-testid="stMain"] h3,
 [data-testid="stMain"] h4, [data-testid="stMain"] h5, [data-testid="stMain"] h6 {
-    color: #0f172a !important;
+    color: var(--clr-ink) !important;
+    font-family: var(--font-head) !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.01em;
 }
 
 [data-testid="stMetricValue"],
 [data-testid="stMetricLabel"],
 [data-testid="stMetricDelta"] {
-    color: #0f172a !important;
+    color: var(--clr-ink) !important;
 }
+[data-testid="stMetricValue"] { font-variant-numeric: tabular-nums; }
 
 .main [data-testid="stCaptionContainer"],
 [data-testid="stMain"] [data-testid="stCaptionContainer"] {
-    color: #64748b !important;
+    color: var(--clr-muted) !important;
 }
 
 .main [data-testid="stExpander"] summary,
@@ -2767,8 +2868,8 @@ html, body, [class*="css"] {
 [data-testid="stMain"] [data-testid="stExpander"] summary,
 [data-testid="stMain"] [data-testid="stExpander"] summary p,
 [data-testid="stMain"] [data-testid="stExpander"] svg {
-    color: #0f172a !important;
-    fill: #0f172a !important;
+    color: var(--clr-ink) !important;
+    fill: var(--clr-ink) !important;
 }
 
 /* Without this, the rule above's higher specificity would win over the
@@ -2783,36 +2884,49 @@ html, body, [class*="css"] {
 }
 
 [data-testid="stExpander"] [data-testid="stMarkdownContainer"] p {
-    color: #1e293b !important;
+    color: var(--clr-slate) !important;
 }
 
 [data-testid="stTabs"] [data-baseweb="tab"] p {
-    color: #334155 !important;
+    color: var(--clr-ink-2) !important;
 }
 
 [data-testid="stDataFrame"] {
-    color: #0f172a;
+    color: var(--clr-ink);
+    border: 1px solid var(--clr-border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
 }
 
 .main [data-testid="stWidgetLabel"] p,
 [data-testid="stMain"] [data-testid="stWidgetLabel"] p,
 .main [data-testid="stFileUploaderDropzoneInstructions"] div,
 [data-testid="stMain"] [data-testid="stFileUploaderDropzoneInstructions"] div {
-    color: #0f172a !important;
+    color: var(--clr-ink) !important;
+    font-weight: 600;
 }
 
+/* ---------- Icons & tones ---------- */
+.ico { width: 20px; height: 20px; flex-shrink: 0; display: block; }
+.tone-blue    { background: #eaf1ff; color: #1d4ed8; }
+.tone-teal    { background: #e6faf6; color: #0f766e; }
+.tone-cyan    { background: #e4f6fb; color: #0e7490; }
+.tone-amber   { background: #fff4dc; color: #b45309; }
+.tone-orange  { background: #ffeedd; color: #c2410c; }
+.tone-rose    { background: #ffe9ee; color: #be123c; }
+.tone-emerald { background: #e5f8ef; color: #047857; }
+.tone-indigo  { background: #ecefff; color: #3730a3; }
+.tone-sky     { background: #e6f3ff; color: #0369a1; }
+.tone-slate   { background: #eef2f7; color: #334155; }
+
+/* ---------- Sidebar ---------- */
 [data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #0f172a 0%, #111827 60%, #020617 100%);
-    border-right: 1px solid rgba(255,255,255,0.08);
-    position: relative;
-}
-
-[data-testid="stSidebar"]::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(circle at 20% 0%, rgba(13,148,136,0.14), transparent 45%);
-    pointer-events: none;
+    background:
+        radial-gradient(420px 300px at 0% 0%, rgba(37,99,235,0.28), transparent 70%),
+        radial-gradient(380px 300px at 100% 100%, rgba(14,116,144,0.22), transparent 70%),
+        linear-gradient(180deg, #0a1430 0%, #0b1226 100%);
+    border-right: 1px solid rgba(255,255,255,0.06);
 }
 
 [data-testid="stSidebar"] h1,
@@ -2824,43 +2938,49 @@ html, body, [class*="css"] {
 [data-testid="stSidebar"] [data-testid="stCaptionContainer"] {
     color: #e5e7eb !important;
 }
+[data-testid="stSidebar"] h2 { font-family: var(--font-head) !important; font-size: 1.15rem !important; font-weight: 800 !important; }
+[data-testid="stSidebar"] h3 { font-family: var(--font-head) !important; font-size: 0.95rem !important; font-weight: 700 !important; letter-spacing: .01em; }
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"] { color: #a9b6cc !important; }
+[data-testid="stSidebar"] hr { border-color: rgba(255,255,255,0.08) !important; }
 
 [data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] > div {
     background: #ffffff !important;
-    border-radius: 14px !important;
+    border-radius: var(--radius-sm) !important;
     border: 1px solid rgba(255,255,255,0.22) !important;
 }
 
 [data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] span,
 [data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] input,
 [data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] svg {
-    color: #0f172a !important;
-    fill: #0f172a !important;
+    color: var(--clr-ink) !important;
+    fill: var(--clr-ink) !important;
 }
 
 [data-testid="stSidebar"] .stRadio label {
     color: #e5e7eb !important;
-    font-weight: 700 !important;
+    font-weight: 600 !important;
 }
 
 [data-testid="stSidebar"] .stRadio div[role="radiogroup"] label {
-    background: rgba(255,255,255,0.08);
-    border: 1px solid rgba(255,255,255,0.15);
-    padding: 8px 10px;
-    border-radius: 14px;
-    margin-right: 6px;
-    transition: background var(--dur-fast) var(--ease-snap), transform var(--dur-fast) var(--ease-snap), box-shadow var(--dur-fast) var(--ease-snap);
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.12);
+    padding: 8px 12px;
+    min-height: 40px;
+    border-radius: var(--radius-sm);
+    margin: 0 6px 6px 0;
+    cursor: pointer;
+    transition: background var(--dur-fast) var(--ease-snap), border-color var(--dur-fast) var(--ease-snap);
 }
 
 [data-testid="stSidebar"] .stRadio div[role="radiogroup"] label:hover {
-    background: rgba(255,255,255,0.16);
-    transform: translateY(-1px);
+    background: rgba(255,255,255,0.10);
+    border-color: rgba(255,255,255,0.24);
 }
 
 [data-testid="stSidebar"] .stRadio div[role="radiogroup"] label:has(input:checked) {
-    background: linear-gradient(135deg, rgba(30,58,138,0.9), rgba(13,148,136,0.9));
-    border-color: transparent;
-    box-shadow: 0 8px 20px rgba(13,148,136,0.35);
+    background: linear-gradient(135deg, rgba(37,99,235,0.55), rgba(14,116,144,0.55));
+    border-color: #7dd3fc;
+    box-shadow: 0 6px 18px rgba(37,99,235,0.30);
 }
 
 [data-testid="stSidebar"] .stSlider label,
@@ -2869,62 +2989,61 @@ html, body, [class*="css"] {
     color: #e5e7eb !important;
 }
 
+.sb-metric { padding: 8px 0 10px; }
+.sb-metric-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.sb-metric-row span { color: #c3cddd; font-size: 13px; }
+.sb-metric-row b { color: #ffffff; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.sb-bar { height: 6px; border-radius: 999px; background: rgba(255,255,255,0.10); margin-top: 6px; overflow: hidden; }
+.sb-bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #60a5fa, #2dd4bf); }
+
+.sb-metric-final { margin-top: 4px; padding: 10px 10px 12px; border-radius: 10px; background: rgba(45,212,191,0.10); border: 1px solid rgba(45,212,191,0.28); }
+.sb-metric-final .sb-metric-row span { color: #ffffff; font-weight: 600; }
+.sb-metric-final .sb-bar i { background: linear-gradient(90deg, #2dd4bf, #a7f3d0); }
+
+/* ---------- Hero ---------- */
 .hero {
     position: relative;
     overflow: hidden;
-    padding: 38px;
-    border-radius: 34px;
-    background:
-        linear-gradient(135deg, rgba(15,23,42,0.98), rgba(30,58,138,0.92) 45%, rgba(29,78,216,0.88) 78%, rgba(13,148,136,0.88));
-    background-size: 200% 200%;
-    color: white;
-    box-shadow: 0 30px 80px rgba(15, 23, 42, 0.28);
-    margin-bottom: 26px;
-    border: 1px solid rgba(255,255,255,0.18);
-    animation: hero-gradient-shift 12s ease-in-out infinite, fade-slide-up .6s var(--ease-snap) both;
+    isolation: isolate;
+    padding: 40px 40px 28px;
+    border-radius: var(--radius-xl);
+    background: var(--grad-hero);
+    color: #ffffff;
+    box-shadow: 0 24px 60px rgba(10,26,68,0.32);
+    margin-bottom: 22px;
+    animation: fade-slide-up var(--dur-med) var(--ease-snap) both;
 }
-
-@keyframes hero-gradient-shift {
-    0%, 100% { background-position: 0% 50%; }
-    50%      { background-position: 100% 50%; }
-}
-
-.hero:before, .hero:after {
+/* static engineering grid */
+.hero::before {
     content: "";
     position: absolute;
+    inset: 0;
+    z-index: -1;
+    background-image:
+        linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
+    background-size: 34px 34px;
+    -webkit-mask-image: radial-gradient(ellipse at 70% 40%, #000 30%, transparent 75%);
+            mask-image: radial-gradient(ellipse at 70% 40%, #000 30%, transparent 75%);
+}
+.hero-glow {
+    position: absolute;
+    z-index: -1;
+    width: 520px;
+    height: 520px;
+    right: -120px;
+    top: -200px;
     border-radius: 50%;
-    filter: blur(4px);
-    opacity: .55;
-    animation: blob-float 14s ease-in-out infinite;
-}
-
-.hero:before {
-    width: 260px;
-    height: 260px;
-    right: -70px;
-    top: -80px;
-    background: rgba(255,255,255,0.13);
-}
-
-.hero:after {
-    width: 190px;
-    height: 190px;
-    left: -60px;
-    bottom: -70px;
-    background: rgba(45,212,191,0.25);
-    animation-delay: -6s;
-}
-
-@keyframes blob-float {
-    0%, 100% { transform: translate(0,0) scale(1); }
-    50%      { transform: translate(-16px, 12px) scale(1.08); }
+    background: radial-gradient(circle, rgba(45,212,191,0.38), transparent 65%);
+    animation: glow-drift 16s ease-in-out infinite;
+    pointer-events: none;
 }
 
 .hero-grid {
     position: relative;
     display: grid;
-    grid-template-columns: 1.6fr 0.9fr;
-    gap: 24px;
+    grid-template-columns: 1.55fr 1fr;
+    gap: 36px;
     align-items: center;
 }
 
@@ -2932,462 +3051,602 @@ html, body, [class*="css"] {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 8px 13px;
+    padding: 6px 12px;
     border-radius: 999px;
-    background: rgba(255,255,255,0.13);
-    border: 1px solid rgba(255,255,255,0.23);
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 0.3px;
-    margin-bottom: 16px;
+    background: rgba(255,255,255,0.10);
+    border: 1px solid rgba(255,255,255,0.22);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    backdrop-filter: blur(6px);
 }
-
 .hero-kicker::before {
     content: "";
-    width: 8px;
-    height: 8px;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
     background: #4ade80;
-    animation: pulse-dot 2s infinite;
-}
-
-@keyframes pulse-dot {
-    0%   { box-shadow: 0 0 0 0 rgba(74,222,128,0.6); }
-    70%  { box-shadow: 0 0 0 8px rgba(74,222,128,0); }
-    100% { box-shadow: 0 0 0 0 rgba(74,222,128,0); }
+    box-shadow: 0 0 0 3px rgba(74,222,128,0.25);
 }
 
 .hero-subtitle {
-    font-size: 18px;
+    font-size: 17px;
     line-height: 1.6;
-    opacity: 0.91;
-    max-width: 760px;
-    animation: fade-slide-up .5s var(--ease-snap) .1s both;
+    color: #dce6f7;
+    max-width: 620px;
+    margin-top: 8px;
 }
 
 .badge {
-    display: inline-block;
-    padding: 9px 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 12px;
     border-radius: 999px;
-    background: rgba(255,255,255,0.13);
-    border: 1px solid rgba(255,255,255,0.22);
-    margin-right: 8px;
-    margin-top: 17px;
+    background: rgba(255,255,255,0.09);
+    border: 1px solid rgba(255,255,255,0.18);
+    margin: 18px 8px 0 0;
     font-size: 13px;
-    font-weight: 700;
-    backdrop-filter: blur(8px);
-    transition: transform var(--dur-fast) var(--ease-snap), background var(--dur-fast) var(--ease-snap);
-    animation: fade-slide-up .5s var(--ease-snap) both;
+    font-weight: 600;
+    color: #eef4ff;
+    backdrop-filter: blur(6px);
 }
+.badge .ico { width: 15px; height: 15px; color: var(--clr-teal-soft); }
 
-.badge:hover { transform: translateY(-2px); background: rgba(255,255,255,0.22); }
-.hero .badge:nth-of-type(1) { animation-delay: .18s; }
-.hero .badge:nth-of-type(2) { animation-delay: .25s; }
-.hero .badge:nth-of-type(3) { animation-delay: .32s; }
-.hero .badge:nth-of-type(4) { animation-delay: .39s; }
+/* Right side: shield visual + readiness card */
+.hero-visual {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.hero-shield {
+    position: relative;
+    width: 116px;
+    height: 116px;
+    margin-bottom: -38px;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #3b82f6, #1e3a8a 70%);
+    border: 1px solid rgba(255,255,255,0.35);
+    box-shadow: 0 0 0 10px rgba(255,255,255,0.06), 0 0 50px rgba(45,212,191,0.45);
+}
+.hero-shield .ico { width: 54px; height: 54px; color: #ffffff; stroke-width: 1.6; }
+.hero-shield::before, .hero-shield::after {
+    content: "";
+    position: absolute;
+    inset: -14px;
+    border-radius: 50%;
+    border: 1px solid rgba(94,234,212,0.5);
+    animation: ring-pulse 3.2s ease-out infinite;
+}
+.hero-shield::after { animation-delay: 1.6s; }
 
 .hero-panel {
-    background: rgba(255,255,255,0.12);
-    border: 1px solid rgba(255,255,255,0.18);
-    border-radius: 28px;
-    padding: 22px;
-    backdrop-filter: blur(16px);
-    animation: float-panel 6s ease-in-out infinite;
-}
-
-@keyframes float-panel {
-    0%, 100% { transform: translateY(0); }
-    50%      { transform: translateY(-6px); }
+    width: 100%;
+    background: linear-gradient(160deg, rgba(255,255,255,0.16), rgba(255,255,255,0.06));
+    border: 1px solid rgba(255,255,255,0.20);
+    border-radius: var(--radius-lg);
+    padding: 52px 22px 20px;
+    backdrop-filter: blur(14px);
+    text-align: center;
+    box-shadow: 0 18px 40px rgba(2,6,23,0.25);
 }
 
 .hero-panel-title {
-    font-size: 14px;
-    opacity: 0.82;
-    font-weight: 700;
-    margin-bottom: 8px;
+    font-size: 12px;
+    color: #bcd0ee;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
 }
 
 .hero-panel-value {
-    font-size: 38px;
-    font-weight: 900;
-    letter-spacing: -1px;
-    background: linear-gradient(90deg, #ffffff, #5eead4);
+    font-family: var(--font-head);
+    font-size: 30px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    background: linear-gradient(90deg, #ffffff 10%, #99f6e4 90%);
     -webkit-background-clip: text;
-    background-clip: text;
+            background-clip: text;
     color: transparent;
 }
 
 .hero-panel-small {
-    font-size: 13px;
-    opacity: 0.82;
-    line-height: 1.5;
-    margin-top: 8px;
+    font-size: 14px;
+    color: #d3def0;
+    line-height: 1.55;
+    margin-top: 10px;
 }
 
-.glass-card {
-    background: rgba(255,255,255,0.86);
-    border: 1px solid rgba(226,232,240,0.92);
-    border-radius: 30px;
-    padding: 25px;
-    box-shadow: 0 20px 55px rgba(15, 23, 42, 0.09);
-    margin-bottom: 19px;
-    backdrop-filter: blur(18px);
-    transition: box-shadow var(--dur-fast) var(--ease-snap);
-    animation: fade-slide-up .5s var(--ease-snap) both;
+.hero-models {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 14px;
+}
+.hero-models span {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: rgba(2,6,23,0.28);
+    border: 1px solid rgba(255,255,255,0.14);
+    color: #c7f5ec;
 }
 
-.glass-card:hover {
-    box-shadow: 0 26px 65px rgba(15, 23, 42, 0.13);
-}
+.hero-models .hero-models-final { background: rgba(45,212,191,0.22); border-color: rgba(94,234,212,0.5); color: #ffffff; font-weight: 600; }
 
-.section-title {
-    font-size: 24px;
-    font-weight: 900;
-    color: #0f172a;
-    letter-spacing: -0.6px;
-    margin-bottom: 8px;
+.hero-stats {
     position: relative;
-    display: inline-block;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-top: 30px;
+    padding-top: 22px;
+    border-top: 1px solid rgba(255,255,255,0.12);
+}
+.hero-stat {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.hero-stat-ico {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    background: rgba(255,255,255,0.10);
+    border: 1px solid rgba(255,255,255,0.16);
+    color: var(--clr-teal-soft);
+    flex-shrink: 0;
+}
+.hero-stat-val {
+    font-family: var(--font-head);
+    font-size: 22px;
+    font-weight: 800;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+}
+.hero-stat-label {
+    font-size: 12px;
+    color: #bcd0ee;
+    font-weight: 500;
+    letter-spacing: 0.02em;
 }
 
-.section-title::after {
+/* ---------- Cards & sections ----------
+   .glass-card = a single-markdown HTML card; .st-key-card_* = real Streamlit
+   containers (st.container(key="card_...")) so widgets sit INSIDE the card. */
+.glass-card,
+[class*="st-key-card_"] {
+    position: relative;
+    background: var(--clr-surface);
+    border: 1px solid var(--clr-border);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    box-shadow: var(--shadow-md);
+    margin-bottom: 20px;
+    overflow: hidden;
+    animation: fade-slide-up var(--dur-med) var(--ease-snap) both;
+}
+.glass-card::before,
+[class*="st-key-card_"]::before {
     content: "";
     position: absolute;
-    left: 0;
-    bottom: -4px;
-    height: 3px;
-    width: 36px;
-    border-radius: 3px;
-    background: linear-gradient(90deg, var(--clr-cobalt), var(--clr-teal));
+    left: 0; right: 0; top: 0;
+    height: 4px;
+    background: var(--grad-brand);
+}
+.st-key-card_deep::before { background: linear-gradient(90deg, #0e7490, #2dd4bf); }
+
+.section-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: var(--font-head);
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--clr-ink);
+    letter-spacing: -0.01em;
+    line-height: 1.3;
+    margin-bottom: 6px;
+}
+.sec-ico {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
 }
 
 .section-subtitle {
-    color: #64748b;
+    color: var(--clr-muted);
+    font-size: 15px;
+    line-height: 1.55;
+    margin-bottom: 14px;
+}
+
+/* Features panel (right column) */
+.feature-list .section-title { margin-bottom: 14px; }
+.feat-grid { display: grid; gap: 8px; }
+.feat {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
+    color: var(--clr-ink-2);
     font-size: 14px;
-    margin-bottom: 15px;
+    font-weight: 500;
+    line-height: 1.4;
+    transition: background var(--dur-fast) var(--ease-snap), border-color var(--dur-fast) var(--ease-snap);
 }
-
-.feature-list p {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    padding: 12px 14px;
-    border-radius: 16px;
-    margin: 8px 0;
-    color: #334155;
-    font-weight: 650;
-    transition: transform var(--dur-fast) var(--ease-snap), box-shadow var(--dur-fast) var(--ease-snap);
-    animation: fade-slide-up .4s var(--ease-snap) both;
+.feat:hover { background: var(--clr-subtle); border-color: var(--clr-border); }
+.feat-ico {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
 }
-
-.feature-list p:hover { transform: translateX(4px); box-shadow: 0 8px 18px rgba(15,23,42,0.06); }
-.feature-list p:nth-of-type(1) { animation-delay: .03s; }
-.feature-list p:nth-of-type(2) { animation-delay: .06s; }
-.feature-list p:nth-of-type(3) { animation-delay: .09s; }
-.feature-list p:nth-of-type(4) { animation-delay: .12s; }
-.feature-list p:nth-of-type(5) { animation-delay: .15s; }
-.feature-list p:nth-of-type(6) { animation-delay: .18s; }
-.feature-list p:nth-of-type(7) { animation-delay: .21s; }
-.feature-list p:nth-of-type(8) { animation-delay: .24s; }
-.feature-list p:nth-of-type(9) { animation-delay: .27s; }
-.feature-list p:nth-of-type(10) { animation-delay: .30s; }
+.feat-ico .ico { width: 17px; height: 17px; }
 
 .howto-steps {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 12px;
-    margin-bottom: 16px;
+    margin: 6px 0 20px;
 }
 
 .howto-step {
-    flex: 1;
-    min-width: 220px;
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 16px;
-    padding: 14px 16px;
-    font-size: 16px;
-    font-weight: 700;
-    color: #1e293b;
+    background: linear-gradient(180deg, #ffffff, #f7faff);
+    border: 1px solid var(--clr-border);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--clr-slate);
     line-height: 1.5;
-    transition: transform var(--dur-fast) var(--ease-snap), box-shadow var(--dur-fast) var(--ease-snap);
-    animation: fade-slide-up .5s var(--ease-snap) both;
+    box-shadow: var(--shadow-sm);
 }
 
-.howto-step:hover { transform: translateY(-3px); box-shadow: 0 12px 24px rgba(15,23,42,0.08); }
-.howto-step:nth-child(1) { animation-delay: .05s; }
-.howto-step:nth-child(2) { animation-delay: .12s; }
-.howto-step:nth-child(3) { animation-delay: .19s; }
-
 .legend-title {
-    font-size: 14px;
-    font-weight: 800;
-    color: #475569;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--clr-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
     margin-bottom: 8px;
 }
 
 .legend-row {
     display: flex;
     flex-wrap: wrap;
-    gap: 10px;
+    gap: 8px;
 }
 
 .legend-chip {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 8px 14px;
+    gap: 8px;
+    padding: 7px 13px;
     border-radius: 999px;
     font-size: 14px;
-    font-weight: 750;
+    font-weight: 600;
     border: 1px solid transparent;
-    transition: transform var(--dur-fast) var(--ease-snap);
-    animation: fade-slide-up .4s var(--ease-snap) both;
 }
-.legend-chip:hover { transform: translateY(-2px) scale(1.03); }
-.legend-row .legend-chip:nth-child(1) { animation-delay: .04s; }
-.legend-row .legend-chip:nth-child(2) { animation-delay: .09s; }
-.legend-row .legend-chip:nth-child(3) { animation-delay: .14s; }
-.legend-row .legend-chip:nth-child(4) { animation-delay: .19s; }
-.legend-low      {background:#dcfce7; color:#166534; border-color:#bbf7d0;}
-.legend-mid      {background:#fef9c3; color:#854d0e; border-color:#fef08a;}
-.legend-high     {background:#ffedd5; color:#9a3412; border-color:#fed7aa;}
-.legend-critical {background:#fee2e2; color:#991b1b; border-color:#fecaca;}
+.legend-chip::before {
+    content: "";
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: currentColor;
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.9);
+}
+.legend-low      {background:#ecfdf3; color:#166534; border-color:#bbf7d0;}
+.legend-mid      {background:#fefce8; color:#854d0e; border-color:#fde68a;}
+.legend-high     {background:#fff7ed; color:#9a3412; border-color:#fed7aa;}
+.legend-critical {background:#fef2f2; color:#991b1b; border-color:#fecaca;}
 
 .disclaimer-box {
-    margin-top: 16px;
-    padding: 12px 16px;
-    background: #fffbeb;
+    margin: 4px 0 22px;
+    padding: 13px 18px;
+    background: linear-gradient(90deg, #fff8e6, #fffbeb);
     border: 1px solid #fde68a;
-    border-radius: 14px;
+    border-left: 4px solid #f59e0b;
+    border-radius: var(--radius-md);
     color: #92400e;
-    font-size: 13px;
-    font-weight: 600;
-    line-height: 1.5;
-    animation: fade-slide-up .4s var(--ease-snap) both;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.55;
 }
 
+/* ---------- Risk meter ---------- */
 .meter-wrap {
-    padding: 10px 6px 4px 6px;
-    animation: fade-slide-up .5s var(--ease-snap) both;
+    padding: 14px 16px 14px;
+    background: var(--clr-surface);
+    border: 1px solid var(--clr-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
 }
 
 .meter-title {
-    font-size: 13px;
-    font-weight: 750;
-    color: #475569;
-    margin-bottom: 22px;
+    font-family: var(--font-head);
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--clr-ink);
+    margin-bottom: 34px;
 }
 
 .meter-track {
     position: relative;
-    height: 22px;
+    height: 14px;
     border-radius: 999px;
-    background: linear-gradient(90deg, #22c55e 0%, #eab308 35%, #f97316 65%, #ef4444 100%);
-    border: 1px solid rgba(15, 23, 42, 0.08);
+    background: linear-gradient(90deg, #16a34a 0%, #84cc16 22%, #eab308 42%, #f97316 66%, #dc2626 100%);
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.12);
     overflow: visible;
 }
 
 .meter-pointer {
     position: absolute;
-    top: -3px;
-    width: 4px;
-    height: 28px;
-    background: #0f172a;
-    border-radius: 2px;
-    transform: translateX(-2px);
-    box-shadow: 0 0 0 2px #ffffff;
-    animation: pointer-drop .5s var(--ease-snap) .15s both;
-}
-
-@keyframes pointer-drop {
-    from { opacity: 0; transform: translateX(-2px) translateY(-10px); }
-    to   { opacity: 1; transform: translateX(-2px) translateY(0); }
+    top: -6px;
+    width: 6px;
+    height: 26px;
+    background: var(--clr-ink);
+    border-radius: 3px;
+    transform: translateX(-3px);
+    box-shadow: 0 0 0 2px #ffffff, 0 4px 10px rgba(15,23,42,0.3);
 }
 
 .meter-threshold-line {
     position: absolute;
-    top: -6px;
-    height: 34px;
-    border-left: 2px dashed #334155;
-    opacity: 0.85;
-    animation: fade-slide-up .4s var(--ease-snap) .2s both;
+    top: -9px;
+    height: 32px;
+    border-left: 2px dashed var(--clr-ink-2);
 }
 
 .meter-value-label {
     position: absolute;
-    top: -30px;
+    top: -36px;
     transform: translateX(-50%);
-    font-weight: 900;
+    font-weight: 700;
     font-size: 13px;
-    color: #0f172a;
-    background: #ffffff;
-    padding: 2px 8px;
-    border-radius: 8px;
-    border: 1px solid #e2e8f0;
+    color: #ffffff;
+    background: var(--clr-ink);
+    padding: 3px 9px;
+    border-radius: 7px;
     white-space: nowrap;
-    animation: fade-slide-up .4s var(--ease-snap) .25s both;
+    font-variant-numeric: tabular-nums;
+    box-shadow: 0 4px 10px rgba(15,23,42,0.25);
 }
 
 .meter-scale {
     display: flex;
     justify-content: space-between;
-    margin-top: 8px;
-    font-size: 11px;
-    /* #94a3b8 measured ~2.56:1 on the white meter card - fails WCAG AA's
-       4.5:1 minimum for normal-size text. #64748b keeps the same muted-gray
-       intent at ~4.76:1. */
-    color: #64748b;
-    font-weight: 700;
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--clr-muted);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
 }
 
-@media (max-width: 640px) {
-    .howto-steps { flex-direction: column; }
-    .howto-step { min-width: 0; font-size: 15px; }
+.meter-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--clr-border);
+    font-size: 13px;
+    color: var(--clr-ink-2);
 }
+.meter-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.meter-legend b { font-weight: 700; font-variant-numeric: tabular-nums; }
+.meter-key-score { width: 5px; height: 14px; border-radius: 2px; background: var(--clr-ink); }
+.meter-key-threshold { width: 0; height: 14px; border-left: 2px dashed var(--clr-ink-2); }
 
+.empty-result {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 4px 0 20px;
+    padding: 18px 20px;
+    border: 1.5px dashed #b8c7e0;
+    border-radius: var(--radius-lg);
+    background: linear-gradient(135deg, rgba(234,241,255,0.8), rgba(230,250,246,0.8));
+    color: var(--clr-ink-2);
+    font-size: 15px;
+    line-height: 1.55;
+}
+.empty-result .sec-ico { background: #ffffff; color: var(--clr-cobalt); box-shadow: var(--shadow-sm); }
+
+/* ---------- Result metrics ---------- */
 .metric-card {
-    background: rgba(255,255,255,0.92);
-    border-radius: 26px;
-    padding: 23px 18px;
-    box-shadow: 0 16px 42px rgba(15, 23, 42, 0.08);
-    border: 1px solid #e2e8f0;
-    text-align: center;
+    position: relative;
+    background: var(--clr-surface);
+    border-radius: var(--radius-lg);
+    padding: 18px;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--clr-border);
+    height: 100%;
+    overflow: hidden;
     transition: transform var(--dur-fast) var(--ease-snap), box-shadow var(--dur-fast) var(--ease-snap);
-    animation: fade-slide-up .5s var(--ease-snap) both;
+    animation: fade-slide-up var(--dur-med) var(--ease-snap) both;
+}
+.metric-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+.metric-card::after {
+    /* soft tinted corner glow, colour from the icon tone */
+    content: "";
+    position: absolute;
+    width: 120px;
+    height: 120px;
+    right: -40px;
+    top: -40px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: .06;
+    pointer-events: none;
 }
 
-.metric-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 22px 50px rgba(15, 23, 42, 0.14);
-}
-
-.metric-card:hover .metric-icon {
-    transform: rotate(-8deg) scale(1.08);
-}
-
-[data-testid="column"]:nth-of-type(1) .metric-card { animation-delay: .03s; }
-[data-testid="column"]:nth-of-type(2) .metric-card { animation-delay: .09s; }
-[data-testid="column"]:nth-of-type(3) .metric-card { animation-delay: .15s; }
-[data-testid="column"]:nth-of-type(4) .metric-card { animation-delay: .21s; }
+[data-testid="column"]:nth-of-type(2) .metric-card { animation-delay: .05s; }
+[data-testid="column"]:nth-of-type(3) .metric-card { animation-delay: .10s; }
+[data-testid="column"]:nth-of-type(4) .metric-card { animation-delay: .15s; }
 
 .metric-icon {
     width: 42px;
     height: 42px;
-    border-radius: 15px;
-    background: linear-gradient(135deg, #1e3a8a, #0d9488);
-    color: white;
+    border-radius: 12px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 10px;
-    font-size: 20px;
-    transition: transform var(--dur-fast) var(--ease-snap);
+    margin-bottom: 12px;
 }
+.metric-icon svg { width: 20px; height: 20px; }
+.metric-card[class*="tone-"] { background: var(--clr-surface); }
 
 .metric-label {
-    color: #64748b;
-    font-size: 13px;
-    font-weight: 750;
+    color: var(--clr-muted);
+    font-size: 12px;
+    font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.45px;
+    letter-spacing: 0.06em;
 }
 
 .metric-value {
-    color: #0f172a;
-    font-size: 34px;
-    font-weight: 900;
-    margin-top: 5px;
+    font-family: var(--font-head);
+    color: var(--clr-ink);
+    font-size: 30px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
 }
 
+/* Verdict banner: icon + text label + score, never colour alone */
 .risk-low, .risk-mid, .risk-high, .risk-critical {
-    border-radius: 30px;
-    padding: 24px 26px;
-    font-size: 28px;
-    font-weight: 900;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    border-radius: var(--radius-lg);
+    padding: 20px 24px;
     margin: 20px 0;
-    border: 1px solid rgba(255,255,255,0.8);
-    box-shadow: 0 18px 45px rgba(15,23,42,0.08);
-    animation: risk-pop .45s var(--ease-snap) both;
+    border: 1px solid;
+    border-left-width: 6px;
+    box-shadow: var(--shadow-md);
+    animation: fade-slide-up var(--dur-med) var(--ease-snap) both;
 }
-.risk-low {background:linear-gradient(135deg,#dcfce7,#f0fdf4);color:#166534;}
-.risk-mid {background:linear-gradient(135deg,#fef9c3,#fffbeb);color:#854d0e;}
-.risk-high {background:linear-gradient(135deg,#ffedd5,#fff7ed);color:#9a3412;}
-.risk-critical {
-    background:linear-gradient(135deg,#fee2e2,#fff1f2);
-    color:#991b1b;
-    animation: risk-pop .45s var(--ease-snap) both, critical-pulse 1.8s ease-in-out .5s infinite;
-}
+.risk-low      {background:linear-gradient(120deg,#ecfdf3,#f7fef9); color:#166534; border-color:#bbf7d0; border-left-color:#16a34a;}
+.risk-mid      {background:linear-gradient(120deg,#fefce8,#fffef5); color:#854d0e; border-color:#fde68a; border-left-color:#ca8a04;}
+.risk-high     {background:linear-gradient(120deg,#fff3e6,#fffaf5); color:#9a3412; border-color:#fed7aa; border-left-color:#ea580c;}
+.risk-critical {background:linear-gradient(120deg,#ffecec,#fff8f8); color:#991b1b; border-color:#fecaca; border-left-color:#dc2626;}
 
-@keyframes risk-pop {
-    from { opacity: 0; transform: translateY(10px) scale(.97); }
-    to   { opacity: 1; transform: translateY(0) scale(1); }
+.verdict-ico {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    background: currentColor;
 }
+.verdict-ico .ico { width: 28px; height: 28px; color: #ffffff; }
+.risk-low .verdict-ico      { background: #16a34a; box-shadow: 0 8px 20px rgba(22,163,74,.30); }
+.risk-mid .verdict-ico      { background: #ca8a04; box-shadow: 0 8px 20px rgba(202,138,4,.30); }
+.risk-high .verdict-ico     { background: #ea580c; box-shadow: 0 8px 20px rgba(234,88,12,.30); }
+.risk-critical .verdict-ico { background: #dc2626; box-shadow: 0 8px 20px rgba(220,38,38,.32); }
 
-@keyframes critical-pulse {
-    0%, 100% { box-shadow: 0 18px 45px rgba(15,23,42,0.08), 0 0 0 0 rgba(239,68,68,0.35); }
-    50%      { box-shadow: 0 18px 45px rgba(15,23,42,0.08), 0 0 0 10px rgba(239,68,68,0); }
+.verdict-body { flex: 1; min-width: 0; }
+.verdict-kicker {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    opacity: .85;
 }
+.verdict-label {
+    font-family: var(--font-head);
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+}
+.verdict-score { text-align: right; }
+.verdict-score b {
+    display: block;
+    font-family: var(--font-head);
+    font-size: 34px;
+    font-weight: 800;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+.verdict-score span { font-size: 12px; font-weight: 600; opacity: .85; }
 
 .feature-chip {
     display: inline-flex;
     align-items: center;
-    padding: 10px 14px;
+    padding: 7px 13px;
     border-radius: 999px;
-    background: #f0fdfa;
-    /* #0d9488 measured ~3.59:1 on this chip's #f0fdfa background - fails
-       WCAG AA's 4.5:1 minimum for normal-size text. #0f766e (a darker shade
-       of the same teal) reaches ~5.25:1 while keeping the brand hue. */
-    color: #0f766e;
-    font-weight: 750;
-    margin: 6px;
-    border: 1px solid #99f6e4;
-    box-shadow: 0 8px 18px rgba(13,148,136,0.08);
-    transition: transform var(--dur-fast) var(--ease-snap), box-shadow var(--dur-fast) var(--ease-snap);
-    animation: fade-slide-up .4s var(--ease-snap) both;
+    background: linear-gradient(135deg, #effdfa, #e8f7ff);
+    /* #0f766e on #f0fdfa = ~5.25:1, passes WCAG AA for normal text */
+    color: var(--clr-teal);
+    font-size: 14px;
+    font-weight: 600;
+    margin: 4px;
+    border: 1px solid #a7f0e1;
+    box-shadow: 0 2px 6px rgba(15,118,110,0.08);
 }
-
-.feature-chip:hover { transform: translateY(-2px) scale(1.04); box-shadow: 0 12px 26px rgba(13,148,136,0.15); }
-.feature-chip:nth-of-type(1) { animation-delay: .03s; }
-.feature-chip:nth-of-type(2) { animation-delay: .06s; }
-.feature-chip:nth-of-type(3) { animation-delay: .09s; }
-.feature-chip:nth-of-type(4) { animation-delay: .12s; }
-.feature-chip:nth-of-type(5) { animation-delay: .15s; }
-.feature-chip:nth-of-type(6) { animation-delay: .18s; }
 
 .domain-box {
-    padding: 15px 16px;
-    border-radius: 18px;
-    background: #0f172a;
+    padding: 14px 16px;
+    border-radius: var(--radius-md);
+    background: linear-gradient(135deg, #0b1226, #13203f);
     color: #e2e8f0;
-    font-family: monospace;
+    font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 14px;
     margin-bottom: 10px;
-    border: 1px solid #334155;
-    transition: transform var(--dur-fast) var(--ease-snap), border-color var(--dur-fast) var(--ease-snap);
-    animation: fade-slide-up .4s var(--ease-snap) both;
+    border: 1px solid #22304f;
+    box-shadow: var(--shadow-sm);
+    overflow-wrap: anywhere;
 }
 
-.domain-box:hover { transform: translateX(3px); border-color: #0d9488; }
-
+/* ---------- Controls ---------- */
 .stButton > button,
 [data-testid="stDownloadButton"] button,
 [data-testid="stFormSubmitButton"] button {
-    border-radius: 18px !important;
-    padding: 0.8rem 1rem !important;
-    font-weight: 850 !important;
+    border-radius: var(--radius-sm) !important;
+    min-height: 46px;
+    padding: 0.7rem 1.15rem !important;
+    font-weight: 600 !important;
     border: 0 !important;
-    background: linear-gradient(135deg, #1e3a8a, #1d4ed8 55%, #0d9488) !important;
-    background-size: 200% auto !important;
-    color: white !important;
-    box-shadow: 0 14px 30px rgba(29,78,216,0.25) !important;
-    transition: transform var(--dur-fast) var(--ease-snap), box-shadow var(--dur-fast) var(--ease-snap), background-position var(--dur-med) ease !important;
+    background: var(--grad-brand) !important;
+    background-size: 160% 100% !important;
+    background-position: 0% 0% !important;
+    color: #ffffff !important;
+    box-shadow: var(--shadow-brand) !important;
+    cursor: pointer;
+    transition: background-position var(--dur-med) var(--ease-snap), box-shadow var(--dur-fast) var(--ease-snap), transform var(--dur-fast) var(--ease-snap) !important;
 }
+.stButton > button p,
+[data-testid="stDownloadButton"] button p,
+[data-testid="stFormSubmitButton"] button p { color: #ffffff !important; font-weight: 600 !important; }
 
 .stButton > button:hover,
 [data-testid="stDownloadButton"] button:hover,
 [data-testid="stFormSubmitButton"] button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 20px 42px rgba(29,78,216,0.32) !important;
-    background-position: 100% center !important;
+    background-position: 100% 0% !important;
+    box-shadow: 0 12px 28px rgba(29,78,216,0.36) !important;
+    transform: translateY(-1px);
 }
 
 .stButton > button:active,
@@ -3396,163 +3655,194 @@ html, body, [class*="css"] {
     transform: translateY(0) scale(.98);
 }
 
+.stButton > button:disabled,
+[data-testid="stDownloadButton"] button:disabled {
+    opacity: .5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Download / export actions are secondary to "Analyze": outline style */
+[data-testid="stDownloadButton"] button {
+    background: var(--clr-surface) !important;
+    color: var(--clr-cobalt) !important;
+    border: 1px solid #bcd0f5 !important;
+    box-shadow: var(--shadow-sm) !important;
+}
+[data-testid="stDownloadButton"] button p { color: var(--clr-cobalt) !important; }
+[data-testid="stDownloadButton"] button:hover {
+    background: #eef4ff !important;
+    border-color: var(--clr-cobalt) !important;
+    box-shadow: var(--shadow-md) !important;
+}
+
+textarea, [data-baseweb="input"] input {
+    font-size: 16px !important;   /* prevents iOS zoom-on-focus */
+    line-height: 1.6 !important;
+}
+
 textarea {
-    border-radius: 22px !important;
-    border: 1px solid #cbd5e1 !important;
-    box-shadow: inset 0 1px 4px rgba(15,23,42,0.05) !important;
+    border-radius: var(--radius-md) !important;
+    border: 1px solid var(--clr-border-strong) !important;
+    background: #fbfcff !important;
     transition: border-color var(--dur-fast) var(--ease-snap), box-shadow var(--dur-fast) var(--ease-snap) !important;
 }
 
 textarea:focus {
-    border-color: #0d9488 !important;
-    box-shadow: inset 0 1px 4px rgba(15,23,42,0.05), 0 0 0 4px rgba(13,148,136,0.15) !important;
+    border-color: var(--clr-cobalt) !important;
+    background: #ffffff !important;
+    box-shadow: 0 0 0 4px rgba(29,78,216,0.15) !important;
+}
+
+[data-testid="stForm"] {
+    border: 1px solid var(--clr-border) !important;
+    border-radius: var(--radius-md) !important;
+    background: var(--clr-subtle);
+    padding: 16px !important;
+}
+
+[data-testid="stFileUploaderDropzone"] {
+    border-radius: var(--radius-md) !important;
+    border: 1.5px dashed #b8c7e0 !important;
+    background: linear-gradient(135deg, #f5f8ff, #f2fbfa) !important;
+}
+
+[data-testid="stAlert"] {
+    border-radius: var(--radius-md) !important;
+}
+
+[data-testid="stTabs"] [role="tablist"] {
+    gap: 6px;
+    border-bottom: 1px solid var(--clr-border);
 }
 
 [data-testid="stTabs"] button {
-    font-weight: 800;
-    border-radius: 16px 16px 0 0;
-    transition: color var(--dur-fast) var(--ease-snap);
+    font-weight: 600;
+    min-height: 44px;
+    padding: 0 14px !important;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    transition: background-color var(--dur-fast) var(--ease-snap);
 }
+[data-testid="stTabs"] button:hover { background: rgba(29,78,216,0.06); }
+[data-testid="stTabs"] button[aria-selected="true"] { background: linear-gradient(180deg, rgba(29,78,216,0.08), rgba(29,78,216,0)); }
+[data-testid="stTabs"] button[aria-selected="true"] p { color: var(--clr-cobalt) !important; }
 
 [data-baseweb="tab-highlight"] {
-    background: linear-gradient(90deg, #1e3a8a, #0d9488) !important;
-    transition: left var(--dur-med) var(--ease-snap), width var(--dur-med) var(--ease-snap) !important;
+    background: var(--grad-brand) !important;
+    height: 3px !important;
+    border-radius: 3px;
 }
 
 [data-testid="stProgress"] > div > div > div {
-    background: linear-gradient(90deg, #1e3a8a, #1d4ed8, #0d9488) !important;
-    transition: width .6s var(--ease-snap) !important;
+    background: var(--grad-brand) !important;
+    transition: width .4s var(--ease-snap) !important;
+}
+
+[data-testid="stExpander"] {
+    border: 1px solid var(--clr-border) !important;
+    border-radius: var(--radius-lg) !important;
+    background: var(--clr-surface);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
 }
 
 [data-testid="stExpander"] summary {
-    border-radius: 14px;
-    transition: background var(--dur-fast) var(--ease-snap);
+    min-height: 50px;
+    font-weight: 600;
+    transition: background-color var(--dur-fast) var(--ease-snap);
 }
 
 [data-testid="stExpander"] summary:hover {
-    background: rgba(13,148,136,0.08);
+    background: #f5f8ff;
 }
+[data-testid="stSidebar"] [data-testid="stExpander"] {
+    background: rgba(255,255,255,0.03);
+    border-color: rgba(255,255,255,0.12) !important;
+    box-shadow: none;
+}
+[data-testid="stSidebar"] [data-testid="stExpander"] summary:hover { background: rgba(255,255,255,0.06); }
 
+/* ---------- Logo / title ---------- */
 .site-logo {
-    width: 86px;
-    height: 86px;
+    width: 76px;
+    height: 76px;
     object-fit: contain;
-    filter: drop-shadow(0 0 18px rgba(34,211,238,0.45));
-    animation: logo-glow 3s ease-in-out infinite;
-}
-
-@keyframes logo-glow {
-    0%, 100% { filter: drop-shadow(0 0 14px rgba(34,211,238,0.35)); }
-    50%      { filter: drop-shadow(0 0 22px rgba(34,211,238,0.6)); }
+    flex-shrink: 0;
+    border-radius: 18px;
+    filter: drop-shadow(0 0 18px rgba(45,212,191,0.45));
 }
 
 .sidebar-logo {
-    width: 72px;
-    height: 72px;
+    width: 56px;
+    height: 56px;
     object-fit: contain;
-    filter: drop-shadow(0 0 12px rgba(34,211,238,0.45));
     margin-bottom: 8px;
+    filter: drop-shadow(0 0 12px rgba(56,189,248,0.40));
 }
 
 .logo-row {
     display: flex;
     align-items: center;
     gap: 18px;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
 }
 
 .logo-title {
-    font-size: 42px;
-    line-height: 1.05;
-    font-weight: 900;
-    letter-spacing: -1.2px;
+    font-family: var(--font-head);
+    font-size: 44px;
+    line-height: 1.02;
+    font-weight: 800;
+    letter-spacing: -0.03em;
 }
 
 .logo-title span {
-    background: linear-gradient(90deg, #0d9488, #1e3a8a, #0d9488);
-    background-size: 200% auto;
+    background: linear-gradient(90deg, #5eead4, #7dd3fc);
     -webkit-background-clip: text;
-    background-clip: text;
+            background-clip: text;
     color: transparent;
-    animation: text-shine 4s linear infinite;
-}
-
-@keyframes text-shine {
-    to { background-position: -200% center; }
 }
 
 .footer {
+    margin-top: 44px;
+    padding: 22px 20px 6px;
+    border-top: 1px solid var(--clr-border);
     text-align: center;
-    color: #64748b;
+    color: var(--clr-muted);
     font-size: 13px;
-    margin-top: 34px;
-    padding: 18px;
-    animation: fade-slide-up .5s var(--ease-snap) both;
 }
-
-.metrics-bar {
-    background: #f1f5f9;
-    border-radius: 20px;
-    padding: 18px 22px;
-    margin: 12px 0;
-    border: 1px solid #e2e8f0;
-}
-
-.metrics-row {
-    display: flex;
-    gap: 14px;
-    flex-wrap: wrap;
-}
-
-.metrics-item {
-    background: white;
-    border-radius: 14px;
-    padding: 12px 18px;
-    border: 1px solid #e2e8f0;
-    flex: 1;
-    min-width: 120px;
-    text-align: center;
-    transition: transform var(--dur-fast) var(--ease-snap), box-shadow var(--dur-fast) var(--ease-snap);
-    animation: fade-slide-up .45s var(--ease-snap) both;
-}
-
-.metrics-item:hover { transform: translateY(-3px); box-shadow: 0 12px 26px rgba(15,23,42,0.08); }
-.metrics-row .metrics-item:nth-child(1) { animation-delay: .03s; }
-.metrics-row .metrics-item:nth-child(2) { animation-delay: .08s; }
-.metrics-row .metrics-item:nth-child(3) { animation-delay: .13s; }
-.metrics-row .metrics-item:nth-child(4) { animation-delay: .18s; }
-
-.metrics-item-label {
-    font-size: 12px;
-    color: #64748b;
+.footer-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-head);
     font-weight: 700;
-    text-transform: uppercase;
-}
-
-.metrics-item-val {
-    font-size: 22px;
-    font-weight: 900;
-    color: #0f172a;
-}
-
-.highlight-box {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 18px;
-    padding: 16px 18px;
-    line-height: 1.85;
-    color: #1e293b;
+    color: var(--clr-ink);
     font-size: 15px;
-    word-wrap: break-word;
+    margin-bottom: 6px;
+}
+.footer-brand .ico { color: var(--clr-cobalt); }
+
+/* ---------- Highlighted input text ---------- */
+.highlight-box {
+    background: var(--clr-surface);
+    border: 1px solid var(--clr-border);
+    border-radius: var(--radius-md);
+    padding: 16px 18px;
+    line-height: 1.9;
+    color: var(--clr-slate);
+    font-size: 16px;
+    box-shadow: var(--shadow-sm);
+    overflow-wrap: anywhere;
 }
 
 .hl-urgent, .hl-secret, .hl-money, .hl-threat,
 .hl-reward, .hl-pressure, .hl-identity, .hl-link {
     padding: 1px 5px;
-    border-radius: 6px;
-    font-weight: 750;
+    border-radius: 5px;
+    font-weight: 600;
     box-decoration-break: clone;
     -webkit-box-decoration-break: clone;
+    border-bottom: 2px solid currentColor;
 }
 .hl-urgent   {background:#fef9c3; color:#854d0e;}
 .hl-secret   {background:#fee2e2; color:#991b1b;}
@@ -3563,33 +3853,37 @@ textarea:focus {
 .hl-identity {background:#ccfbf1; color:#0f766e;}
 .hl-link     {background:#e0e7ff; color:#3730a3; text-decoration: underline;}
 
-.hl-secret, .hl-threat {
-    animation: chip-alert 2.2s ease-in-out infinite;
-}
-
-@keyframes chip-alert {
-    0%, 100% { filter: brightness(1); }
-    50%      { filter: brightness(1.12); }
-}
-
+/* ---------- Responsive ---------- */
 @media (max-width: 900px) {
-    .hero-grid { grid-template-columns: 1fr; }
+    .hero-grid { grid-template-columns: 1fr; gap: 24px; }
+    .hero-stats { grid-template-columns: repeat(2, 1fr); gap: 16px; }
     .logo-title { font-size: 34px; }
-    .hero { padding: 26px; }
+    .hero { padding: 28px 26px 22px; }
     .block-container { padding-left: 1rem; padding-right: 1rem; }
     .metric-value { font-size: 26px; }
 }
 
 @media (max-width: 640px) {
-    .hero-panel-value { font-size: 28px; }
-    .risk-low, .risk-mid, .risk-high, .risk-critical { font-size: 20px; padding: 18px 20px; }
-    .logo-title { font-size: 28px; }
+    .hero { padding: 22px 18px 18px; border-radius: var(--radius-lg); }
+    .site-logo { width: 58px; height: 58px; }
+    .hero-subtitle { font-size: 16px; }
+    /* content-priority: get phone users to the input box faster; the
+       readiness panel repeats what the subtitle + badges already say */
+    .hero-visual { display: none; }
+    .hero-stats { margin-top: 20px; padding-top: 18px; }
+    .hero-stat-val { font-size: 19px; }
+    .logo-title { font-size: 27px; }
+    .risk-low, .risk-mid, .risk-high, .risk-critical { flex-wrap: wrap; padding: 16px 18px; gap: 14px; }
+    .verdict-label { font-size: 20px; }
+    .verdict-score { text-align: left; width: 100%; }
+    .verdict-score b { display: inline; font-size: 26px; margin-right: 6px; }
+    .glass-card, [class*="st-key-card_"] { padding: 18px; }
+    .howto-step { font-size: 15px; }
 }
 
 /* Respect the OS/browser-level motion preference: collapse every animation
-   and transition to effectively instant rather than removing them outright,
-   so layout/positioning logic that happens to ride on an animation (e.g.
-   the fade-slide-up entrances) still ends in its final, correct state. */
+   and transition to effectively instant so entrances still end in their
+   final, correct state; decorative loops are removed outright. */
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
         animation-duration: 0.001ms !important;
@@ -3597,9 +3891,8 @@ textarea:focus {
         transition-duration: 0.001ms !important;
         scroll-behavior: auto !important;
     }
-    .stApp, .hero {
-        animation: none !important;
-    }
+    .hero-glow, .hero-shield::before, .hero-shield::after { animation: none !important; }
+    .hero-shield::before, .hero-shield::after { opacity: 0; }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -3611,7 +3904,7 @@ with st.sidebar:
     if LOGO_HTML:
         st.markdown(f'<img src="{LOGO_HTML}" class="sidebar-logo" alt="AI Fraud Detector logo">', unsafe_allow_html=True)
     st.markdown(f"## {T['title']}")
-    st.caption("Smart fraud detection prototype")
+    st.caption(T["sidebar_tagline"])
 
     st.radio(
         "🌍 Language / Тіл / Язык",
@@ -3699,11 +3992,10 @@ with st.sidebar:
     st.markdown(f"### 📊 {T['model_metrics']}")
     st.caption(T["model_metrics_note"].format(n=eval_report["n_test"]))
     for model_name, acc in model_metrics.items():
-        color = "#16a34a" if acc >= 90 else "#ca8a04"
+        final_cls = " sb-metric-final" if model_name == fm.MODEL_DISPLAY_NAMES["final"] else ""
         st.markdown(
-            f'<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.1)">'
-            f'<span style="color:#94a3b8;font-size:12px">{model_name}</span>'
-            f'<span style="color:{color};font-weight:800;font-size:13px">{acc}%</span></div>',
+            f'<div class="sb-metric{final_cls}"><div class="sb-metric-row"><span>{model_name}</span><b>{acc}%</b></div>'
+            f'<div class="sb-bar"><i style="width:{max(0.0, min(100.0, acc))}%"></i></div></div>',
             unsafe_allow_html=True
         )
 
@@ -3716,10 +4008,31 @@ with st.sidebar:
 # =========================
 # HERO
 # =========================
-logo_block = f'<img src="{LOGO_HTML}" class="site-logo" alt="AI Fraud Detector logo">' if LOGO_HTML else '<div style="font-size:58px">🔐</div>'
+logo_block = f'<img src="{LOGO_HTML}" class="site-logo" alt="AI Fraud Detector logo">' if LOGO_HTML else f'<span class="hero-stat-ico">{icon("shield-check")}</span>'
+
+_hero_stats = "".join(
+    f'<div class="hero-stat"><span class="hero-stat-ico">{icon(ic)}</span>'
+    f'<div><div class="hero-stat-val">{val}</div><div class="hero-stat-label">{label}</div></div></div>'
+    for ic, val, label in [
+        ("database", len(training_data), T["stat_examples"]),
+        ("alert", "24+", T["stat_categories"]),
+        ("target", f"{ENSEMBLE_ACCURACY}%", T["stat_accuracy"]),
+        ("globe", 3, T["stat_languages"]),
+    ]
+)
+_hero_badges = "".join(
+    f'<span class="badge">{icon(ic)}{label}</span>'
+    for ic, label in [
+        ("cpu", T["badge_ensemble_ml"]),
+        ("link", T["badge_domain_analysis"]),
+        ("search", T["badge_explainable_ai"]),
+        ("report", T["badge_risk_report"]),
+    ]
+)
 
 st.markdown(f"""
 <div class="hero">
+    <div class="hero-glow"></div>
     <div class="hero-grid">
         <div>
             <div class="logo-row">
@@ -3730,17 +4043,19 @@ st.markdown(f"""
                 </div>
             </div>
             <div class="hero-subtitle">{T['subtitle']}</div>
-            <span class="badge">{T['badge_ensemble_ml']}</span>
-            <span class="badge">{T['badge_domain_analysis']}</span>
-            <span class="badge">{T['badge_explainable_ai']}</span>
-            <span class="badge">{T['badge_risk_report']}</span>
+            {_hero_badges}
         </div>
-        <div class="hero-panel">
-            <div class="hero-panel-title">{T['hero_panel_title']}</div>
-            <div class="hero-panel-value">{T['hero_panel_value']}</div>
-            <div class="hero-panel-small">{T['hero_panel_desc']}</div>
+        <div class="hero-visual">
+            <div class="hero-shield">{icon("shield-check")}</div>
+            <div class="hero-panel">
+                <div class="hero-panel-title">{T['hero_panel_title']}</div>
+                <div class="hero-panel-value">{T['hero_panel_value']}</div>
+                <div class="hero-panel-small">{T['hero_panel_desc']}</div>
+                <div class="hero-models"><span>LR</span><span>RF</span><span>GB</span><span>TF-IDF</span><span>CHAR</span><span class="hero-models-final">STACK</span></div>
+            </div>
         </div>
     </div>
+    <div class="hero-stats">{_hero_stats}</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -3938,28 +4253,27 @@ try {
 # INSTALL INSTRUCTIONS (toggled by the sidebar button)
 # =========================
 if st.session_state.get("show_install_instructions"):
-    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-    st.markdown(f'<div class="section-title">📲 {T["install_panel_title"]}</div>', unsafe_allow_html=True)
-    st.info(T["howto_easy"])
-    tab_android, tab_iphone, tab_pc = st.tabs([T["install_tab_android"], T["install_tab_iphone"], T["install_tab_pc"]])
-    with tab_android:
-        st.markdown(T["howto_android"].format(apk_url=ANDROID_APK_URL))
-    with tab_iphone:
-        st.link_button(T["checker_button"], checker_url(lang), type="primary", width="stretch")
-        # with ?lang=: a Kazakh/English reader gets the page in their language
-        # (an iPhone has no Kazakh system language to fall back on)
-        st.markdown(T["howto_iphone"].format(url=public_app_url(), checker=checker_url(lang)))
-    with tab_pc:
-        st.markdown(T["howto_pc"])
-        ext_version = extension_version()
-        st.download_button(
-            T["install_extension_download_button"] + (f" · v{ext_version}" if ext_version else ""),
-            build_extension_zip(extension_fingerprint()),
-            file_name=f"AI-Fraud-Detector-extension-{ext_version or 'latest'}.zip",
-            mime="application/zip",
-        )
-        st.markdown(T["install_extension_steps"])
-    st.markdown('</div>', unsafe_allow_html=True)
+    with st.container(key="card_install"):
+        st.markdown(section_title("smartphone", T["install_panel_title"], "sky"), unsafe_allow_html=True)
+        st.info(T["howto_easy"])
+        tab_android, tab_iphone, tab_pc = st.tabs([T["install_tab_android"], T["install_tab_iphone"], T["install_tab_pc"]])
+        with tab_android:
+            st.markdown(T["howto_android"].format(apk_url=ANDROID_APK_URL))
+        with tab_iphone:
+            st.link_button(T["checker_button"], checker_url(lang), type="primary", width="stretch")
+            # with ?lang=: a Kazakh/English reader gets the page in their language
+            # (an iPhone has no Kazakh system language to fall back on)
+            st.markdown(T["howto_iphone"].format(url=public_app_url(), checker=checker_url(lang)))
+        with tab_pc:
+            st.markdown(T["howto_pc"])
+            ext_version = extension_version()
+            st.download_button(
+                T["install_extension_download_button"] + (f" · v{ext_version}" if ext_version else ""),
+                build_extension_zip(extension_fingerprint()),
+                file_name=f"AI-Fraud-Detector-extension-{ext_version or 'latest'}.zip",
+                mime="application/zip",
+            )
+            st.markdown(T["install_extension_steps"])
 
 # =========================
 # STATS + HOW TO USE + COLOR LEGEND — collapsed by default so a first-time
@@ -3968,30 +4282,8 @@ if st.session_state.get("show_install_instructions"):
 # stays visible outside the expander since it matters even to someone who
 # never opens this.
 # =========================
-_avg_acc = ENSEMBLE_ACCURACY
-
 with st.expander(f"🧭 {T['how_to_use']}", expanded=False):
     st.markdown(f"""
-    <div class="metrics-bar">
-        <div class="metrics-row">
-            <div class="metrics-item">
-                <div class="metrics-item-val">{len(training_data)}</div>
-                <div class="metrics-item-label">{T['stat_examples']}</div>
-            </div>
-            <div class="metrics-item">
-                <div class="metrics-item-val">24+</div>
-                <div class="metrics-item-label">{T['stat_categories']}</div>
-            </div>
-            <div class="metrics-item">
-                <div class="metrics-item-val">{_avg_acc}%</div>
-                <div class="metrics-item-label">{T['stat_accuracy']}</div>
-            </div>
-            <div class="metrics-item">
-                <div class="metrics-item-val">3</div>
-                <div class="metrics-item-label">{T['stat_languages']}</div>
-            </div>
-        </div>
-    </div>
     <div class="howto-steps">
         <div class="howto-step">{T['step1']}</div>
         <div class="howto-step">{T['step2']}</div>
@@ -3999,10 +4291,10 @@ with st.expander(f"🧭 {T['how_to_use']}", expanded=False):
     </div>
     <div class="legend-title">{T['legend_title']}</div>
     <div class="legend-row">
-        <span class="legend-chip legend-low">🟢 {T['low']}</span>
-        <span class="legend-chip legend-mid">🟡 {T['mid']}</span>
-        <span class="legend-chip legend-high">🟠 {T['high']}</span>
-        <span class="legend-chip legend-critical">🔴 {T['critical']}</span>
+        <span class="legend-chip legend-low">{T['low']}</span>
+        <span class="legend-chip legend-mid">{T['mid']}</span>
+        <span class="legend-chip legend-high">{T['high']}</span>
+        <span class="legend-chip legend-critical">{T['critical']}</span>
     </div>
     """, unsafe_allow_html=True)
 
@@ -4088,76 +4380,80 @@ def render_voice_input():
 left, right = st.columns([2.1, 0.9], gap="large")
 
 with left:
-    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+    with st.container(key="card_input"):
 
-    if mode == "batch":
-        st.markdown(f'<div class="section-title">📊 {T["batch"]}</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="section-subtitle">{T["batch_subtitle"]}</div>', unsafe_allow_html=True)
+        if mode == "batch":
+            st.markdown(section_title("table", T["batch"], "indigo"), unsafe_allow_html=True)
+            st.markdown(f'<div class="section-subtitle">{T["batch_subtitle"]}</div>', unsafe_allow_html=True)
 
-        with st.form("batch_form", clear_on_submit=False):
-            batch_file = st.file_uploader(T["batch_upload"], type=["csv"], key="batch_file_uploader")
-            batch_column = st.text_input(T["batch_column"], value="text", key="batch_column_input")
-            batch_go = st.form_submit_button(T["batch_run"], width="stretch")
+            with st.form("batch_form", clear_on_submit=False):
+                batch_file = st.file_uploader(T["batch_upload"], type=["csv"], key="batch_file_uploader")
+                batch_column = st.text_input(T["batch_column"], value="text", key="batch_column_input")
+                batch_go = st.form_submit_button(T["batch_run"], width="stretch")
 
-        analyze = False
-        input_text = ""
-    else:
-        st.markdown(f'<div class="section-title">✍️ {T["input_title"]}</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="section-subtitle">{T["input_subtitle"]}</div>', unsafe_allow_html=True)
-        if mode == "voice":
-            render_voice_input()
+            analyze = False
+            input_text = ""
         else:
-            st.caption(f"ℹ️ {T['call_transcript_hint']}")
-
-        with st.form("analysis_form", clear_on_submit=False):
-            uploaded = None
-            if mode == "file":
-                uploaded = st.file_uploader(T["upload"], type=["txt"], key="txt_file_uploader")
-
-            if uploaded:
-                input_text = uploaded.read().decode("utf-8", errors="ignore")
-                if len(input_text) > MAX_INPUT_CHARS:
-                    input_text = input_text[:MAX_INPUT_CHARS]
-                    st.warning(T["file_truncated"].format(max_chars=MAX_INPUT_CHARS))
-                st.success(T["file_uploaded"])
+            st.markdown(section_title("pen", T["input_title"], "blue"), unsafe_allow_html=True)
+            st.markdown(f'<div class="section-subtitle">{T["input_subtitle"]}</div>', unsafe_allow_html=True)
+            if mode == "voice":
+                render_voice_input()
             else:
-                input_text = st.text_area(
-                    T["input_label"],
-                    key="main_input_text",
-                    height=210,
-                    max_chars=MAX_INPUT_CHARS
-                )
+                st.caption(f"ℹ️ {T['call_transcript_hint']}")
 
-            # FIX: Show live character/word count below textarea
-            char_count = len(input_text)
-            word_count_val = len(input_text.split()) if input_text.strip() else 0
-            st.caption(f"📝 {T['char_count']}: {char_count} | {T['word_count']}: {word_count_val}")
+            with st.form("analysis_form", clear_on_submit=False):
+                uploaded = None
+                if mode == "file":
+                    uploaded = st.file_uploader(T["upload"], type=["txt"], key="txt_file_uploader")
 
-            analyze = st.form_submit_button(T["analyze"], width="stretch")
-            if st.session_state.pop("shared_autorun", False):
-                analyze = True
+                if uploaded:
+                    input_text = uploaded.read().decode("utf-8", errors="ignore")
+                    if len(input_text) > MAX_INPUT_CHARS:
+                        input_text = input_text[:MAX_INPUT_CHARS]
+                        st.warning(T["file_truncated"].format(max_chars=MAX_INPUT_CHARS))
+                    st.success(T["file_uploaded"])
+                else:
+                    input_text = st.text_area(
+                        T["input_label"],
+                        key="main_input_text",
+                        height=210,
+                        max_chars=MAX_INPUT_CHARS
+                    )
 
-        batch_go = False
-        batch_file = None
-        batch_column = "text"
-    st.markdown('</div>', unsafe_allow_html=True)
+                # FIX: Show live character/word count below textarea
+                char_count = len(input_text)
+                word_count_val = len(input_text.split()) if input_text.strip() else 0
+                st.caption(f"📝 {T['char_count']}: {char_count} | {T['word_count']}: {word_count_val}")
+
+                analyze = st.form_submit_button(T["analyze"], width="stretch")
+                if st.session_state.pop("shared_autorun", False):
+                    analyze = True
+
+            batch_go = False
+            batch_file = None
+            batch_column = "text"
 
 with right:
-    st.markdown(f"""
-    <div class="glass-card feature-list">
-        <div class="section-title">⚙️ {T['features']}</div>
-        <p>🧾 {T['flist_text_analysis']}</p>
-        <p>🌐 {T['flist_domain_analysis']}</p>
-        <p>🧠 {T['flist_ensemble_ml']}</p>
-        <p>🔍 {T['flist_explainable_result']}</p>
-        <p>🖍️ {T['flist_highlighted_words']}</p>
-        <p>📈 {T['flist_risk_gauge']}</p>
-        <p>📊 {T['flist_batch_csv']}</p>
-        <p>📥 {T['flist_downloadable_report']}</p>
-        <p>🚨 {T['flist_real_scam_scenarios']}</p>
-        <p>⚡ {T['flist_rule_risk_boost']}</p>
-    </div>
-    """, unsafe_allow_html=True)
+    _features = "".join(
+        f'<div class="feat"><span class="feat-ico tone-{tone}">{icon(ic)}</span><span>{label}</span></div>'
+        for ic, tone, label in [
+            ("text", "blue", T["flist_text_analysis"]),
+            ("link", "cyan", T["flist_domain_analysis"]),
+            ("cpu", "indigo", T["flist_ensemble_ml"]),
+            ("search", "teal", T["flist_explainable_result"]),
+            ("highlighter", "amber", T["flist_highlighted_words"]),
+            ("gauge", "rose", T["flist_risk_gauge"]),
+            ("table", "sky", T["flist_batch_csv"]),
+            ("download", "emerald", T["flist_downloadable_report"]),
+            ("alert", "orange", T["flist_real_scam_scenarios"]),
+            ("zap", "slate", T["flist_rule_risk_boost"]),
+        ]
+    )
+    st.markdown(
+        f'<div class="glass-card feature-list">{section_title("layers", T["features"], "blue")}'
+        f'<div class="feat-grid">{_features}</div></div>',
+        unsafe_allow_html=True,
+    )
 
 # =========================
 # HISTORY & FEEDBACK INIT
@@ -4209,7 +4505,8 @@ if mode == "batch" and batch_go:
                     # Vectorized: extract all feature rows once, then a single
                     # batch predict_proba call per model instead of one call per row.
                     feats_list = [extract_features(t)[0] for t in texts]
-                    probs = ensemble_predict(feats_list, texts)["final"]
+                    with st.spinner(T["batch_loading"]):
+                        probs = ensemble_predict(feats_list, texts)["final"]
 
                     results = []
                     for t, p in zip(texts, probs):
@@ -4222,7 +4519,7 @@ if mode == "batch" and batch_go:
                             "Verdict": f"{em} {verdict}",
                         })
 
-                    st.markdown(f'<div class="section-title">📊 {T["batch_results"]}</div>', unsafe_allow_html=True)
+                    st.markdown(section_title("table", T["batch_results"], "indigo"), unsafe_allow_html=True)
                     results_df = pd.DataFrame(results)
                     st.dataframe(results_df, width="stretch", hide_index=True)
                     csv_safe_results_df = results_df.assign(Text=results_df["Text"].apply(sanitize_for_csv))
@@ -4332,11 +4629,14 @@ def _model_probs(r):
 # RESULT DISPLAY (reads from session_state so it survives feedback/history
 # button clicks instead of disappearing on the next rerun)
 # =========================
+if mode != "batch" and "last_result" not in st.session_state:
+    st.markdown(f'<div class="empty-result"><span class="sec-ico">{icon("search")}</span><span>{T["empty_result_hint"]}</span></div>', unsafe_allow_html=True)
+
 if mode != "batch" and "last_result" in st.session_state:
     r = st.session_state["last_result"]
     X_input = pd.DataFrame([r["features"]])
 
-    st.markdown(f'<div class="section-title" id="fraud-result">📊 {T["result"]}</div>', unsafe_allow_html=True)
+    st.markdown(section_title("chart", T["result"], "blue", el_id="fraud-result"), unsafe_allow_html=True)
     if st.session_state.pop("scroll_to_result", False):
         # Opened from the Share menu: jump straight to the verdict instead of
         # leaving the user at the top of the page on a small phone screen.
@@ -4348,17 +4648,24 @@ if mode != "batch" and "last_result" in st.session_state:
         </script>""", height=1, width=1)
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.markdown(f'<div class="metric-card"><div class="metric-icon">%</div><div class="metric-label">{T["risk"]}</div><div class="metric-value">{risk_percent(r["prob"])}%</div></div>', unsafe_allow_html=True)
-    c2.markdown(f'<div class="metric-card"><div class="metric-icon">⚠️</div><div class="metric-label">{T["detected"]}</div><div class="metric-value">{len(r["explanations"])}</div></div>', unsafe_allow_html=True)
-    c3.markdown(f'<div class="metric-card"><div class="metric-icon">🎚️</div><div class="metric-label">{T["threshold"]}</div><div class="metric-value">{r["threshold"]:.2f}</div></div>', unsafe_allow_html=True)
-    c4.markdown(f'<div class="metric-card"><div class="metric-icon">🧠</div><div class="metric-label">{T["model"]}</div><div class="metric-value">5 + stack</div></div>', unsafe_allow_html=True)
+    c1.markdown(metric_card("chart", "blue", T["risk"], f'{risk_percent(r["prob"])}%'), unsafe_allow_html=True)
+    c2.markdown(metric_card("alert", "amber", T["detected"], len(r["explanations"])), unsafe_allow_html=True)
+    c3.markdown(metric_card("sliders", "indigo", T["threshold"], f'{r["threshold"]:.2f}'), unsafe_allow_html=True)
+    c4.markdown(metric_card("cpu", "teal", T["models_stacked"], 5), unsafe_allow_html=True)
     st.caption(f"ℹ️ {T['model_help']} · model {MODEL_FINGERPRINT[:8]}")
 
-    st.markdown(f'<div class="{r["risk_class"]}">{r["emoji"]} {r["risk_label"]}</div>', unsafe_allow_html=True)
+    _verdict_icon = {"risk-low": "shield-check", "risk-critical": "siren"}.get(r["risk_class"], "shield-alert")
+    st.markdown(
+        f'<div class="{r["risk_class"]}" role="status" aria-atomic="true">'
+        f'<span class="verdict-ico">{icon(_verdict_icon)}</span>'
+        f'<div class="verdict-body"><div class="verdict-kicker">{T["result"]}</div><div class="verdict-label">{T.get(r["risk_class"].removeprefix("risk-"), r["risk_label"])}</div></div>'
+        f'<div class="verdict-score"><b>{risk_percent(r["prob"])}%</b><span>{T["risk"]}</span></div></div>',
+        unsafe_allow_html=True,
+    )
     st.progress(float(r["prob"]))
 
     # Plain-language verdict shown immediately, not buried in a tab
-    st.markdown(f'<div class="section-title" style="font-size:19px;">💡 {T["simple_result"]}</div>', unsafe_allow_html=True)
+    st.markdown(section_title("bulb", T["simple_result"], "amber"), unsafe_allow_html=True)
     if r["pred"] == 1:
         st.error(T["bad_advice"])
     else:
@@ -4410,7 +4717,7 @@ if mode != "batch" and "last_result" in st.session_state:
 
     chart_col1, chart_col2 = st.columns(2)
     with chart_col1:
-        st.markdown(render_risk_meter(r["prob"], r["threshold"], T["gauge_title"]), unsafe_allow_html=True)
+        st.markdown(render_risk_meter(r["prob"], r["threshold"], T["gauge_title"], T["meter_score"], T["threshold"], T["meter_aria"]), unsafe_allow_html=True)
     with chart_col2:
         st.markdown(f"**{T['model_compare']}**")
         model_df = pd.DataFrame(
@@ -4651,36 +4958,35 @@ SECURITY ADVICE:
     # no ANTHROPIC_API_KEY is configured, the section explains that plainly
     # instead of a dead-end button — rather than disappearing entirely,
     # which left users wondering if the feature existed at all.
-    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-    st.markdown(f'<div class="section-title">{T["deep_analysis_title"]}</div>', unsafe_allow_html=True)
-    st.markdown(T["deep_analysis_intro"])
-    st.caption(T["deep_analysis_privacy_note"])
+    with st.container(key="card_deep"):
+        st.markdown(section_title("sparkles", T["deep_analysis_title"].removeprefix("🧠 "), "teal"), unsafe_allow_html=True)
+        st.markdown(T["deep_analysis_intro"])
+        st.caption(T["deep_analysis_privacy_note"])
 
-    if not get_anthropic_api_key():
-        st.info(T["deep_analysis_not_configured"])
-    else:
-        last_click = st.session_state.get("deep_analysis_last_click")
-        cooldown_remaining = 0.0
-        if last_click is not None:
-            elapsed = (datetime.now() - last_click).total_seconds()
-            cooldown_remaining = max(0.0, DEEP_ANALYSIS_COOLDOWN_SECONDS - elapsed)
+        if not get_anthropic_api_key():
+            st.info(T["deep_analysis_not_configured"])
+        else:
+            last_click = st.session_state.get("deep_analysis_last_click")
+            cooldown_remaining = 0.0
+            if last_click is not None:
+                elapsed = (datetime.now() - last_click).total_seconds()
+                cooldown_remaining = max(0.0, DEEP_ANALYSIS_COOLDOWN_SECONDS - elapsed)
 
-        if st.button(T["deep_analysis_button"], key="deep_analysis_btn", disabled=cooldown_remaining > 0):
-            st.session_state["deep_analysis_last_click"] = datetime.now()
-            lang_name = {"🇰🇿 KZ": "Kazakh", "🇷🇺 RU": "Russian", "🇬🇧 EN": "English"}.get(lang, "English")
-            with st.spinner(T["deep_analysis_loading"]):
-                try:
-                    st.session_state["deep_analysis_result"] = run_deep_analysis(r["input_text"], lang_name)
-                except Exception:
-                    logger.warning("Deep analysis (Claude) call failed", exc_info=True)
-                    st.session_state["deep_analysis_result"] = None
-                    st.error(T["deep_analysis_error"])
-        elif cooldown_remaining > 0:
-            st.caption(T["deep_analysis_cooldown"].format(seconds=int(cooldown_remaining) + 1))
+            if st.button(T["deep_analysis_button"], key="deep_analysis_btn", disabled=cooldown_remaining > 0):
+                st.session_state["deep_analysis_last_click"] = datetime.now()
+                lang_name = {"🇰🇿 KZ": "Kazakh", "🇷🇺 RU": "Russian", "🇬🇧 EN": "English"}.get(lang, "English")
+                with st.spinner(T["deep_analysis_loading"]):
+                    try:
+                        st.session_state["deep_analysis_result"] = run_deep_analysis(r["input_text"], lang_name)
+                    except Exception:
+                        logger.warning("Deep analysis (Claude) call failed", exc_info=True)
+                        st.session_state["deep_analysis_result"] = None
+                        st.error(T["deep_analysis_error"])
+            elif cooldown_remaining > 0:
+                st.caption(T["deep_analysis_cooldown"].format(seconds=int(cooldown_remaining) + 1))
 
-        if st.session_state.get("deep_analysis_result"):
-            st.markdown(f"**{T['deep_analysis_result_title']}**")
-            st.info(st.session_state["deep_analysis_result"])
-    st.markdown('</div>', unsafe_allow_html=True)
+            if st.session_state.get("deep_analysis_result"):
+                st.markdown(f"**{T['deep_analysis_result_title']}**")
+                st.info(st.session_state["deep_analysis_result"])
 
-st.markdown(f'<div class="footer">{T["footer"]} · {T["badge_ensemble_ml"]} · {datetime.now().year}</div>', unsafe_allow_html=True)
+st.markdown(f'<div class="footer"><div class="footer-brand">{icon("shield-check")}AI Fraud Detector</div><div>{T["footer"]} · {T["badge_ensemble_ml"]} · {datetime.now().year}</div></div>', unsafe_allow_html=True)
