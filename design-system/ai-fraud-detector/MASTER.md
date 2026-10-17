@@ -9,7 +9,8 @@
 **Project:** AI Fraud Detector
 **Updated:** 2026-10-16. Built with ui-ux-pro-max guidance, edited to match what is actually implemented.
 **Category:** Security / Fintech tool
-**Direction:** "Trust, rich": the navy/cobalt/teal brand with gradient depth, colour-coded icon tiles and layered cards.
+**Direction (2026-10-17 reskin):** "Graphite & Sky": graphite hero, sky-700 `#0369a1` primary (5.9:1 on white), tighter radii 6/10/14/18, IBM Plex Sans for headings (Montserrat dropped). Values below the table header may be stale; `:root` in app.py wins.
+**Previous direction:** "Trust, rich": the navy/cobalt/teal brand with gradient depth, colour-coded icon tiles and layered cards.
 **Source of truth for values:** the `:root` block in `app.py`'s UI STYLE section. Keep this file and that block in sync.
 
 > **Rejected generator suggestions:** a dark gold `#F59E0B` + purple `#8B5CF6` palette, and later "Claymorphism" with Varela Round / Nunito Sans (playful, aimed at children's products, weak Kazakh Cyrillic). Reasons: the existing brand is navy/cobalt/teal, `.streamlit/config.toml` forces a light theme, and the generator's own anti-patterns forbid AI purple gradients and playful design for this category.
