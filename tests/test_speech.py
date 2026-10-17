@@ -111,6 +111,45 @@ def test_voice_mode_transcript_lands_in_text_box_and_is_analysed(tmp_path, monke
     assert at.session_state["last_result"]["prob"] > 0.5
 
 
+def test_only_one_transcription_runs_at_a_time():
+    with speech.transcription_slot(timeout=0):
+        with pytest.raises(speech.TranscriptionError, match="busy"):
+            with speech.transcription_slot(timeout=0):
+                pass
+    with speech.transcription_slot(timeout=0):  # released again afterwards
+        pass
+
+
+def test_voice_mode_tells_user_to_wait_when_another_transcription_runs(tmp_path, monkeypatch):
+    from streamlit.testing.v1 import AppTest
+    from translations import get_translations
+
+    monkeypatch.chdir(tmp_path)
+    model = FakeModel()
+    monkeypatch.setattr(speech, "load_model", lambda size=None: model)
+    monkeypatch.setattr(speech, "TRANSCRIPTION_WAIT_SECONDS", 0.1)
+
+    at = AppTest.from_file(APP_PATH, default_timeout=120)
+    at.run()
+    at.selectbox(key="mode_select").set_value("voice").run()
+    at.file_uploader(key="voice_file_uploader").set_value(("call.wav", make_wav(1.0), "audio/wav"))
+    at.run()
+    with speech.transcription_slot(timeout=0):  # someone else is transcribing
+        at.button(key="voice_transcribe_btn").click().run()
+    assert not at.exception, at.exception
+    assert not model.calls
+    busy = get_translations(at.session_state["lang"])["voice_busy"]
+    assert [e.value for e in at.error] == [busy]
+
+
+def test_transcription_settings_keep_cpu_use_short():
+    model = FakeModel()
+    speech.transcribe(model, make_wav(1.0), language="ru")
+    assert model.calls[0]["beam_size"] == speech.BEAM_SIZE == 1
+    assert speech.CPU_THREADS == 2
+    assert speech.MAX_AUDIO_SECONDS == 2 * 60
+
+
 # ---------- improvements: model choice, prompt, loudness, Kazakh download ----------
 
 def test_kazakh_gets_the_kazakh_model_others_the_general_one():

@@ -4316,6 +4316,7 @@ VOICE_ERROR_KEYS = {
     "empty_audio": "voice_empty",
     "unavailable": "voice_unavailable",
     "model_checksum": "voice_failed",
+    "busy": "voice_busy",
 }
 
 
@@ -4341,7 +4342,7 @@ def render_voice_input():
 
     if st.button(T["voice_transcribe"], disabled=audio is None, width="stretch", key="voice_transcribe_btn"):
         try:
-            with st.spinner(T["voice_transcribing"]):
+            with st.spinner(T["voice_transcribing"]), speech.transcription_slot():
                 spec = speech.model_for_language(voice_lang)
                 try:
                     model = get_speech_model(spec)

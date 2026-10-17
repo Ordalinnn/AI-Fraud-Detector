@@ -21,7 +21,9 @@ import io
 import os
 import tarfile
 import tempfile
+import threading
 import urllib.request
+from contextlib import contextmanager
 from pathlib import Path
 
 import numpy as np
@@ -31,7 +33,21 @@ SAMPLE_RATE = 16_000
 # "base"/"tiny" are much worse on Kazakh. Override with the WHISPER_MODEL
 # environment variable (e.g. "base" if the server runs out of memory).
 DEFAULT_MODEL_SIZE = os.environ.get("WHISPER_MODEL", "small")
-MAX_AUDIO_SECONDS = 5 * 60          # longer recordings are cut, with a warning
+# Streamlit Community Cloud throttles the whole app when it keeps the CPU
+# maxed for too long, and transcription is by far the heaviest thing it
+# does. These keep one transcription to a short burst: a scam call snippet
+# rarely needs more than two minutes, greedy decoding (beam 1) costs a
+# fraction of beam search for a small accuracy loss, and a fixed thread
+# count stops CTranslate2 from sizing itself to the host's cores instead of
+# the container's CPU quota.
+MAX_AUDIO_SECONDS = 2 * 60          # longer recordings are cut, with a warning
+BEAM_SIZE = int(os.environ.get("WHISPER_BEAM_SIZE", "1"))
+CPU_THREADS = int(os.environ.get("WHISPER_CPU_THREADS", "2"))
+# One transcription at a time per server process: several at once is what
+# keeps the CPU maxed. A second request waits this long (waiting costs no
+# CPU) and is then told to try again.
+TRANSCRIPTION_WAIT_SECONDS = 60
+_transcription_lock = threading.Lock()
 MAX_AUDIO_BYTES = 25 * 1024 * 1024  # refuse anything bigger before decoding
 SUPPORTED_AUDIO_TYPES = ["wav", "mp3", "m4a", "ogg", "opus", "oga", "webm", "aac", "flac", "mp4", "amr", "3gp"]
 LANGUAGES = ["auto", "kk", "ru", "en"]
@@ -122,7 +138,20 @@ def load_model(spec: str = DEFAULT_MODEL_SIZE):
         raise TranscriptionError("unavailable")
     from faster_whisper import WhisperModel
     path = str(ensure_kazakh_model()) if spec == KAZAKH_MODEL else spec
-    return WhisperModel(path, device="cpu", compute_type="int8")
+    return WhisperModel(path, device="cpu", compute_type="int8", cpu_threads=CPU_THREADS)
+
+
+@contextmanager
+def transcription_slot(timeout: float | None = None):
+    """Holds the process-wide transcription slot for the `with` block.
+    Raises TranscriptionError("busy") if another transcription still holds
+    it after `timeout` seconds (default TRANSCRIPTION_WAIT_SECONDS)."""
+    if not _transcription_lock.acquire(timeout=TRANSCRIPTION_WAIT_SECONDS if timeout is None else timeout):
+        raise TranscriptionError("busy")
+    try:
+        yield
+    finally:
+        _transcription_lock.release()
 
 
 def normalize_loudness(samples: np.ndarray, target_rms: float = 0.1, max_gain: float = 20.0) -> np.ndarray:
@@ -177,7 +206,7 @@ def transcribe(model, audio_bytes: bytes, language: str | None = None,
         samples,
         language=lang,
         initial_prompt=PROMPTS.get(lang) if use_prompt else None,
-        beam_size=5,
+        beam_size=BEAM_SIZE,
         vad_filter=True,                  # skip silence / hold music
         condition_on_previous_text=False,  # fewer repetition loops on noisy calls
     )
