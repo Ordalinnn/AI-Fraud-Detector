@@ -28,8 +28,8 @@ base = "light"
 # checkboxes/radios outside the sidebar's custom dark theme) share the same
 # blue as the rest of the app's navy/cobalt/teal brand gradient, instead of
 # a similar-but-not-quite-matching stock blue.
-primaryColor = "#1d4ed8"
+primaryColor = "#0369a1"
 backgroundColor = "#f8fafc"
-secondaryBackgroundColor = "#eef2ff"
+secondaryBackgroundColor = "#e6f3fb"
 textColor = "#0f172a"
 font = "sans serif"

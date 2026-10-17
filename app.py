@@ -2750,44 +2750,44 @@ st.markdown("""
    design-system/ai-fraud-detector/MASTER.md. Light only, matching
    .streamlit/config.toml's forced light theme. Montserrat (headings) and
    IBM Plex Sans (body) both cover Kazakh + Russian Cyrillic. */
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
 :root {
     /* Brand */
-    --clr-navy: #0a1a44;
-    --clr-navy-2: #12307a;
-    --clr-cobalt: #1d4ed8;      /* = primaryColor in .streamlit/config.toml */
-    --clr-cobalt-hover: #1e40af;
+    --clr-navy: #0b1220;
+    --clr-navy-2: #1e293b;
+    --clr-cobalt: #0369a1;      /* = primaryColor in .streamlit/config.toml */
+    --clr-cobalt-hover: #075985;
     --clr-cyan: #0e7490;
     --clr-teal: #0f766e;
-    --clr-teal-soft: #5eead4;
+    --clr-teal-soft: #7dd3fc;
     --clr-slate: #1e293b;
-    --grad-brand: linear-gradient(135deg, #1d4ed8 0%, #2563eb 45%, #0e7490 100%);
-    --grad-hero: linear-gradient(125deg, #081436 0%, #0f2a6b 38%, #1d4ed8 72%, #0e7490 100%);
+    --grad-brand: linear-gradient(135deg, #0369a1 0%, #0284c7 55%, #0e7490 100%);
+    --grad-hero: linear-gradient(135deg, #0b1220 0%, #111c2e 45%, #1e293b 75%, #0c4a6e 100%);
     /* Neutrals */
     --clr-ink: #0f172a;
     --clr-ink-2: #334155;
     --clr-muted: #475569;       /* 7.5:1 on white */
-    --clr-bg: #f3f6fb;
+    --clr-bg: #f4f6f8;
     --clr-surface: #ffffff;
     --clr-subtle: #f8fafc;
-    --clr-border: #e3e9f2;
+    --clr-border: #e2e6eb;
     --clr-border-strong: #cbd5e1;
-    --clr-focus: #2563eb;
+    --clr-focus: #0284c7;
     /* Scale */
-    --radius-sm: 10px;
-    --radius-md: 14px;
-    --radius-lg: 20px;
-    --radius-xl: 28px;
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+    --radius-xl: 18px;
     --shadow-sm: 0 1px 2px rgba(15,23,42,0.05), 0 2px 8px rgba(15,23,42,0.04);
     --shadow-md: 0 2px 4px rgba(15,23,42,0.04), 0 10px 24px rgba(15,23,42,0.07);
     --shadow-lg: 0 4px 8px rgba(15,23,42,0.05), 0 24px 48px rgba(15,23,42,0.12);
-    --shadow-brand: 0 8px 22px rgba(29,78,216,0.28);
+    --shadow-brand: 0 6px 18px rgba(3,105,161,0.25);
     /* Motion */
     --ease-snap: cubic-bezier(.2,.8,.2,1);
     --dur-fast: .2s;
     --dur-med: .4s;
-    --font-head: "Montserrat", "IBM Plex Sans", -apple-system, "Segoe UI", sans-serif;
+    --font-head: "IBM Plex Sans", -apple-system, "Segoe UI", sans-serif;
 }
 
 html, body, [class*="css"], .stApp, button, input, textarea, select {
@@ -2797,7 +2797,7 @@ html, body, [class*="css"], .stApp, button, input, textarea, select {
 .stApp {
     color: var(--clr-ink);
     background:
-        radial-gradient(1100px 520px at 0% -8%, rgba(29,78,216,0.11), transparent 62%),
+        radial-gradient(1100px 520px at 0% -8%, rgba(3,105,161,0.11), transparent 62%),
         radial-gradient(900px 480px at 100% 0%, rgba(14,116,144,0.11), transparent 60%),
         radial-gradient(800px 600px at 50% 110%, rgba(37,99,235,0.06), transparent 60%),
         var(--clr-bg);
@@ -2909,7 +2909,7 @@ summary:focus-visible, input:focus-visible, [tabindex]:focus-visible {
 
 /* ---------- Icons & tones ---------- */
 .ico { width: 20px; height: 20px; flex-shrink: 0; display: block; }
-.tone-blue    { background: #eaf1ff; color: #1d4ed8; }
+.tone-blue    { background: #e6f3fb; color: #0369a1; }
 .tone-teal    { background: #e6faf6; color: #0f766e; }
 .tone-cyan    { background: #e4f6fb; color: #0e7490; }
 .tone-amber   { background: #fff4dc; color: #b45309; }
@@ -3645,7 +3645,7 @@ summary:focus-visible, input:focus-visible, [tabindex]:focus-visible {
 [data-testid="stDownloadButton"] button:hover,
 [data-testid="stFormSubmitButton"] button:hover {
     background-position: 100% 0% !important;
-    box-shadow: 0 12px 28px rgba(29,78,216,0.36) !important;
+    box-shadow: 0 12px 28px rgba(3,105,161,0.36) !important;
     transform: translateY(-1px);
 }
 
@@ -3691,7 +3691,7 @@ textarea {
 textarea:focus {
     border-color: var(--clr-cobalt) !important;
     background: #ffffff !important;
-    box-shadow: 0 0 0 4px rgba(29,78,216,0.15) !important;
+    box-shadow: 0 0 0 4px rgba(3,105,161,0.15) !important;
 }
 
 [data-testid="stForm"] {
@@ -3723,8 +3723,8 @@ textarea:focus {
     border-radius: var(--radius-sm) var(--radius-sm) 0 0;
     transition: background-color var(--dur-fast) var(--ease-snap);
 }
-[data-testid="stTabs"] button:hover { background: rgba(29,78,216,0.06); }
-[data-testid="stTabs"] button[aria-selected="true"] { background: linear-gradient(180deg, rgba(29,78,216,0.08), rgba(29,78,216,0)); }
+[data-testid="stTabs"] button:hover { background: rgba(3,105,161,0.06); }
+[data-testid="stTabs"] button[aria-selected="true"] { background: linear-gradient(180deg, rgba(3,105,161,0.08), rgba(3,105,161,0)); }
 [data-testid="stTabs"] button[aria-selected="true"] p { color: var(--clr-cobalt) !important; }
 
 [data-baseweb="tab-highlight"] {
