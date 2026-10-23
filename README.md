@@ -274,4 +274,4 @@ This is an educational prototype, not a certified security product:
 
 ## License
 
-Copyright © 2026 Ordalin Nurassyl and Gani Akzhol. **All rights reserved** — this is not an open-source licence. The repository is public so the project can be viewed, evaluated and its results reproduced; any other use of the code, the trained models or the authors' datasets needs the authors' written permission. See [`LICENSE`](LICENSE). Third-party data (UCI SMS Spam Collection, CC BY 4.0) and libraries keep their own licences.
+Copyright © 2026 Ordalin Nurassyl. **All rights reserved** — this is not an open-source licence. The repository is public so the project can be viewed, evaluated and its results reproduced; any other use of the code, the trained models or the project's datasets needs the copyright holder's written permission. See [`LICENSE`](LICENSE). Third-party data (UCI SMS Spam Collection, CC BY 4.0) and libraries keep their own licences.
