@@ -252,6 +252,7 @@ On the jury's test split, scam messages disguised by a program ([`scripts/eval_o
 
 - **"This is a mistake"** on the site, in the extension (popup and the in-page panel) and in the Android app. Reports stay on the user's device and are exported as CSV in the team's real-message format, so testers' files go straight into `python scripts/import_mistakes.py` and `python scripts/run_jury_evaluation.py --real data/real/collected_mistakes.csv` — see [`data/real/README.md`](data/real/README.md).
 - **User study kit** ([`docs/user_study/`](docs/user_study/README.md)): does the system help *people* spot scams? 20 new messages, printable sheets with and without the system's real hint (including its 4 mistakes on these messages, to measure over-reliance), counterbalanced A/B design, and an analysis script with a paired test.
+- **Federated learning simulation** ([`scripts/eval_federated.py`](scripts/eval_federated.py), [report](reports/federated/REPORT_RU.md)): 3 simulated banks train the character n-gram model together with FedAvg and share only weights, never messages. When each bank sees only its own scam families, a bank alone reaches 84.1% accuracy and catches 62.2% of scam types it never saw; federated: 93.0% and 90.8%, the same as pooling all data (92.9% / 90.6%).
 - **An idea tested and not shipped:** judging the last 3 messages from one sender together catches more scams split into pieces, but adds false alarms and misses scams that follow ordinary messages — [report](reports/conversation_window/REPORT_RU.md).
 
 ## Limitations & disclaimer
