@@ -23,6 +23,7 @@ An AI-powered prototype that detects fraud and scam patterns in SMS messages, ch
 - [Learning from mistakes and the user study](#learning-from-mistakes-and-the-user-study)
 - [Limitations & disclaimer](#limitations--disclaimer)
 - [Privacy](#privacy)
+- [License](#license)
 
 ---
 
@@ -270,3 +271,7 @@ This is an educational prototype, not a certified security product:
 - The browser extension does all analysis on-device — text never leaves your browser.
 - Data submitted via the "Was this result accurate?" feedback buttons is aggregated into a single shared `feedback.json` (also gitignored) used only to help improve the model — unlike history, this is intentionally cross-session since its whole purpose is building a better training set, and it's never displayed back to any user.
 - CSV exports (batch results and history) neutralize spreadsheet-formula-injection payloads (e.g. text starting with `=`, `+`, `-`, `@`) so opening an export in Excel/Sheets can't execute a formula from analyzed message text.
+
+## License
+
+Copyright © 2026 Ordalin Nurassyl and Gani Akzhol. **All rights reserved** — this is not an open-source licence. The repository is public so the project can be viewed, evaluated and its results reproduced; any other use of the code, the trained models or the authors' datasets needs the authors' written permission. See [`LICENSE`](LICENSE). Third-party data (UCI SMS Spam Collection, CC BY 4.0) and libraries keep their own licences.
