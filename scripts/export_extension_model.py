@@ -77,9 +77,9 @@ def _attacks():
 
 
 def training_set():
-    """Exactly app.py's training_data: `data` + the real SMS sample."""
+    """Exactly app.py's training_data: `data` + the real SMS sample + bank notifications."""
     df = fe.load_dataset()
-    real = fm.load_real_training_sample()
+    real = fm.extra_training_examples()  # real SMS + bank notifications
     texts = df["text"].tolist() + [t for t, _ in real]
     y = np.array(df["label"].tolist() + [label for _, label in real])
     return texts, y
