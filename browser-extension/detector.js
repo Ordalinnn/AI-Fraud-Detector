@@ -87,7 +87,7 @@ const WORD_LISTS = {
   ],
   suspiciousZones: [".xyz", ".top", ".click", ".site", ".online", ".live", ".info", ".icu"],
   knownBrands: [
-    "kaspi.kz", "halykbank.kz", "sberbank.kz", "sberbank.ru",
+    "kaspi.kz", "halykbank.kz", "forte.kz", "sberbank.kz", "sberbank.ru",
     "tinkoff.ru", "vtb.ru", "egov.kz", "kazpost.kz", "dhl.com",
     "paypal.com", "amazon.com", "apple.com", "google.com", "microsoft.com",
     "instagram.com", "whatsapp.com", "facebook.com", "netflix.com",

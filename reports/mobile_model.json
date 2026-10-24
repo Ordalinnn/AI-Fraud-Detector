@@ -2,48 +2,48 @@
   "max_features": 20000,
   "jury_test": {
     "0.5": {
-      "TN": 144,
-      "FP": 8,
+      "TN": 145,
+      "FP": 7,
       "FN": 9,
       "TP": 121,
-      "accuracy": 0.9397,
+      "accuracy": 0.9433,
       "recall": 0.9308,
-      "fpr": 0.0526
+      "fpr": 0.0461
     },
     "0.8": {
       "TN": 151,
       "FP": 1,
-      "FN": 49,
-      "TP": 81,
-      "accuracy": 0.8227,
-      "recall": 0.6231,
+      "FN": 48,
+      "TP": 82,
+      "accuracy": 0.8262,
+      "recall": 0.6308,
       "fpr": 0.0066
     },
     "0.95": {
       "TN": 152,
       "FP": 0,
-      "FN": 93,
-      "TP": 37,
-      "accuracy": 0.6702,
-      "recall": 0.2846,
+      "FN": 99,
+      "TP": 31,
+      "accuracy": 0.6489,
+      "recall": 0.2385,
       "fpr": 0.0
     }
   },
   "real_holdout_trained_on_full": {
     "0.5": {
-      "false_alarms_on_real_legit": 0.0103,
+      "false_alarms_on_real_legit": 0.0116,
       "flagged_real_spam": 0.8735
     },
     "0.8": {
-      "false_alarms_on_real_legit": 0.0018,
-      "flagged_real_spam": 0.7199
+      "false_alarms_on_real_legit": 0.0022,
+      "flagged_real_spam": 0.6386
     },
     "0.95": {
       "false_alarms_on_real_legit": 0.0,
-      "flagged_real_spam": 0.2982
+      "flagged_real_spam": 0.2801
     }
   },
-  "reference_vs_sklearn_max_abs_diff": 2.1094237467877974e-15,
-  "model_file_bytes": 896887,
+  "reference_vs_sklearn_max_abs_diff": 1.9984014443252818e-15,
+  "model_file_bytes": 895054,
   "n_ngrams": 20000
 }

@@ -2670,7 +2670,11 @@ EVAL_TEST_SIZE = fm.EVAL_TEST_SIZE
 # hand-written core and vetted feedback. Kept separate from `data` so the
 # methodology numbers can say exactly how many examples are real.
 real_training_examples = fm.load_real_training_sample()
-training_data = training_data + real_training_examples
+# Genuine-format bank notifications + look-alike scams (data/bank/,
+# scripts/make_bank_notifications.py): without them real bank SMS such as
+# "Ваш код для входа ...: 4821. Никому не сообщайте его" scored as fraud.
+bank_training_examples = fm.load_bank_notifications()
+training_data = training_data + real_training_examples + bank_training_examples
 # Identifies the exact training set; the extension's model file carries the
 # same value (shown in both UIs, checked by tests/test_extension_ensemble.py).
 MODEL_FINGERPRINT = fm.training_fingerprint([t for t, _ in training_data], [label for _, label in training_data])

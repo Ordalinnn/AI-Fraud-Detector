@@ -1,0 +1,531 @@
+{
+  "n_written": 1398,
+  "n_real": 400,
+  "n_bank_train": 195,
+  "n_bank_train_fraud": 51,
+  "jury_test": {
+    "A": {
+      "TN": 147,
+      "FP": 5,
+      "FN": 9,
+      "TP": 121,
+      "accuracy": 0.950354609929078,
+      "precision": 0.9603174603174603,
+      "recall": 0.9307692307692308,
+      "f1": 0.9453125000000001
+    },
+    "B": {
+      "TN": 146,
+      "FP": 6,
+      "FN": 8,
+      "TP": 122,
+      "accuracy": 0.950354609929078,
+      "precision": 0.953125,
+      "recall": 0.9384615384615385,
+      "f1": 0.9457364341085271
+    }
+  },
+  "bank_test": {
+    "A": {
+      "safe_total": 31,
+      "safe_false_alarms": 15,
+      "fraud_total": 21,
+      "fraud_caught": 21
+    },
+    "B": {
+      "safe_total": 31,
+      "safe_false_alarms": 4,
+      "fraud_total": 21,
+      "fraud_caught": 21
+    }
+  },
+  "real_holdout": {
+    "A": {
+      "ham": 2242,
+      "ham_false_alarms": 8,
+      "spam": 332,
+      "spam_flagged": 298
+    },
+    "B": {
+      "ham": 2242,
+      "ham_false_alarms": 8,
+      "spam": 332,
+      "spam_flagged": 292
+    }
+  },
+  "bank_test_nearest_train_similarity": {
+    "median": 0.21927951119627462,
+    "max": 0.46915364549467253,
+    "share_at_or_above_0.6": 0.0
+  },
+  "bank_test_messages": [
+    {
+      "text": "Ваш код для входа в ForteBank: 4821. Никому не сообщайте его",
+      "label": 0,
+      "language": "ru",
+      "note": "failed_before",
+      "A": 0.997550007284855,
+      "B": 0.1294559679264026,
+      "nearest_train_sim": 0.4604970798302759
+    },
+    {
+      "text": "ForteBank: оплата 4 500 ₸ в Magnum. Баланс 120 300 ₸",
+      "label": 0,
+      "language": "ru",
+      "note": "failed_before",
+      "A": 0.5440344206306349,
+      "B": 0.000526930705243275,
+      "nearest_train_sim": 0.2043195887790428
+    },
+    {
+      "text": "Halyk: оплата 1500 KZT, Yandex Go. Остаток 88 000 KZT",
+      "label": 0,
+      "language": "ru",
+      "note": "failed_before",
+      "A": 0.41574096624306556,
+      "B": 0.0005219650937139945,
+      "nearest_train_sim": 0.31995429868717823
+    },
+    {
+      "text": "Списание 2 350 ₸: YANDEX.GO. Остаток на карте 41 200 ₸ — ForteBank",
+      "label": 0,
+      "language": "ru",
+      "note": "new_wording",
+      "A": 0.6066211886177872,
+      "B": 0.008634510160066153,
+      "nearest_train_sim": 0.2073635402615897
+    },
+    {
+      "text": "Вы оплатили 12 990 ₸ в Sulpak картой *7710",
+      "label": 0,
+      "language": "ru",
+      "note": "new_wording",
+      "A": 0.7565603515571909,
+      "B": 0.017089533696341606,
+      "nearest_train_sim": 0.1644127130908913
+    },
+    {
+      "text": "Ваш одноразовый пароль 739104. Не передавайте его третьим лицам",
+      "label": 0,
+      "language": "ru",
+      "note": "new_wording",
+      "A": 0.9382366812209049,
+      "B": 0.8954325027903647,
+      "nearest_train_sim": 0.0767579827486162
+    },
+    {
+      "text": "Код 5521 для входа в Forte. Сотрудники банка никогда не спрашивают код",
+      "label": 0,
+      "language": "ru",
+      "note": "new_wording",
+      "A": 0.9080336353751317,
+      "B": 0.026491205692961855,
+      "nearest_train_sim": 0.3619077779876058
+    },
+    {
+      "text": "Пароль для подтверждения операции: 662018. Действует 5 минут. Не сообщайте его никому",
+      "label": 0,
+      "language": "ru",
+      "note": "new_wording",
+      "A": 0.9994775613341382,
+      "B": 0.920717148483423,
+      "nearest_train_sim": 0.3135737341458403
+    },
+    {
+      "text": "Поступление 85 000 ₸ на счёт *3302. Отправитель: ТОО Кайнар",
+      "label": 0,
+      "language": "ru",
+      "note": "new_wording",
+      "A": 0.9605867968825316,
+      "B": 0.07661158615670274,
+      "nearest_train_sim": 0.09308540458080113
+    },
+    {
+      "text": "Остаток по карте после покупки в ЦУМ: 17 450 ₸",
+      "label": 0,
+      "language": "ru",
+      "note": "new_wording",
+      "A": 0.1417015716283649,
+      "B": 0.004057278321650597,
+      "nearest_train_sim": 0.12825596050101176
+    },
+    {
+      "text": "Jusan: пополнение карты на 20 000 ₸ через терминал",
+      "label": 0,
+      "language": "ru",
+      "note": "new_wording",
+      "A": 0.11944640785141854,
+      "B": 0.0034936921318046636,
+      "nearest_train_sim": 0.22339947543068012
+    },
+    {
+      "text": "Сегодня списан ежемесячный платёж 18 400 ₸ по кредиту. Спасибо, что платите вовремя",
+      "label": 0,
+      "language": "ru",
+      "note": "new_wording",
+      "A": 0.23017593933121572,
+      "B": 0.029354719447191053,
+      "nearest_train_sim": 0.19284394746018943
+    },
+    {
+      "text": "Ваша новая карта активирована. Приятных покупок! Forte",
+      "label": 0,
+      "language": "ru",
+      "note": "new_wording",
+      "A": 0.010975182414812629,
+      "B": 0.0050098474538618765,
+      "nearest_train_sim": 0.1880523405825445
+    },
+    {
+      "text": "Начислено вознаграждение по депозиту: 3 215 ₸",
+      "label": 0,
+      "language": "ru",
+      "note": "new_wording",
+      "A": 0.04391697768167231,
+      "B": 0.0011197867524236093,
+      "nearest_train_sim": 0.46915364549467253
+    },
+    {
+      "text": "Перевод 7 000 ₸ клиенту Kaspi Мадине Ж. отправлен",
+      "label": 0,
+      "language": "ru",
+      "note": "new_wording",
+      "A": 0.7736851532498146,
+      "B": 0.07516807949227383,
+      "nearest_train_sim": 0.14366011363292105
+    },
+    {
+      "text": "Платёж за интернет 6 990 ₸ (Kazakhtelecom) проведён успешно",
+      "label": 0,
+      "language": "ru",
+      "note": "new_wording",
+      "A": 0.0075622554080458735,
+      "B": 0.000696430543152426,
+      "nearest_train_sim": 0.17119744835122774
+    },
+    {
+      "text": "Bereke Bank: покупка в Wildberries 4 120 ₸ отменена, деньги вернутся на карту в течение 3 дней",
+      "label": 0,
+      "language": "ru",
+      "note": "new_wording",
+      "A": 0.9136981668369691,
+      "B": 0.1770106540357594,
+      "nearest_train_sim": 0.15166529408513885
+    },
+    {
+      "text": "Сіздің бір реттік құпия сөзіңіз 739104. Оны үшінші тұлғаларға бермеңіз",
+      "label": 0,
+      "language": "kz",
+      "note": "new_wording",
+      "A": 0.9649523867967609,
+      "B": 0.8520423296714184,
+      "nearest_train_sim": 0.08548608373485057
+    },
+    {
+      "text": "ForteBank: Small дүкенінде 3 200 ₸ сатып алу. Қалдық 54 000 ₸",
+      "label": 0,
+      "language": "kz",
+      "note": "new_wording",
+      "A": 0.5276448443776021,
+      "B": 0.004019465604357873,
+      "nearest_train_sim": 0.10744999213942179
+    },
+    {
+      "text": "Шотыңызға 150 000 ₸ жалақы түсті",
+      "label": 0,
+      "language": "kz",
+      "note": "new_wording",
+      "A": 0.20710339442188483,
+      "B": 0.006659773242569988,
+      "nearest_train_sim": 0.24456279582798224
+    },
+    {
+      "text": "Forte қосымшасына кіру коды 8812. Банк қызметкерлері кодты ешқашан сұрамайды",
+      "label": 0,
+      "language": "kz",
+      "note": "new_wording",
+      "A": 0.9852499276990874,
+      "B": 0.5297665084431529,
+      "nearest_train_sim": 0.237937581524468
+    },
+    {
+      "text": "Несие бойынша ай сайынғы төлем 22 000 ₸ сәтті төленді",
+      "label": 0,
+      "language": "kz",
+      "note": "new_wording",
+      "A": 0.002958326022676642,
+      "B": 3.4891741816243525e-05,
+      "nearest_train_sim": 0.3654988460234638
+    },
+    {
+      "text": "Халық банкі: картадан 10 000 ₸ аударылды, алушы Ерлан Б.",
+      "label": 0,
+      "language": "kz",
+      "note": "new_wording",
+      "A": 0.05597537102510715,
+      "B": 0.0028815113483395983,
+      "nearest_train_sim": 0.13675186801331696
+    },
+    {
+      "text": "Депозит бойынша сыйақы 2 880 ₸ есептелді",
+      "label": 0,
+      "language": "kz",
+      "note": "new_wording",
+      "A": 0.029697795544175943,
+      "B": 0.0012573444434968515,
+      "nearest_train_sim": 0.2590779482945283
+    },
+    {
+      "text": "Your one-time password is 739104. Bank employees will never ask for it",
+      "label": 0,
+      "language": "en",
+      "note": "new_wording",
+      "A": 0.07573453125534703,
+      "B": 0.013662626586662424,
+      "nearest_train_sim": 0.15479409022875693
+    },
+    {
+      "text": "ForteBank: card *4410 charged 9 800 KZT at Technodom",
+      "label": 0,
+      "language": "en",
+      "note": "new_wording",
+      "A": 0.4540067104371886,
+      "B": 0.0032898877555453455,
+      "nearest_train_sim": 0.3018698866547399
+    },
+    {
+      "text": "Incoming transfer: 45 000 KZT from Aigerim S.",
+      "label": 0,
+      "language": "en",
+      "note": "new_wording",
+      "A": 0.5562760010451198,
+      "B": 0.0052020072625498515,
+      "nearest_train_sim": 0.2340354636848108
+    },
+    {
+      "text": "Your monthly statement is ready in the mobile app",
+      "label": 0,
+      "language": "en",
+      "note": "new_wording",
+      "A": 9.661510106335206e-05,
+      "B": 0.00010440990297835029,
+      "nearest_train_sim": 0.29695132999785034
+    },
+    {
+      "text": "Payment of 5 500 KZT for Kcell mobile completed",
+      "label": 0,
+      "language": "en",
+      "note": "new_wording",
+      "A": 0.4355020033912492,
+      "B": 0.0025491967715514387,
+      "nearest_train_sim": 0.3246727681760031
+    },
+    {
+      "text": "Login to Forte app from a new device at 22:14. If this was you, no action is needed",
+      "label": 0,
+      "language": "en",
+      "note": "new_wording",
+      "A": 0.0012278499281963154,
+      "B": 0.0008457993296524371,
+      "nearest_train_sim": 0.11792921074180336
+    },
+    {
+      "text": "Your deposit earned 4 100 KZT in interest this month",
+      "label": 0,
+      "language": "en",
+      "note": "new_wording",
+      "A": 0.6840260365719224,
+      "B": 0.06024328333922802,
+      "nearest_train_sim": 0.10409204532422511
+    },
+    {
+      "text": "Одноразовый пароль 739104. Сотрудник банка свяжется с вами, назовите ему этот пароль для отмены кредита",
+      "label": 1,
+      "language": "ru",
+      "note": "new_wording",
+      "A": 0.9973715528051045,
+      "B": 0.9922701699954538,
+      "nearest_train_sim": 0.1564787529797546
+    },
+    {
+      "text": "Списание 150 000 ₸. Не вы? Отмените операцию: forte-otmena.top",
+      "label": 1,
+      "language": "ru",
+      "note": "new_wording",
+      "A": 0.9963063116370423,
+      "B": 0.946338678543215,
+      "nearest_train_sim": 0.18384424162302948
+    },
+    {
+      "text": "ForteBank: ваш счёт будет закрыт сегодня. Подтвердите личность на fortebank-id.online",
+      "label": 1,
+      "language": "ru",
+      "note": "new_wording",
+      "A": 0.9998019326198533,
+      "B": 0.9970494048782054,
+      "nearest_train_sim": 0.20469817023988862
+    },
+    {
+      "text": "Служба безопасности ForteBank: на вашу карту пытаются оформить кредит. Перезвоните на +7 702 444 18 90 и назовите код",
+      "label": 1,
+      "language": "ru",
+      "note": "new_wording",
+      "A": 0.9999958394423175,
+      "B": 0.9997220114346884,
+      "nearest_train_sim": 0.24471110090592416
+    },
+    {
+      "text": "Вам одобрен перевод 95 000 ₸. Для зачисления введите номер карты и CVV: kaspi-perevod.site",
+      "label": 1,
+      "language": "ru",
+      "note": "new_wording",
+      "A": 0.9999758323456656,
+      "B": 0.9995852982811783,
+      "nearest_train_sim": 0.25199818839479593
+    },
+    {
+      "text": "Ваш код 5521. Чтобы защитить деньги, перешлите это сообщение специалисту банка в WhatsApp",
+      "label": 1,
+      "language": "ru",
+      "note": "new_wording",
+      "A": 0.9996845406511801,
+      "B": 0.997666386561999,
+      "nearest_train_sim": 0.17983627234371788
+    },
+    {
+      "text": "Forte: начислено 25 000 бонусов. Обменяйте на деньги до 23:59 по ссылке forte-bonus.click",
+      "label": 1,
+      "language": "ru",
+      "note": "new_wording",
+      "A": 0.9999186750481793,
+      "B": 0.9987693752840346,
+      "nearest_train_sim": 0.15909292916279452
+    },
+    {
+      "text": "Халык: подозрительная операция на 340 000 ₸. Срочно переведите деньги на безопасный счёт, реквизиты пришлёт сотрудник",
+      "label": 1,
+      "language": "ru",
+      "note": "new_wording",
+      "A": 0.9999999682643567,
+      "B": 0.9999986789313768,
+      "nearest_train_sim": 0.29555199882749505
+    },
+    {
+      "text": "Карта заблокирована из-за подозрительной активности. Для восстановления доступа сообщите код из SMS оператору",
+      "label": 1,
+      "language": "ru",
+      "note": "new_wording",
+      "A": 0.9999805906829413,
+      "B": 0.9999634800590781,
+      "nearest_train_sim": 0.26338174153862814
+    },
+    {
+      "text": "Jusan Bank: вы выиграли 200 000 ₸. Для получения оплатите комиссию 2 500 ₸ на карту 4400 4301 2233 1188",
+      "label": 1,
+      "language": "ru",
+      "note": "new_wording",
+      "A": 0.999996670745896,
+      "B": 0.9958274470170394,
+      "nearest_train_sim": 0.11716552216725716
+    },
+    {
+      "text": "Ваш депозит в ForteBank под угрозой. Переведите сбережения на защищённый счёт по указанию специалиста",
+      "label": 1,
+      "language": "ru",
+      "note": "new_wording",
+      "A": 0.9937455024438224,
+      "B": 0.9708289102644183,
+      "nearest_train_sim": 0.1267724891232676
+    },
+    {
+      "text": "Неудачная попытка входа в Kaspi. Подтвердите, что это вы: kaspi-security.xyz",
+      "label": 1,
+      "language": "ru",
+      "note": "new_wording",
+      "A": 0.9802529580383809,
+      "B": 0.911641490885982,
+      "nearest_train_sim": 0.2518611529800256
+    },
+    {
+      "text": "Сіздің картаңызға несие рәсімделуде. Тоқтату үшін SMS кодты қауіпсіздік қызметіне айтыңыз",
+      "label": 1,
+      "language": "kz",
+      "note": "new_wording",
+      "A": 0.999745117449593,
+      "B": 0.9994239779484017,
+      "nearest_train_sim": 0.38057983896588155
+    },
+    {
+      "text": "ForteBank: шотыңыз бұғатталады. Растау үшін forte-kz.site сайтына кіріңіз",
+      "label": 1,
+      "language": "kz",
+      "note": "new_wording",
+      "A": 0.9884838332273861,
+      "B": 0.9486238967406423,
+      "nearest_train_sim": 0.28925209794282064
+    },
+    {
+      "text": "Сізге 50 000 ₸ сыйлық! Алу үшін карта нөмірі мен CVV кодын жіберіңіз",
+      "label": 1,
+      "language": "kz",
+      "note": "new_wording",
+      "A": 0.9997386616204224,
+      "B": 0.9978659248012736,
+      "nearest_train_sim": 0.43239847554041994
+    },
+    {
+      "text": "Банк қызметкері: ақшаңызды сақтау үшін оны қауіпсіз шотқа аударыңыз",
+      "label": 1,
+      "language": "kz",
+      "note": "new_wording",
+      "A": 0.9994324602953991,
+      "B": 0.9949013271520721,
+      "nearest_train_sim": 0.24617933976017137
+    },
+    {
+      "text": "ForteBank: your account will be suspended today. Confirm your identity at forte-secure-id.top",
+      "label": 1,
+      "language": "en",
+      "note": "new_wording",
+      "A": 0.999867729173318,
+      "B": 0.9990231918877828,
+      "nearest_train_sim": 0.25031800707276175
+    },
+    {
+      "text": "Your code is 739104. Our manager will call you, please tell him the code to stop the fraud",
+      "label": 1,
+      "language": "en",
+      "note": "new_wording",
+      "A": 0.9981338706885493,
+      "B": 0.979191434320767,
+      "nearest_train_sim": 0.18470397262556604
+    },
+    {
+      "text": "You received 80 000 KZT. Enter your card number and CVV at kaspi-receive.info to get it",
+      "label": 1,
+      "language": "en",
+      "note": "new_wording",
+      "A": 0.9993167905065403,
+      "B": 0.9708168204994079,
+      "nearest_train_sim": 0.2666882510095779
+    },
+    {
+      "text": "Suspicious login detected. Call +7 707 999 00 11 immediately and confirm the SMS code",
+      "label": 1,
+      "language": "en",
+      "note": "new_wording",
+      "A": 0.9999513296417186,
+      "B": 0.9992322792688382,
+      "nearest_train_sim": 0.21515954696186912
+    },
+    {
+      "text": "Bank security: move your savings to a safe account today, our officer will send the details",
+      "label": 1,
+      "language": "en",
+      "note": "new_wording",
+      "A": 0.9950295993031849,
+      "B": 0.9853644968810548,
+      "nearest_train_sim": 0.30368227906076084
+    }
+  ]
+}

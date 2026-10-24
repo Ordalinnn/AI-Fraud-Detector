@@ -105,7 +105,7 @@ suspicious_zones = [".xyz", ".top", ".click", ".site", ".online", ".live", ".inf
 # bank.kz / kaspi.kz domain isn't itself flagged as suspicious just for
 # containing the brand name.
 KNOWN_BRANDS = [
-    "kaspi.kz", "halykbank.kz", "sberbank.kz", "sberbank.ru",
+    "kaspi.kz", "halykbank.kz", "forte.kz", "sberbank.kz", "sberbank.ru",
     "tinkoff.ru", "vtb.ru", "egov.kz", "kazpost.kz", "dhl.com",
     "paypal.com", "amazon.com", "apple.com", "google.com", "microsoft.com",
     "instagram.com", "whatsapp.com", "facebook.com", "netflix.com",
