@@ -37,7 +37,7 @@ messages): a network on ALL n-grams agreed with the char model 99% of the
 time and added nothing, while the selected-n-gram one makes different
 mistakes, which is what a stacker can use. Its first-layer weights are
 stored as 8-bit integers with one scale per hidden unit (_quantize_mlp), so
-the browser extension and the offline phone page carry it for ~0.6 MB and
+the browser extension and the offline phone page carry it for ~0.15 MB and
 compute exactly the same numbers. Full comparison with the 5-model system:
 reports/neural_member/REPORT_RU.md.
 """
