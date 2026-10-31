@@ -35,7 +35,7 @@
       shareText: "⚠️ Абай болыңыз: бұл хабарлама алаяқтыққа ұқсайды ({pct}%). Кодты, құпиясөзді, карта деректерін ешкімге айтпаңыз.\n\n«{text}»",
       mistakeThanks: "Рахмет! Белгіленді. Тек осы телефонда сақталады.",
       mistakesNote: "Белгілер тек осы телефонда сақталады, ал Safari бетті 7 күн ашпаса оларды өшіріп тастауы мүмкін — CSV файлын бірден жүктеп, жоба командасына жіберіңіз. Алдымен аттарды, телефон мен карта нөмірлерін [АТЫ], [ТЕЛЕФОН], [КАРТА] деп ауыстырыңыз.",
-      modelLine: "Сайттағы модель (5 модель + стекинг) · model {id} · ресми қауіпсіздік құралы емес",
+      modelLine: "Сайттағы модель (6 модель + стекинг) · model {id} · ресми қауіпсіздік құралы емес",
     },
     ru: {
       pageTitle: "Проверка сообщения",
@@ -60,7 +60,7 @@
       shareText: "⚠️ Осторожно: это сообщение похоже на мошенничество ({pct}%). Никому не сообщайте коды, пароли и данные карты.\n\n«{text}»",
       mistakeThanks: "Спасибо! Отмечено. Хранится только на этом телефоне.",
       mistakesNote: "Отметки хранятся только на этом телефоне, а Safari может стереть их, если страницу не открывать 7 дней, — скачайте CSV сразу и отправьте команде проекта. Перед отправкой замените имена, телефоны и номера карт на [ИМЯ], [ТЕЛЕФОН], [КАРТА].",
-      modelLine: "Модель сайта (5 моделей + стекинг) · model {id} · не сертифицированный инструмент безопасности",
+      modelLine: "Модель сайта (6 моделей + стекинг) · model {id} · не сертифицированный инструмент безопасности",
     },
     en: {
       pageTitle: "Check a message",
@@ -85,7 +85,7 @@
       shareText: "⚠️ Careful: this message looks like a scam ({pct}%). Never share codes, passwords or card details.\n\n“{text}”",
       mistakeThanks: "Thanks! Marked. Saved only on this phone.",
       mistakesNote: "Marks are stored only on this phone, and Safari may erase them if the page isn't opened for 7 days — download the CSV right away and send it to the project team. First replace names, phone and card numbers with [NAME], [PHONE], [CARD].",
-      modelLine: "The website's model (5 models + stacking) · model {id} · not a certified security tool",
+      modelLine: "The website's model (6 models + stacking) · model {id} · not a certified security tool",
     },
   };
   const LANGS = ["kz", "ru", "en"];

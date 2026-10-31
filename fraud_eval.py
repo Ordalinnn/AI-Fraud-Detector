@@ -36,8 +36,8 @@ BASE_DIR = Path(__file__).resolve().parent
 APP_PATH = BASE_DIR / "app.py"
 
 SYSTEMS = ["old_lr", "old_rf", "old_gb", "old_tfidf", "old_ensemble", "old_ensemble_rules",
-           "lr", "rf", "gb", "tfidf", "char", "final", "baseline"]
-SINGLE_MODELS = ["lr", "rf", "gb", "tfidf", "char"]
+           "lr", "rf", "gb", "tfidf", "char", "mlp", "final", "baseline"]
+SINGLE_MODELS = ["lr", "rf", "gb", "tfidf", "char", "mlp"]
 SYSTEM_NAMES = {
     "old_lr": "Logistic Regression (старая система)",
     "old_rf": "Random Forest (старая система)",
@@ -48,9 +48,10 @@ SYSTEM_NAMES = {
     "gb": "Gradient Boosting",
     "tfidf": "TF-IDF + Naive Bayes",
     "char": "Символьные n-граммы + LR (новая модель)",
+    "mlp": "Нейросеть (MLP) на символьных n-граммах",
     "old_ensemble": "Старый ансамбль: среднее 4 моделей",
     "old_ensemble_rules": "Старый ансамбль + правила (как в работе)",
-    "final": "Новый ансамбль: стекинг 5 моделей + правила",
+    "final": "Новый ансамбль: стекинг 6 моделей + правила",
     "baseline": "Простое правило по ключевым словам",
 }
 
@@ -149,7 +150,7 @@ def score_split(df: pd.DataFrame, feats: pd.DataFrame, groups, train_idx, test_i
       NEW (trained on the project's train messages + the small real sample
       `extra`, if given - every single model sees exactly the same data as
       the ensemble, so the single-vs-ensemble comparison is fair):
-        lr / rf / gb / tfidf / char   each single model
+        lr / rf / gb / tfidf / char / mlp   each single model
         final                         stacked ensemble (rules are one input)
       baseline  "flag if any urgency/secret/threat/reward word" (no training)
     """
