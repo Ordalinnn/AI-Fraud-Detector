@@ -23,6 +23,7 @@ An AI-powered prototype that detects fraud and scam patterns in SMS messages, ch
 - [Learning from mistakes and the user study](#learning-from-mistakes-and-the-user-study)
 - [Limitations & disclaimer](#limitations--disclaimer)
 - [Privacy](#privacy)
+- [License](#license)
 
 ---
 
@@ -53,7 +54,8 @@ extract_features()  →  20 hand-engineered features
     ├──▶ Gradient Boosting      ├─▶ logistic-regression STACKER
     ├──▶ TF-IDF + Naive Bayes   │   (learns how much to trust each model
     ├──▶ Char n-grams + LR      │    from out-of-fold predictions grouped
-    └──▶ rule-based boost      ─┘    by template)
+    ├──▶ Neural network (MLP)   │    by template)
+    └──▶ rule-based boost      ─┘
                                      │
                                      ▼
               Final risk = calibrated probability → risk level
@@ -111,7 +113,7 @@ translations.py                KZ/RU/EN UI strings. Validates at import time tha
                                languages have identical key sets, so a missing translation
                                fails loudly at startup instead of silently as a runtime
                                KeyError the first time a user picks that language.
-fraud_model.py                The 5 base models + stacker, hyperparameters, template grouping,
+fraud_model.py                The 6 base models + stacker, hyperparameters, template grouping,
                                real-message loaders. Shared by app.py, the evaluation and tests.
 fraud_eval.py                 Offline evaluation toolkit (dataset loader, metrics, McNemar,
                                cluster bootstrap, calibration, threshold costs).
@@ -141,7 +143,7 @@ static/
     lib/                       Copies of the extension's model and scripts (scripts/build_web_checker.py)
 
 browser-extension/            Standalone Chrome/Edge extension (Manifest V3)
-  ensemble.js + ensemble_model.json  The website's model (5 models + stacker), run on the device
+  ensemble.js + ensemble_model.json  The website's model (6 models + stacker), run on the device
   scorer.js                     Character n-gram model (one member; also the Android app's model)
   content.js / content.css      Automatic checks + red label in WhatsApp Web, Telegram Web, Gmail
   detector.js                   Reasons, domain checks, rule-based fallback (port of fraud_logic.py)
@@ -231,7 +233,7 @@ It still needs an internet connection to reach the server — installing it skip
 
 ## Browser extension
 
-A self-contained Chrome/Edge extension in [`browser-extension/`](browser-extension/) — see its own [README](browser-extension/README.md) for install steps. Runs entirely on-device: your text is never sent anywhere, and it works even without the main web app running. It runs the website's own model — the same 5 models and stacker, exported by [`scripts/export_extension_model.py`](scripts/export_extension_model.py) — so a text gets the same percentage on the site and in the extension (checked on ~4,500 texts: identical features, probabilities within 10⁻⁹; both show the same "model xxxxxxxx" id), automatically labels suspicious incoming messages in WhatsApp Web, Telegram Web and Gmail, and checks any selected text via right-click.
+A self-contained Chrome/Edge extension in [`browser-extension/`](browser-extension/) — see its own [README](browser-extension/README.md) for install steps. Runs entirely on-device: your text is never sent anywhere, and it works even without the main web app running. It runs the website's own model — the same 6 models and stacker, exported by [`scripts/export_extension_model.py`](scripts/export_extension_model.py) — so a text gets the same percentage on the site and in the extension (checked on ~4,500 texts: identical features, probabilities within 10⁻⁹; both show the same "model xxxxxxxx" id), automatically labels suspicious incoming messages in WhatsApp Web, Telegram Web and Gmail, and checks any selected text via right-click.
 
 ## Dataset & models
 
@@ -240,6 +242,7 @@ A self-contained Chrome/Edge extension in [`browser-extension/`](browser-extensi
 - **+400 real SMS** (300 legitimate, 100 spam) from the public [UCI SMS Spam Collection](https://archive.ics.uci.edu/dataset/228/sms+spam+collection) (CC BY 4.0), added because a model trained only on written examples falsely flagged 12–18% of ordinary real messages. The other half of that corpus (2,574 messages, split by template group) is never trained on and serves as an independent real-message test — see [`scripts/prepare_external_data.py`](scripts/prepare_external_data.py).
 - **+195 bank service notifications** ([`data/bank/`](data/bank/), built by [`scripts/make_bank_notifications.py`](scripts/make_bank_notifications.py)): genuine-format codes, purchases, transfers and reminders from Kazakhstan banks in KZ/RU/EN (144 safe), plus look-alike scams in the same format (51 fraud). Added because real bank SMS such as "Ваш код для входа в ForteBank: 4821. Никому не сообщайте его" scored as fraud; on 52 separately written bank messages false alarms fell from 15/31 to 4/31 with all 21 scams still caught, and the jury's 282-message test is unchanged — see [`reports/bank_notifications/REPORT_RU.md`](reports/bank_notifications/REPORT_RU.md).
 - **Stacked 5-model ensemble**: Logistic Regression, Random Forest, Gradient Boosting (on the 20 hand-engineered features), TF-IDF + Multinomial Naive Bayes and character n-grams + Logistic Regression (on raw text), combined by a logistic-regression stacker — see [`fraud_model.py`](fraud_model.py).
+- **Neural network member (branch `neural-mlp-member`, 31.10.2026)**: a one-hidden-layer MLP (16 ReLU units) on the 5,000 most informative character n-grams, the 6th stacker input. Chosen out-of-fold on the training part only ([`scripts/select_neural_member.py`](scripts/select_neural_member.py)); full 5-vs-6 comparison, including where it is worse (real English SMS false alarms 7 → 10 of 2,242): [`reports/neural_member/REPORT_RU.md`](reports/neural_member/REPORT_RU.md).
 - **Evaluation**: every number in the app's sidebar comes from one template-grouped held-out test, the same for every model. The full jury evaluation (same-test comparison with McNemar tests, per-language metrics, never-seen scam types, real messages, calibration and threshold costs) is reproducible with `python scripts/run_jury_evaluation.py`; results and charts are in [`reports/jury_evaluation/`](reports/jury_evaluation/). To test on your own collected messages: `python scripts/run_jury_evaluation.py --real data/real/your_file.csv` (columns `text,label[,language]`, template in [`data/real/`](data/real/)).
 
 ## Robustness to disguised text
@@ -272,3 +275,7 @@ This is an educational prototype, not a certified security product:
 - The browser extension does all analysis on-device — text never leaves your browser.
 - Data submitted via the "Was this result accurate?" feedback buttons is aggregated into a single shared `feedback.json` (also gitignored) used only to help improve the model — unlike history, this is intentionally cross-session since its whole purpose is building a better training set, and it's never displayed back to any user.
 - CSV exports (batch results and history) neutralize spreadsheet-formula-injection payloads (e.g. text starting with `=`, `+`, `-`, `@`) so opening an export in Excel/Sheets can't execute a formula from analyzed message text.
+
+## License
+
+Copyright © 2026 Ordalin Nurassyl. **All rights reserved** — this is not an open-source licence. The repository is public so the project can be viewed, evaluated and its results reproduced; any other use of the code, the trained models or the project's datasets needs the copyright holder's written permission. See [`LICENSE`](LICENSE). Third-party data (UCI SMS Spam Collection, CC BY 4.0) and libraries keep their own licences.

@@ -1,0 +1,338 @@
+{
+  "jury_test_282": {
+    "five": {
+      "TN": 146,
+      "FP": 6,
+      "FN": 9,
+      "TP": 121,
+      "accuracy": 0.9468,
+      "precision": 0.9528,
+      "recall": 0.9308,
+      "f1": 0.9416,
+      "brier": 0.0346
+    },
+    "six": {
+      "TN": 148,
+      "FP": 4,
+      "FN": 9,
+      "TP": 121,
+      "accuracy": 0.9539,
+      "precision": 0.968,
+      "recall": 0.9308,
+      "f1": 0.949,
+      "brier": 0.0365
+    }
+  },
+  "jury_test_282_mlp_alone": {
+    "TN": 144,
+    "FP": 8,
+    "FN": 12,
+    "TP": 118,
+    "accuracy": 0.9291,
+    "precision": 0.9365,
+    "recall": 0.9077,
+    "f1": 0.9219
+  },
+  "jury_test_282_six_vs_char": {
+    "a": "final",
+    "b": "char",
+    "mcnemar": {
+      "a_only_right": 10,
+      "b_only_right": 5,
+      "p_value": 0.3018
+    },
+    "accuracy_diff_ci95": [
+      0.0177,
+      -0.0103,
+      0.0466
+    ],
+    "f1_diff_ci95": [
+      0.0183,
+      -0.0116,
+      0.0498
+    ]
+  },
+  "repeated_cv_15_folds": {
+    "accuracy": {
+      "five": 0.9610124272302258,
+      "six": 0.9641387799129081,
+      "six_better_folds": 9,
+      "six_worse_folds": 4,
+      "ties": 2,
+      "wilcoxon_p": 0.068115234375
+    },
+    "f1": {
+      "five": 0.9601663227753662,
+      "six": 0.9634152814075579,
+      "six_better_folds": 9,
+      "six_worse_folds": 5,
+      "ties": 1,
+      "wilcoxon_p": 0.118896484375
+    },
+    "recall": {
+      "five": 0.9606968540662356,
+      "six": 0.9636532580423602,
+      "six_better_folds": 7,
+      "six_worse_folds": 5,
+      "ties": 3,
+      "wilcoxon_p": 0.30126953125
+    },
+    "fpr": {
+      "five": 0.03752663074890795,
+      "six": 0.034341972830346644,
+      "six_better_folds": 6,
+      "six_worse_folds": 2,
+      "ties": 7,
+      "wilcoxon_p": 0.1484375
+    },
+    "brier": {
+      "five": 0.02819453298572865,
+      "six": 0.026423763788544993,
+      "six_better_folds": 12,
+      "six_worse_folds": 3,
+      "ties": 0,
+      "wilcoxon_p": 0.012451171875
+    }
+  },
+  "repeated_cv_mlp_alone": {
+    "accuracy": 0.9499,
+    "f1": 0.9482,
+    "brier": 0.0386
+  },
+  "repeated_cv_char_alone": {
+    "accuracy": 0.9483,
+    "f1": 0.9466,
+    "brier": 0.0519
+  },
+  "per_language_pooled_1398": {
+    "five": {
+      "kk": {
+        "n": 121.0,
+        "accuracy": 0.8843,
+        "recall": 0.8548,
+        "fpr": 0.0847
+      },
+      "ru": {
+        "n": 672.0,
+        "accuracy": 0.9643,
+        "recall": 0.9726,
+        "fpr": 0.0436
+      },
+      "en": {
+        "n": 605.0,
+        "accuracy": 0.9719,
+        "recall": 0.9696,
+        "fpr": 0.0259
+      }
+    },
+    "six": {
+      "kk": {
+        "n": 121.0,
+        "accuracy": 0.9174,
+        "recall": 0.9032,
+        "fpr": 0.0678
+      },
+      "ru": {
+        "n": 672.0,
+        "accuracy": 0.9658,
+        "recall": 0.9726,
+        "fpr": 0.0407
+      },
+      "en": {
+        "n": 605.0,
+        "accuracy": 0.9719,
+        "recall": 0.9662,
+        "fpr": 0.0227
+      }
+    }
+  },
+  "unseen_families_recall": {
+    "QR-коды / штрафы / платные дороги": {
+      "n": 64,
+      "five": 0.890625,
+      "six": 0.890625
+    },
+    "Аккаунты / SIM / мессенджеры": {
+      "n": 42,
+      "five": 0.8809523809523809,
+      "six": 0.8809523809523809
+    },
+    "Аренда / маркетплейсы / покупки": {
+      "n": 30,
+      "five": 0.8333333333333334,
+      "six": 0.8333333333333334
+    },
+    "Банк / карта / колл-центр банка": {
+      "n": 114,
+      "five": 0.9473684210526316,
+      "six": 0.956140350877193
+    },
+    "Бизнес-почта / счета / зарплата": {
+      "n": 20,
+      "five": 1.0,
+      "six": 0.95
+    },
+    "Долги / суды / коммуналка / благотворительность": {
+      "n": 42,
+      "five": 0.9523809523809524,
+      "six": 0.9523809523809524
+    },
+    "Доставка / госорганы / родственник в беде": {
+      "n": 90,
+      "five": 0.9222222222222224,
+      "six": 0.9222222222222224
+    },
+    "Инвестиции / крипта / работа": {
+      "n": 104,
+      "five": 0.6634615384615384,
+      "six": 0.6730769230769231
+    },
+    "Подделка брендов / подписки": {
+      "n": 52,
+      "five": 0.8461538461538461,
+      "six": 0.8461538461538461
+    },
+    "Призы / налоги / наследство / лотереи": {
+      "n": 39,
+      "five": 1.0,
+      "six": 0.9743589743589745
+    },
+    "Романтические / знакомства": {
+      "n": 53,
+      "five": 0.4150943396226415,
+      "six": 0.4150943396226415
+    },
+    "Техподдержка / устройство": {
+      "n": 42,
+      "five": 0.9047619047619048,
+      "six": 0.8809523809523809
+    }
+  },
+  "unseen_weighted": {
+    "five": 0.8410404624277457,
+    "six": 0.8395953757225434
+  },
+  "real_uci_holdout": {
+    "five": {
+      "false_blocks": 7,
+      "legit": 2242,
+      "false_block_rate": 0.0031,
+      "spam_flagged": 0.8976,
+      "roc_auc": 0.9938
+    },
+    "six": {
+      "false_blocks": 10,
+      "legit": 2242,
+      "false_block_rate": 0.0045,
+      "spam_flagged": 0.8976,
+      "roc_auc": 0.9937
+    }
+  },
+  "calibration": {
+    "five": {
+      "brier": 0.0288,
+      "ece": 0.008
+    },
+    "six": {
+      "brier": 0.026,
+      "ece": 0.0125
+    }
+  },
+  "thresholds": {
+    "five": {
+      "0.15": {
+        "recall": 0.9912536443148688,
+        "false_blocks_per_1000": 102.52808988764043
+      },
+      "0.5": {
+        "recall": 0.9606413994169096,
+        "false_blocks_per_1000": 39.32584269662921
+      },
+      "0.8": {
+        "recall": 0.9081632653061223,
+        "false_blocks_per_1000": 15.44943820224719
+      }
+    },
+    "six": {
+      "0.15": {
+        "recall": 0.9912536443148688,
+        "false_blocks_per_1000": 92.69662921348316
+      },
+      "0.5": {
+        "recall": 0.9635568513119532,
+        "false_blocks_per_1000": 35.1123595505618
+      },
+      "0.8": {
+        "recall": 0.9081632653061223,
+        "false_blocks_per_1000": 12.640449438202246
+      }
+    }
+  },
+  "cost_scenarios": {
+    "five": [
+      {
+        "scenario": "warning",
+        "best_threshold": 0.2,
+        "cost_at_best": 20.4,
+        "recall_at_best": 0.9883,
+        "fpr_at_best": 0.0871
+      },
+      {
+        "scenario": "equal",
+        "best_threshold": 0.35,
+        "cost_at_best": 51.0,
+        "recall_at_best": 0.9781,
+        "fpr_at_best": 0.0506
+      },
+      {
+        "scenario": "auto_block",
+        "best_threshold": 0.9,
+        "cost_at_best": 117.0,
+        "recall_at_best": 0.8732,
+        "fpr_at_best": 0.0084
+      }
+    ],
+    "six": [
+      {
+        "scenario": "warning",
+        "best_threshold": 0.2,
+        "cost_at_best": 16.8,
+        "recall_at_best": 0.9913,
+        "fpr_at_best": 0.0758
+      },
+      {
+        "scenario": "equal",
+        "best_threshold": 0.35,
+        "cost_at_best": 48.0,
+        "recall_at_best": 0.9796,
+        "fpr_at_best": 0.0478
+      },
+      {
+        "scenario": "auto_block",
+        "best_threshold": 0.75,
+        "cost_at_best": 101.0,
+        "recall_at_best": 0.9184,
+        "fpr_at_best": 0.0126
+      }
+    ]
+  },
+  "stacker_weights_full_model": {
+    "five": {
+      "lr": 0.0778,
+      "rf": 0.1986,
+      "gb": 0.5174,
+      "tfidf": 1.3714,
+      "char": 1.6568,
+      "boost": 0.3444
+    },
+    "six": {
+      "lr": 0.0896,
+      "rf": 0.1911,
+      "gb": 0.5061,
+      "tfidf": 1.3458,
+      "char": 1.0363,
+      "mlp": 0.3065,
+      "boost": 0.3343
+    }
+  }
+}

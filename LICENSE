@@ -1,0 +1,37 @@
+AI Fraud Detector
+Copyright (c) 2026 Ordalin Nurassyl (Ордалин Нұрасыл).
+All rights reserved.
+
+This repository is public so that the project can be viewed, evaluated and
+reproduced by juries, teachers and reviewers. Viewing the code and running
+it to check the results described in this repository is permitted.
+
+No other permission is granted. Without the prior written permission of the
+copyright holder, you may not copy, modify, distribute, sublicense, sell, or use this
+software, its trained models, its exported model files, its datasets written
+by the copyright holder, or any part of them, in any product or service, commercial or
+not.
+
+To ask for permission or a licence, contact the copyright holder through
+https://github.com/Ordalinnn.
+
+Third-party material keeps its own licence. In particular, the UCI SMS Spam
+Collection files in data/external/ are licensed under CC BY 4.0
+(https://archive.ics.uci.edu/dataset/228/sms+spam+collection), and the
+libraries and speech models the project downloads are covered by their own
+licences.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND. IT IS AN
+EDUCATIONAL PROTOTYPE, NOT A CERTIFIED SECURITY TOOL.
+
+---
+
+Все права защищены. Репозиторий открыт для просмотра, оценки и проверки
+результатов. Копирование, изменение, распространение и любое использование
+программы, обученных моделей и данных, созданных правообладателем, полностью или
+частично, без письменного разрешения правообладателя (Ордалин Нұрасыл) не допускается.
+
+Барлық құқықтар қорғалған. Репозиторий қарау, бағалау және нәтижелерді тексеру
+үшін ашық. Құқық иесінің (Ордалин Нұрасыл) жазбаша рұқсатынсыз бағдарламаны, оқытылған модельдерді
+және құқық иесі жасаған деректерді толық немесе ішінара көшіруге, өзгертуге,
+таратуға және кез келген мақсатта пайдалануға болмайды.

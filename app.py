@@ -2654,8 +2654,9 @@ def render_risk_meter(prob, threshold, title, score_label="", threshold_label=""
 # What changed after the jury review (09.10.2026), and why:
 #   - Measured on the SAME held-out messages, the old plain average of 4
 #     models was worse than its best member (TF-IDF+NB) - the three
-#     keyword-feature models outvoted it. Now 5 base models (adding a
-#     character n-gram model) are combined by a logistic-regression stacker
+#     keyword-feature models outvoted it. Now 6 base models (adding a
+#     character n-gram model and, on 31.10.2026, a small neural network on
+#     the same n-grams) are combined by a logistic-regression stacker
 #     that learns each model's weight from out-of-fold predictions; the rule
 #     boost is one more stacker input instead of a hand-set +30%.
 #   - The sidebar used to show each model's ordinary cross-validation
@@ -2737,7 +2738,7 @@ def ensemble_predict(feats_list, texts):
     """Scores a batch of one or more messages with the stacked ensemble.
     `feats_list` and `texts` must be the same length and in the same order.
     Single source of truth for the scoring formula. Returns a dict of numpy
-    arrays: one entry per base model, "raw" (plain average of the 5 models,
+    arrays: one entry per base model, "raw" (plain average of the base models,
     shown for transparency), "boost" (rule boost, a stacker input) and
     "final" (the stacker's calibrated probability)."""
     scores = fraud_model.score(list(texts), pd.DataFrame(feats_list))
@@ -4562,13 +4563,14 @@ if mode != "batch" and analyze:
         features, domains = extract_features(input_text)
         X_input = pd.DataFrame([features])
 
-        # Stacked ensemble prediction (5 base models + learned combiner)
+        # Stacked ensemble prediction (6 base models + learned combiner)
         scores = ensemble_predict([features], [input_text])
         lr_prob = float(scores["lr"][0])
         rf_prob = float(scores["rf"][0])
         gb_prob = float(scores["gb"][0])
         tfidf_prob = float(scores["tfidf"][0])
         char_prob = float(scores["char"][0])
+        mlp_prob = float(scores["mlp"][0])
         raw_prob = float(scores["raw"][0])
         prob = float(scores["final"][0])
         pred = int(prob >= threshold)
@@ -4599,6 +4601,7 @@ if mode != "batch" and analyze:
             "gb_prob": gb_prob,
             "tfidf_prob": tfidf_prob,
             "char_prob": char_prob,
+            "mlp_prob": mlp_prob,
             "raw_prob": raw_prob,
             "boost": float(scores["boost"][0]),
             "prob": prob,
@@ -4624,10 +4627,11 @@ if mode != "batch" and analyze:
         save_history(st.session_state.history)
 
 def _model_probs(r):
-    """The 5 base-model probabilities of a stored result, in fm.BASE_MODELS
-    order. .get() for char_prob: a result stored by a pre-update session
-    (still in session_state across a redeploy) has no char model score."""
-    return [r["lr_prob"], r["rf_prob"], r["gb_prob"], r["tfidf_prob"], r.get("char_prob", r["tfidf_prob"])]
+    """The base-model probabilities of a stored result, in fm.BASE_MODELS
+    order. .get() for char_prob / mlp_prob: a result stored by a pre-update
+    session (still in session_state across a redeploy) has no such score."""
+    char = r.get("char_prob", r["tfidf_prob"])
+    return [r["lr_prob"], r["rf_prob"], r["gb_prob"], r["tfidf_prob"], char, r.get("mlp_prob", char)]
 
 
 # =========================
@@ -4874,7 +4878,8 @@ Random Forest probability:       {r["rf_prob"]*100:.1f}%
 Gradient Boosting probability:   {r["gb_prob"]*100:.1f}%
 Text Patterns (TF-IDF) probability: {r["tfidf_prob"]*100:.1f}%
 Char n-grams (LR) probability:   {r.get("char_prob", 0.0)*100:.1f}%
-Plain average of 5 models:       {r["raw_prob"]*100:.1f}%
+Neural network (MLP) probability: {r.get("mlp_prob", 0.0)*100:.1f}%
+Plain average of the base models: {r["raw_prob"]*100:.1f}%
 Model agreement spread:          {(max(_model_probs(r)) - min(_model_probs(r)))*100:.1f} pts
 Rule boost (stacker input):      +{r["boost"]*100:.1f}%
 Final fraud risk (stacked, calibrated): {r["prob"]*100:.1f}%
@@ -4905,6 +4910,7 @@ SECURITY ADVICE:
                 "gradient_boosting": round(r["gb_prob"], 4),
                 "text_patterns_tfidf": round(r["tfidf_prob"], 4),
                 "char_ngrams": round(r.get("char_prob", 0.0), 4),
+                "neural_network_mlp": round(r.get("mlp_prob", 0.0), 4),
                 "ensemble_raw": round(r["raw_prob"], 4),
                 "rule_boost": round(r["boost"], 4),
                 "final": round(r["prob"], 4),
