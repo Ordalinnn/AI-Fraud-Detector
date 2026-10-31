@@ -2692,18 +2692,33 @@ def train_models(feature_schema, n_examples):
     feats = fm.featurise(texts)
     groups = fm.template_groups(texts)
 
-    # 1) Honest held-out evaluation on a throwaway copy: group-aware 80/20
-    #    split so no variant of a test template is ever trained on.
+    # 1) Honest held-out evaluation on a throwaway copy: the JURY TEST - the
+    #    same 282 hand-written messages as scripts/run_jury_evaluation.py
+    #    (group-aware 80/20 split of `data` alone, so no variant of a test
+    #    template is ever trained on). The split used to be drawn from ALL
+    #    training messages, so adding data (real SMS, bank notifications)
+    #    re-drew the test and the shown accuracy jumped (98.9% -> 95.4% on
+    #    01.11.2026) with the models barely changing. Now the test stays
+    #    fixed; everything else (real SMS, bank notifications) is training
+    #    only, as in scripts/eval_bank_notifications.py (its "jury B" row is
+    #    this number). The stacker's folds group the training messages by
+    #    template, the same way the production model below is fitted, so
+    #    the variants of one bank-notification template stay in one fold.
+    n_written = len(data)
+    w_y, w_feats = y[:n_written], feats.iloc[:n_written]
     splitter = GroupShuffleSplit(n_splits=1, test_size=EVAL_TEST_SIZE, random_state=fm.MODEL_RANDOM_STATE)
-    tr, te = next(splitter.split(feats, y, groups))
-    eval_model = fm.FraudEnsemble().fit([texts[i] for i in tr], y[tr], feats.iloc[tr], groups[tr])
-    s = eval_model.score([texts[i] for i in te], feats.iloc[te])
-    y_te = y[te]
+    tr, te = next(splitter.split(w_feats, w_y, fm.template_groups(texts[:n_written])))
+    tr_all = np.concatenate([tr, np.arange(n_written, len(texts))])
+    tr_texts = [texts[i] for i in tr_all]
+    eval_model = fm.FraudEnsemble().fit(tr_texts, y[tr_all], feats.iloc[tr_all].reset_index(drop=True),
+                                        fm.template_groups(tr_texts))
+    s = eval_model.score([texts[i] for i in te], w_feats.iloc[te])
+    y_te = w_y[te]
     preds = (s["final"] >= 0.5).astype(int)
     metrics = {fm.MODEL_DISPLAY_NAMES[k]: round(accuracy_score(y_te, (s[k] >= 0.5).astype(int)) * 100, 1)
                for k in fm.BASE_MODELS + ["final"]}
     eval_report = {
-        "n_train": int(len(tr)),
+        "n_train": int(len(tr_all)),
         "n_test": int(len(te)),
         "n_template_groups": int(len(set(groups.tolist()))),
         "n_examples": int(len(texts)),
