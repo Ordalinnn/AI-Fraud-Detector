@@ -139,7 +139,7 @@ def write_model(pipe, path: Path) -> dict:
 
 def main():
     df = fe.load_dataset()
-    real = fm.load_real_training_sample()
+    real = fm.extra_training_examples()  # real SMS + bank notifications
     hold = fm.load_real_holdout()
     y = df["label"].to_numpy()
     groups = fm.template_groups(df["text"].tolist())

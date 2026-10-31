@@ -96,6 +96,8 @@ EVAL_TEST_SIZE = 0.2
 _DATA_DIR = Path(__file__).resolve().parent / "data" / "external"
 REAL_TRAIN_PATH = _DATA_DIR / "real_train_sample.csv"
 REAL_HOLDOUT_PATH = _DATA_DIR / "real_holdout.csv"
+BANK_TRAIN_PATH = Path(__file__).resolve().parent / "data" / "bank" / "bank_notifications_train.csv"
+BANK_TEST_PATH = Path(__file__).resolve().parent / "data" / "bank" / "bank_notifications_test.csv"
 REAL_TRAIN_N_HAM = 300
 REAL_TRAIN_N_SPAM = 100
 
@@ -184,6 +186,32 @@ def load_real_training_sample(path: Path = REAL_TRAIN_PATH) -> list[list]:
     df = pd.read_csv(path, dtype={"text": str})
     df = df.dropna(subset=["text", "label"])
     return [[t, int(label)] for t, label in zip(df["text"], df["label"])]
+
+
+def load_bank_notifications(path: Path = BANK_TRAIN_PATH) -> list[list]:
+    """Genuine-format bank service notifications (SAFE) and look-alike scams
+    on the same format (FRAUD), from scripts/make_bank_notifications.py.
+    Added to training like the real-SMS sample, so the jury's 282-message
+    test (drawn from app.py's `data`) stays the same. Returns [] if the file
+    is missing."""
+    if not Path(path).exists():
+        return []
+    df = pd.read_csv(path, dtype={"text": str}).dropna(subset=["text", "label"])
+    return [[t, int(label)] for t, label in zip(df["text"], df["label"])]
+
+
+def extra_training_examples() -> list[list]:
+    """Everything added to app.py's hand-written `data` for training: the
+    real-SMS sample + the bank-notification file. app.py and both export
+    scripts use this one function, so the site, the extension and Android
+    train on the same messages."""
+    return load_real_training_sample() + load_bank_notifications()
+
+
+def load_bank_notifications_test(path: Path = BANK_TEST_PATH) -> pd.DataFrame:
+    """Hand-written bank notifications and bank-style scams in wording that
+    is NOT in the training templates; used only for evaluation."""
+    return pd.read_csv(path, dtype={"text": str}).dropna(subset=["text", "label"])
 
 
 def load_real_holdout(path: Path = REAL_HOLDOUT_PATH) -> pd.DataFrame:
