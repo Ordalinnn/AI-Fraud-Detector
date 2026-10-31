@@ -1,5 +1,5 @@
 """
-The trained part of the detector: 5 base models + a learned combiner.
+The trained part of the detector: 6 base models + a learned combiner.
 
 Kept out of app.py (no Streamlit import) so the exact same code is used by
 the live app, by the offline jury evaluation (fraud_eval.py /
@@ -26,19 +26,38 @@ The fix has two parts:
      a model's score on messages that model was trained on). Its output is
      a probability fitted with log-loss, which is also what makes the
      final risk percentage calibrated (see the jury's 3rd point).
+
+A 6TH MEMBER: A SMALL NEURAL NETWORK (added 31.10.2026)
+---------------------------------------------------------
+"mlp": the same character n-grams, the 5,000 most informative of them
+(chi-squared), into a one-hidden-layer neural network (16 ReLU units). The
+settings were chosen on the training part only (out-of-fold, by how much
+they improve the whole stacked system, never on the jury's 282 test
+messages): a network on ALL n-grams agreed with the char model 99% of the
+time and added nothing, while the selected-n-gram one makes different
+mistakes, which is what a stacker can use. Its first-layer weights are
+stored as 8-bit integers with one scale per hidden unit (_quantize_mlp), so
+the browser extension and the offline phone page carry it for ~0.6 MB and
+compute exactly the same numbers. Full comparison with the 5-model system:
+reports/neural_member/REPORT_RU.md.
 """
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
+from sklearn.exceptions import ConvergenceWarning
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.feature_selection import chi2
 from sklearn.model_selection import GroupKFold
 from sklearn.naive_bayes import MultinomialNB
+from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
@@ -62,6 +81,12 @@ TFIDF_MIN_DF = 1
 CHAR_NGRAM_RANGE = (2, 5)
 CHAR_MIN_DF = 2
 CHAR_C = 10.0
+# Neural member: chosen out-of-fold on the jury split's TRAINING part only
+# (scripts/select_neural_member.py), by the whole stacker's log-loss.
+MLP_SELECT_K = 5000
+MLP_HIDDEN = 16
+MLP_ALPHA = 0.01
+MLP_MAX_ITER = 300
 STACK_C = 1.0
 STACK_FOLDS = 5
 TEMPLATE_SIMILARITY = 0.6
@@ -74,9 +99,9 @@ REAL_HOLDOUT_PATH = _DATA_DIR / "real_holdout.csv"
 REAL_TRAIN_N_HAM = 300
 REAL_TRAIN_N_SPAM = 100
 
-BASE_MODELS = ["lr", "rf", "gb", "tfidf", "char"]
+BASE_MODELS = ["lr", "rf", "gb", "tfidf", "char", "mlp"]
 FEATURE_MODELS = ["lr", "rf", "gb"]          # use the 20 hand-engineered features
-TEXT_MODELS = ["tfidf", "char"]              # read the raw text
+TEXT_MODELS = ["tfidf", "char", "mlp"]       # read the raw text
 STACK_INPUTS = BASE_MODELS + ["boost"]
 
 MODEL_DISPLAY_NAMES = {
@@ -85,10 +110,48 @@ MODEL_DISPLAY_NAMES = {
     "gb": "Gradient Boosting",
     "tfidf": "Text Patterns (TF-IDF)",
     "char": "Char n-grams (LR)",
+    "mlp": "Neural network (MLP)",
     "average": "Plain average (old)",
     "average_rules": "Plain average + rules (old app)",
     "final": "Stacked ensemble (final)",
 }
+
+
+class Chi2TopK(BaseEstimator, TransformerMixin):
+    """Keeps the k columns with the highest chi-squared score against the
+    label (like SelectKBest(chi2, k)), but never fails when a small training
+    set has fewer than k columns, and breaks ties by column order so the
+    choice is reproducible."""
+
+    def __init__(self, k: int = MLP_SELECT_K):
+        self.k = k
+
+    def fit(self, X, y):
+        scores, _ = chi2(X, y)
+        scores = np.nan_to_num(scores, nan=0.0)
+        k = min(int(self.k), X.shape[1])
+        self.support_ = np.sort(np.argsort(-scores, kind="stable")[:k])
+        return self
+
+    def transform(self, X):
+        return X[:, self.support_]
+
+
+def _quantize_mlp(pipe: Pipeline) -> None:
+    """Stores the network's first layer (n-grams x hidden units, by far its
+    biggest part) as 8-bit integers with one scale per hidden unit, and makes
+    the fitted model USE those rounded weights. The exported file then holds
+    exactly the numbers Python computes with, so the extension reproduces
+    the site's probability. Effect on accuracy: within noise (see the
+    report)."""
+    clf = pipe.named_steps["clf"]
+    w = clf.coefs_[0]
+    scale = np.abs(w).max(axis=0) / 127.0
+    scale[scale == 0] = 1.0
+    q = np.clip(np.round(w / scale), -127, 127).astype(np.int8)
+    clf.coefs_[0] = q.astype(np.float64) * scale
+    clf.w1_int8_ = q
+    clf.w1_scale_ = scale
 
 
 def build_base_models() -> dict:
@@ -101,6 +164,13 @@ def build_base_models() -> dict:
         "char": Pipeline([
             ("tfidf", TfidfVectorizer(analyzer="char_wb", ngram_range=CHAR_NGRAM_RANGE, min_df=CHAR_MIN_DF, sublinear_tf=True, lowercase=True)),
             ("clf", LogisticRegression(C=CHAR_C, max_iter=2000, random_state=rs)),
+        ]),
+        # Same n-grams as "char" (identical vectorizer settings, so the
+        # extension reuses that vocabulary), 5,000 kept, one hidden layer.
+        "mlp": Pipeline([
+            ("tfidf", TfidfVectorizer(analyzer="char_wb", ngram_range=CHAR_NGRAM_RANGE, min_df=CHAR_MIN_DF, sublinear_tf=True, lowercase=True)),
+            ("select", Chi2TopK(MLP_SELECT_K)),
+            ("clf", MLPClassifier(hidden_layer_sizes=(MLP_HIDDEN,), alpha=MLP_ALPHA, max_iter=MLP_MAX_ITER, random_state=rs)),
         ]),
     }
 
@@ -181,7 +251,14 @@ class BaseModels:
         for k in FEATURE_MODELS:
             self.models[k].fit(feats, y)
         for k in TEXT_MODELS:
-            self.models[k].fit(texts, y)
+            if k == "mlp":
+                with warnings.catch_warnings():
+                    # small data: adam may stop at max_iter before its tolerance
+                    warnings.simplefilter("ignore", ConvergenceWarning)
+                    self.models[k].fit(texts, y)
+                _quantize_mlp(self.models[k])
+            else:
+                self.models[k].fit(texts, y)
         self.columns_ = list(feats.columns)
         return self
 
@@ -272,6 +349,30 @@ def _export_tree(tree, value) -> dict:
     }
 
 
+def _export_mlp(mlp: Pipeline, char: Pipeline) -> dict:
+    """The neural member. It reads the same TF-IDF vector as "char" (same
+    vectorizer settings and training texts, checked here), so the extension
+    reuses the char vocabulary's idf values and only needs: the kept
+    n-grams, the 8-bit first layer (base64, row per kept n-gram), one scale
+    per hidden unit, and the small second layer."""
+    import base64
+    tf, ctf = mlp.named_steps["tfidf"], char.named_steps["tfidf"]
+    assert tf.vocabulary_ == ctf.vocabulary_ and np.array_equal(tf.idf_, ctf.idf_), "mlp must share char's TF-IDF"
+    clf = mlp.named_steps["clf"]
+    assert clf.activation == "relu" and clf.out_activation_ == "logistic" and len(clf.coefs_) == 2
+    inv = {i: g for g, i in tf.vocabulary_.items()}
+    support = mlp.named_steps["select"].support_
+    q = np.ascontiguousarray(clf.w1_int8_, dtype=np.int8)
+    assert np.array_equal(q.astype(np.float64) * clf.w1_scale_, clf.coefs_[0])
+    return {"hidden": int(q.shape[1]),
+            "ngrams": [inv[int(i)] for i in support],
+            "w1_int8": base64.b64encode(q.tobytes()).decode("ascii"),
+            "w1_scale": [float(x) for x in clf.w1_scale_],
+            "b1": [float(x) for x in clf.intercepts_[0]],
+            "w2": [float(x) for x in clf.coefs_[1][:, 0]],
+            "b2": float(clf.intercepts_[1][0])}
+
+
 def export_ensemble(model: FraudEnsemble, fingerprint: str) -> dict:
     """Every number FraudEnsemble.score() uses, as plain JSON."""
     m = model.base.models
@@ -309,6 +410,9 @@ def export_ensemble(model: FraudEnsemble, fingerprint: str) -> dict:
     assert tf.analyzer == "char_wb" and tf.norm == "l2" and tf.sublinear_tf and tf.lowercase
     out["char"] = {"ngram_range": list(tf.ngram_range), "intercept": float(clf.intercept_[0]),
                    "vocab": {g: [float(tf.idf_[i]), float(clf.coef_[0][i])] for g, i in sorted(tf.vocabulary_.items())}}
+
+    if "mlp" in m:
+        out["mlp"] = _export_mlp(m["mlp"], m["char"])
 
     w = model.stacker.coef_[0]
     out["stacker"] = {"inputs": list(STACK_INPUTS), "coef": [float(x) for x in w],

@@ -1,4 +1,4 @@
-// The web app's full model, run on the device: the same 5 base models and
+// The web app's full model, run on the device: the same 6 base models and
 // the same learned combiner ("stacker") as fraud_model.FraudEnsemble.score().
 //
 //   lr     StandardScaler + logistic regression on the 25 rule features
@@ -6,8 +6,10 @@
 //   gb     StandardScaler + gradient boosting (50 trees) on the same features
 //   tfidf  word 1-2-gram TF-IDF + multinomial Naive Bayes
 //   char   char_wb 2-5-gram TF-IDF + logistic regression (scorer.js)
+//   mlp    the same TF-IDF vector, 5,000 kept n-grams -> a neural network
+//          with one hidden layer (16 ReLU units, 8-bit first layer)
 //   boost  the rule boost (detector.js ruleBoost, = fraud_logic.rule_boost)
-//   final  logistic regression over the logits of the five + the boost
+//   final  logistic regression over the logits of the six + the boost
 //
 // Every number comes from ensemble_model.json, written by
 // scripts/export_extension_model.py from the model the site trains.
@@ -37,6 +39,19 @@
     return Math.log(q / (1 - q));
   }
   const camel = (s) => s.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+
+  // base64 -> signed bytes, in the browser, the MV3 service worker and Node
+  function int8FromBase64(b64) {
+    let bytes;
+    if (typeof atob === "function") {
+      const bin = atob(b64);
+      bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    } else {
+      bytes = Uint8Array.from(Buffer.from(b64, "base64"));
+    }
+    return new Int8Array(bytes.buffer, bytes.byteOffset, bytes.length);
+  }
 
   // scikit-learn's default token_pattern (?u)\b\w\w+\b: every maximal run
   // of word characters that is at least 2 characters long.
@@ -85,6 +100,12 @@
       this.tfidfVocab = new Map(Object.entries(m.tfidf.vocab));
       this.char = new CharScorer(new Map(Object.entries(m.char.vocab)), m.char.intercept,
         m.char.ngram_range[0], m.char.ngram_range[1], false);
+      if (m.mlp) {
+        const p = m.mlp;
+        this.mlpRow = new Map(p.ngrams.map((g, i) => [g, i]));
+        this.mlpW1 = int8FromBase64(p.w1_int8);
+        if (this.mlpW1.length !== p.ngrams.length * p.hidden) throw new Error("bad mlp weights");
+      }
     }
 
     static parse(json) {
@@ -146,7 +167,37 @@
       return sigmoid(p.prior + (sq > 0 ? dot / Math.sqrt(sq) : 0));
     }
 
-    // All six stacker inputs + the final probability. `f` is
+    // Neural member. Its input is the char model's TF-IDF vector (same
+    // n-grams, same idf, normalised over ALL of them, as scikit-learn does
+    // before the 5,000 are kept); only the kept n-grams feed the network.
+    mlp(prepared) {
+      const p = this.m.mlp;
+      const H = p.hidden;
+      const counts = new Map();
+      for (const g of this.char.ngrams(prepared)) {
+        if (this.char.vocab.has(g)) counts.set(g, (counts.get(g) || 0) + 1);
+      }
+      let sq = 0;
+      const kept = [];
+      for (const [g, c] of counts) {
+        const w = (1 + Math.log(c)) * this.char.vocab.get(g)[0];
+        sq += w * w;
+        const row = this.mlpRow.get(g);
+        if (row !== undefined) kept.push([row, w]);
+      }
+      const norm = sq > 0 ? Math.sqrt(sq) : 1;
+      const h = p.b1.slice();
+      for (const [row, w] of kept) {
+        const x = w / norm;
+        const base = row * H;
+        for (let j = 0; j < H; j++) h[j] += x * (this.mlpW1[base + j] * p.w1_scale[j]);
+      }
+      let z = p.b2;
+      for (let j = 0; j < H; j++) if (h[j] > 0) z += h[j] * p.w2[j];
+      return sigmoid(z);
+    }
+
+    // All stacker inputs + the final probability. `f` is
     // detector.js extractFeatures(text), `boost` its ruleBoost(f).
     scores(text, f, boost) {
       const x = this.vector(f);
@@ -155,6 +206,7 @@
         lr: this.lr(x), rf: this.rf(x), gb: this.gb(x),
         tfidf: this.tfidf(prepared), char: this.char.probability(prepared), boost
       };
+      if (this.m.mlp) s.mlp = this.mlp(prepared);
       const st = this.m.stacker;
       let z = st.intercept;
       st.inputs.forEach((k, i) => { z += st.coef[i] * (k === "boost" ? s[k] : logit(s[k])); });
