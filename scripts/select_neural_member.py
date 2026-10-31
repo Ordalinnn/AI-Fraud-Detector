@@ -1,8 +1,15 @@
 """
 How the neural member's settings (fraud_model.MLP_*) were chosen.
 
-    python scripts/select_neural_member.py          # all 38 candidates, ~40 min
-    python scripts/select_neural_member.py --quick  # 6 candidates, ~5 min
+    python scripts/select_neural_member.py --quick                 # current (L-BFGS) choice, 8 candidates, ~3 min
+    python scripts/select_neural_member.py --solver adam           # the first (Adam) search, 38 candidates, ~40 min
+
+Two searches were made. 31.10.2026, solver Adam: 38 candidates, pick
+k5000_h16_a0.01 (selection.csv). 01.11.2026, solver L-BFGS (Adam needed
+~4 s per fit and the site trains the network 12 times at every start, so it
+took ~1 min to open, minutes on Streamlit Cloud): the alpha re-chosen the
+same way, pick k5000_h16_a0.3, the same stacked log-loss and Brier score
+(0.0899 / 0.0238) at ~0.6 s per fit (selection_lbfgs.csv).
 
 Uses ONLY the training part of the jury split (the same 80/20 grouped split
 as scripts/run_jury_evaluation.py) plus the real SMS sample - the jury's
@@ -14,11 +21,12 @@ For every candidate network:
   2. how much it improves the WHOLE stacked system: the 5 current base
      models' out-of-fold scores + the candidate go into the stacker, which is
      itself cross-validated (5 different second-level splits, averaged).
-The pick (k5000_h16_a0.01): among the networks tied at the lowest stacked
-log-loss (0.0897-0.0902), the one with the lowest stacked Brier score and
-the stronger regularization (tied with the 32-unit version, which is twice
-the size); small enough for the extension and the phone page. Writes reports/neural_member/selection.csv (the committed file is the
-full 38-candidate run).
+The Adam pick (k5000_h16_a0.01): among the networks tied at the lowest
+stacked log-loss (0.0897-0.0902), the one with the lowest stacked Brier
+score and the stronger regularization (tied with the 32-unit version, which
+is twice the size). The L-BFGS pick (k5000_h16_a0.3): tied first with alpha
+1.0 on the stacked numbers, better on its own log-loss. Writes
+reports/neural_member/selection.csv (Adam) or selection_lbfgs.csv.
 """
 from __future__ import annotations
 
@@ -49,19 +57,19 @@ OUT = ROOT / "reports" / "neural_member"
 OLD_MEMBERS = ["lr", "rf", "gb", "tfidf", "char"]   # the 5-model system
 
 
-def candidates(quick: bool) -> dict:
+def candidates(quick: bool, solver: str) -> dict:
     def make(hidden, alpha, k=None):
         steps = [("tfidf", TfidfVectorizer(analyzer="char_wb", ngram_range=fm.CHAR_NGRAM_RANGE, min_df=fm.CHAR_MIN_DF,
                                            sublinear_tf=True, lowercase=True))]
         if k:
             steps.append(("select", fm.Chi2TopK(k)))
         steps.append(("clf", MLPClassifier(hidden_layer_sizes=(hidden,), alpha=alpha, max_iter=fm.MLP_MAX_ITER,
-                                           random_state=fm.MODEL_RANDOM_STATE)))
+                                           solver=solver, random_state=fm.MODEL_RANDOM_STATE)))
         return Pipeline(steps)
 
     if quick:
-        grid_all = [(16, 0.01), (16, 0.03)]
-        grid_sel = [(5000, 16, 0.01), (5000, 32, 0.01), (3000, 16, 0.01), (10000, 16, 0.01)]
+        grid_all = []
+        grid_sel = [(5000, 16, a) for a in (0.003, 0.01, 0.03, 0.1, 0.3, 1.0)] + [(5000, 8, 0.1), (3000, 16, 0.1)]
     else:
         grid_all = list(itertools.product([16, 32, 64], [1e-4, 1e-3, 1e-2])) + \
                    list(itertools.product([8, 16, 32], [0.03, 0.1, 0.3]))
@@ -75,6 +83,7 @@ def candidates(quick: bool) -> dict:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--quick", action="store_true")
+    ap.add_argument("--solver", default=fm.MLP_SOLVER, choices=["lbfgs", "adam"])
     args = ap.parse_args()
     warnings.simplefilter("ignore", ConvergenceWarning)
     OUT.mkdir(parents=True, exist_ok=True)
@@ -125,7 +134,7 @@ def main():
 
     rows = [dict(zip(["model", "stack_logloss", "stack_brier", "stack_f1", "stack_acc"], ["5 models (current)", *map(float, stacked())]))]
     char_err = (base["char"] >= .5) != Y
-    for name, make in candidates(args.quick).items():
+    for name, make in candidates(args.quick, args.solver).items():
         o = np.zeros(len(T))
         t0 = time.time()
         for a, b in folds:
@@ -138,7 +147,7 @@ def main():
         print({k: (round(v, 4) if isinstance(v, float) else v) for k, v in r.items()}, flush=True)
 
     res = pd.DataFrame(rows).set_index("model").sort_values("stack_logloss")
-    res.to_csv(OUT / "selection.csv")
+    res.to_csv(OUT / ("selection.csv" if args.solver == "adam" else "selection_lbfgs.csv"))
     print(res.round(4).to_string())
 
 

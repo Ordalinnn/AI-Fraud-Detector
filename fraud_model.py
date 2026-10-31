@@ -85,7 +85,13 @@ CHAR_C = 10.0
 # (scripts/select_neural_member.py), by the whole stacker's log-loss.
 MLP_SELECT_K = 5000
 MLP_HIDDEN = 16
-MLP_ALPHA = 0.01
+# Solver: L-BFGS, which scikit-learn recommends for small datasets. The
+# first version used Adam, which stopped at its 300-step limit (~4 s per
+# fit, 12 fits at every app start: ~50 s, minutes on Streamlit Cloud).
+# L-BFGS reaches the optimum in well under a second; with alpha re-chosen
+# the same way (training part only) the stacked system scores the same.
+MLP_SOLVER = "lbfgs"
+MLP_ALPHA = 0.3
 MLP_MAX_ITER = 300
 STACK_C = 1.0
 STACK_FOLDS = 5
@@ -172,7 +178,7 @@ def build_base_models() -> dict:
         "mlp": Pipeline([
             ("tfidf", TfidfVectorizer(analyzer="char_wb", ngram_range=CHAR_NGRAM_RANGE, min_df=CHAR_MIN_DF, sublinear_tf=True, lowercase=True)),
             ("select", Chi2TopK(MLP_SELECT_K)),
-            ("clf", MLPClassifier(hidden_layer_sizes=(MLP_HIDDEN,), alpha=MLP_ALPHA, max_iter=MLP_MAX_ITER, random_state=rs)),
+            ("clf", MLPClassifier(hidden_layer_sizes=(MLP_HIDDEN,), solver=MLP_SOLVER, alpha=MLP_ALPHA, max_iter=MLP_MAX_ITER, random_state=rs)),
         ]),
     }
 
