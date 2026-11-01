@@ -85,14 +85,22 @@ CHAR_C = 10.0
 # (scripts/select_neural_member.py), by the whole stacker's log-loss.
 MLP_SELECT_K = 5000
 MLP_HIDDEN = 16
-# Solver: L-BFGS, which scikit-learn recommends for small datasets. The
-# first version used Adam, which stopped at its 300-step limit (~4 s per
-# fit, 12 fits at every app start: ~50 s, minutes on Streamlit Cloud).
-# L-BFGS reaches the optimum in well under a second; with alpha re-chosen
-# the same way (training part only) the stacked system scores the same.
-MLP_SOLVER = "lbfgs"
-MLP_ALPHA = 0.3
-MLP_MAX_ITER = 300
+# Solver: Adam with a FIXED number of steps (no early stop), so every
+# computer trains bit-for-bit the same network: the site (Streamlit Cloud),
+# CI and the exported extension model must agree to 1e-6 (tests check it).
+#   - Adam, 300 steps (31.10): same everywhere, but ~4 s per fit and the
+#     app fits it 12 times at start (~1 min to open, minutes on the cloud).
+#   - L-BFGS (01.11, PR #26): ~1 s, but it stops when "converged", and that
+#     moment depends on the CPU's BLAS kernels: 91-107 steps on different
+#     CPUs, probabilities up to 0.06 apart -> CI failed, and the site could
+#     disagree with the extension.
+#   - Now: Adam, 60 steps, learning rate 0.003: ~1 s, identical to 3e-16 on
+#     every BLAS kernel tested, stacked log-loss 0.0887 (chosen on the
+#     training part only: reports/neural_member/selection_adam_fixed.csv).
+MLP_SOLVER = "adam"
+MLP_ALPHA = 0.01
+MLP_LEARNING_RATE = 0.003
+MLP_MAX_ITER = 60
 STACK_C = 1.0
 STACK_FOLDS = 5
 TEMPLATE_SIMILARITY = 0.6
@@ -178,7 +186,9 @@ def build_base_models() -> dict:
         "mlp": Pipeline([
             ("tfidf", TfidfVectorizer(analyzer="char_wb", ngram_range=CHAR_NGRAM_RANGE, min_df=CHAR_MIN_DF, sublinear_tf=True, lowercase=True)),
             ("select", Chi2TopK(MLP_SELECT_K)),
-            ("clf", MLPClassifier(hidden_layer_sizes=(MLP_HIDDEN,), solver=MLP_SOLVER, alpha=MLP_ALPHA, max_iter=MLP_MAX_ITER, random_state=rs)),
+            ("clf", MLPClassifier(hidden_layer_sizes=(MLP_HIDDEN,), solver=MLP_SOLVER, alpha=MLP_ALPHA,
+                                  learning_rate_init=MLP_LEARNING_RATE, max_iter=MLP_MAX_ITER,
+                                  tol=0.0, n_iter_no_change=MLP_MAX_ITER, random_state=rs)),
         ]),
     }
 

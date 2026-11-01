@@ -1,15 +1,22 @@
 """
 How the neural member's settings (fraud_model.MLP_*) were chosen.
 
-    python scripts/select_neural_member.py --quick                 # current (L-BFGS) choice, 8 candidates, ~3 min
-    python scripts/select_neural_member.py --solver adam           # the first (Adam) search, 38 candidates, ~40 min
+    python scripts/select_neural_member.py --quick                 # CURRENT: fixed-step Adam, 10 candidates, ~5 min
+    python scripts/select_neural_member.py                         # the first Adam search, 38 candidates, ~40 min
+    python scripts/select_neural_member.py --quick --solver lbfgs  # the L-BFGS search (not used, see below)
 
-Two searches were made. 31.10.2026, solver Adam: 38 candidates, pick
+Three searches were made. 31.10.2026, solver Adam: 38 candidates, pick
 k5000_h16_a0.01 (selection.csv). 01.11.2026, solver L-BFGS (Adam needed
 ~4 s per fit and the site trains the network 12 times at every start, so it
 took ~1 min to open, minutes on Streamlit Cloud): the alpha re-chosen the
 same way, pick k5000_h16_a0.3, the same stacked log-loss and Brier score
-(0.0899 / 0.0238) at ~0.6 s per fit (selection_lbfgs.csv).
+(0.0899 / 0.0238) at ~0.6 s per fit (selection_lbfgs.csv). Dropped the
+same day: L-BFGS stops when it judges itself converged, and that moment
+depends on the CPU's BLAS kernels (91-107 steps on different CPUs), so CI
+and the cloud trained a different network than the exported extension
+model. 01.11.2026, fixed-step Adam (every computer runs exactly the same
+steps, identical to 3e-16): pick lr 0.003, 60 steps, alpha 0.01, the lowest
+stacked log-loss (0.0887) at ~0.8 s per fit (selection_adam_fixed.csv).
 
 Uses ONLY the training part of the jury split (the same 80/20 grouped split
 as scripts/run_jury_evaluation.py) plus the real SMS sample - the jury's
@@ -58,16 +65,24 @@ OLD_MEMBERS = ["lr", "rf", "gb", "tfidf", "char"]   # the 5-model system
 
 
 def candidates(quick: bool, solver: str) -> dict:
-    def make(hidden, alpha, k=None):
-        steps = [("tfidf", TfidfVectorizer(analyzer="char_wb", ngram_range=fm.CHAR_NGRAM_RANGE, min_df=fm.CHAR_MIN_DF,
-                                           sublinear_tf=True, lowercase=True))]
+    def make(hidden, alpha, k=None, lr=0.001, n_iter=None):
+        pipe = [("tfidf", TfidfVectorizer(analyzer="char_wb", ngram_range=fm.CHAR_NGRAM_RANGE, min_df=fm.CHAR_MIN_DF,
+                                          sublinear_tf=True, lowercase=True))]
         if k:
-            steps.append(("select", fm.Chi2TopK(k)))
-        steps.append(("clf", MLPClassifier(hidden_layer_sizes=(hidden,), alpha=alpha, max_iter=fm.MLP_MAX_ITER,
-                                           solver=solver, random_state=fm.MODEL_RANDOM_STATE)))
-        return Pipeline(steps)
+            pipe.append(("select", fm.Chi2TopK(k)))
+        # n_iter given: exactly that many Adam steps, no early stop
+        fixed = {"tol": 0.0, "n_iter_no_change": n_iter} if n_iter else {}
+        pipe.append(("clf", MLPClassifier(hidden_layer_sizes=(hidden,), alpha=alpha, solver=solver,
+                                          max_iter=n_iter or 300, learning_rate_init=lr,
+                                          random_state=fm.MODEL_RANDOM_STATE, **fixed)))
+        return Pipeline(pipe)
 
-    if quick:
+    if quick and solver == "adam":   # fixed-step Adam, 01.11.2026 (selection_adam_fixed.csv)
+        grid = [(lr, n, a) for lr, n in [(0.001, 300), (0.003, 60), (0.003, 100), (0.01, 30), (0.01, 50)]
+                for a in (0.01, 0.1)]
+        return {f"k5000_h16_lr{lr:g}_it{n}_a{a:g}": (lambda lr=lr, n=n, a=a: make(16, a, 5000, lr, n))
+                for lr, n, a in grid}
+    if quick:   # L-BFGS, 01.11.2026 (selection_lbfgs.csv)
         grid_all = []
         grid_sel = [(5000, 16, a) for a in (0.003, 0.01, 0.03, 0.1, 0.3, 1.0)] + [(5000, 8, 0.1), (3000, 16, 0.1)]
     else:
@@ -147,7 +162,8 @@ def main():
         print({k: (round(v, 4) if isinstance(v, float) else v) for k, v in r.items()}, flush=True)
 
     res = pd.DataFrame(rows).set_index("model").sort_values("stack_logloss")
-    res.to_csv(OUT / ("selection.csv" if args.solver == "adam" else "selection_lbfgs.csv"))
+    name = "selection_lbfgs.csv" if args.solver == "lbfgs" else ("selection_adam_fixed.csv" if args.quick else "selection.csv")
+    res.to_csv(OUT / name)
     print(res.round(4).to_string())
 
 
