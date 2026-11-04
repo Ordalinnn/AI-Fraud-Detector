@@ -240,7 +240,17 @@ function extractBareDomains(textLower, urls) {
 }
 
 function getDomain(url) {
-  return url.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
+  // The port and trailing-punctuation strip matters for detection, not just
+  // display: a link that ends a sentence ("...secure-login.xyz.") or carries
+  // an explicit port used to keep the "." / ":8443" in the domain, so the
+  // suspicious-TLD check (an endsWith test for .xyz/.top/.icu) silently
+  // stopped firing. Mirrors fraud_logic.get_domain().
+  return url
+    .replace(/^https?:\/\//, "")
+    .replace(/^www\./, "")
+    .split("/")[0]
+    .split(":")[0]
+    .replace(/[.,;:!?)"'\u00bb\u201d]+$/, "");
 }
 
 function brandImpersonation(domain) {

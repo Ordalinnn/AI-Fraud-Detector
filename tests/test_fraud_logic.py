@@ -171,6 +171,27 @@ def test_get_domain_does_not_strip_non_leading_www_substring():
     assert get_domain("http://kaspi-www.secure-login.xyz/path") == "kaspi-www.secure-login.xyz"
 
 
+def test_get_domain_strips_trailing_punctuation_and_port():
+    # extract_urls() matches everything up to whitespace, so a link ending a
+    # sentence or carrying a port used to keep the "." / ":8443" in the
+    # "domain" and the suspicious-TLD endswith check stopped firing.
+    assert get_domain("http://secure-login.xyz.") == "secure-login.xyz"
+    assert get_domain("http://secure-login.xyz,") == "secure-login.xyz"
+    assert get_domain("http://secure-login.xyz:8443/login") == "secure-login.xyz"
+    assert get_domain("https://secure-login.xyz)") == "secure-login.xyz"
+
+
+def test_link_at_end_of_sentence_still_flags_a_suspicious_tld():
+    # The most common way people paste a scam link: at the end of a sentence,
+    # often with a port. The TLD signal (and its rule-boost input) must fire.
+    for text in ("visit http://secure-login.xyz now",
+                 "visit http://secure-login.xyz.",
+                 "visit http://secure-login.xyz:8443/login"):
+        features, domains = extract_features(text)
+        assert features["suspicious_zone"] == 1, text
+        assert domains == ["secure-login.xyz"], text
+
+
 def test_extract_urls_finds_http_and_www_links():
     urls = extract_urls("visit http://a.com or www.b.com today")
     assert len(urls) == 2

@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import threading
+import time
 import uuid
 import zipfile
 import numpy as np
@@ -22,6 +23,7 @@ import re
 import sys
 import text_normalize
 import mistakes
+import deep_analysis
 import fraud_logic
 import fraud_model
 import speech
@@ -37,7 +39,7 @@ def _reload_changed_local_modules():
     # In dependency order. If any changed, reload it and everything after it
     # (fraud_logic does `from text_normalize import ...`, so it must be
     # reloaded to pick up a new text_normalize).
-    mods = (text_normalize, mistakes, fraud_logic, fraud_model, speech, translations)
+    mods = (text_normalize, mistakes, fraud_logic, fraud_model, speech, deep_analysis, translations)
     changed = False
     for mod in mods:
         mod = sys.modules.get(mod.__name__, mod)
@@ -328,7 +330,40 @@ def build_extension_zip(fingerprint: tuple = ()) -> bytes:
 # persisted (e.g. a mounted volume) without editing code.
 DATA_DIR = Path("session_data")
 FEEDBACK_FILE = Path("feedback.json")
+# Retention limits. Both files are written by every visitor and neither used to
+# be bounded, so a long-running public deployment grew without limit AND kept
+# people's messages forever. History keeps the newest N checks per session, the
+# shared feedback file keeps the newest N rows, and history files belonging to
+# sessions that never came back are deleted after a month.
+MAX_HISTORY_ENTRIES = 50
+MAX_FEEDBACK_ENTRIES = 5000
+HISTORY_RETENTION_DAYS = 30
 _feedback_lock = threading.Lock()
+_prune_done = False
+
+def _prune_old_history(directory=DATA_DIR, days=HISTORY_RETENTION_DAYS):
+    """Deletes history files last written more than `days` days ago and returns
+    how many were removed. Runs once per process (at import) so a redeploy does
+    not rescan the folder on every rerun."""
+    global _prune_done
+    if _prune_done:
+        return 0
+    _prune_done = True
+    cutoff = time.time() - days * 86400
+    removed = 0
+    try:
+        for path in Path(directory).glob("history_*.json"):
+            try:
+                if path.stat().st_mtime < cutoff:
+                    path.unlink()
+                    removed += 1
+            except OSError:
+                logger.warning("Failed to prune %s", path, exc_info=True)
+    except OSError:
+        logger.warning("Failed to scan %s for old history files", directory, exc_info=True)
+    return removed
+
+_prune_old_history()
 
 def _session_id():
     """A random id generated once per browser session (not per rerun),
@@ -341,12 +376,20 @@ def _history_file():
     return DATA_DIR / f"history_{_session_id()}.json"
 
 def _load_json(path):
+    """Reads a JSON list. Anything unreadable, corrupt, or not a list is
+    treated as empty: these files are written only by this app, but a partial
+    restore or an operator edit must not turn the next feedback click into an
+    unhandled AttributeError."""
     if path.exists():
         try:
-            return json.loads(path.read_text(encoding="utf-8"))
+            data = json.loads(path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             logger.warning("Failed to read/parse %s, treating as empty", path, exc_info=True)
             return []
+        if not isinstance(data, list):
+            logger.warning("%s did not contain a JSON list, treating as empty", path)
+            return []
+        return data
     return []
 
 def _atomic_write_json(path, data):
@@ -363,22 +406,25 @@ def _atomic_write_json(path, data):
 def load_history():
     """Loads this browser session's own past analysis results, so the
     History tab survives an app restart/rerun without ever showing another
-    visitor's data."""
-    return _load_json(_history_file())
+    visitor's data. Only the newest MAX_HISTORY_ENTRIES are kept."""
+    return _load_json(_history_file())[-MAX_HISTORY_ENTRIES:]
 
 def save_history(history):
-    """Writes this session's full history list back to its own file.
-    Called after every analysis and after clearing history."""
-    _atomic_write_json(_history_file(), history)
+    """Writes this session's history list back to its own file, keeping only
+    the newest MAX_HISTORY_ENTRIES entries so the file - and the server disk
+    behind it - cannot grow without limit. Called after every analysis and
+    after clearing history."""
+    _atomic_write_json(_history_file(), list(history)[-MAX_HISTORY_ENTRIES:])
 
 def append_feedback_entry(entry):
     """Appends one "was this correct?" entry to the shared feedback.json
     under a lock, re-reading the file first so a concurrent submission from
-    another session in between isn't lost."""
+    another session in between isn't lost. Only the newest
+    MAX_FEEDBACK_ENTRIES rows are kept."""
     with _feedback_lock:
         current = _load_json(FEEDBACK_FILE)
         current.append(entry)
-        _atomic_write_json(FEEDBACK_FILE, current)
+        _atomic_write_json(FEEDBACK_FILE, current[-MAX_FEEDBACK_ENTRIES:])
 
 # =========================
 # DEEP ANALYSIS (optional, external — sends text to the Anthropic API)
@@ -390,14 +436,11 @@ def append_feedback_entry(entry):
 #   .streamlit/secrets.toml -> ANTHROPIC_API_KEY = "sk-ant-..."
 # (never commit that file — it's already in .gitignore) or the
 # ANTHROPIC_API_KEY environment variable for non-Streamlit-Cloud hosts.
-DEEP_ANALYSIS_MODEL = "claude-haiku-4-5-20251001"
-# A per-session cooldown (not a hard rate limit — this is a single-instance
-# prototype with no shared request store) so a user can't burn through API
-# quota by mashing the button; each click still costs a real Anthropic API call.
-DEEP_ANALYSIS_COOLDOWN_SECONDS = 15
-# Without an explicit timeout a hung network connection could leave the
-# Streamlit script (and the user's spinner) stuck indefinitely.
-DEEP_ANALYSIS_TIMEOUT_SECONDS = 30.0
+# The prompt building, response handling and cooldown live in
+# deep_analysis.py (no Streamlit import) so they are unit-tested - see
+# tests/test_deep_analysis.py. Only the cooldown length is needed here, for the
+# caption under the button.
+DEEP_ANALYSIS_COOLDOWN_SECONDS = deep_analysis.DEEP_ANALYSIS_COOLDOWN_SECONDS
 
 def get_anthropic_api_key():
     """Reads the API key from Streamlit secrets first, then the
@@ -415,32 +458,12 @@ def get_anthropic_api_key():
     return os.environ.get("ANTHROPIC_API_KEY")
 
 def run_deep_analysis(text, lang_name):
-    """Sends the message to Claude for a genuine reasoning-based second
-    opinion (not keyword matching): what manipulation tactics it uses, if
-    any, and whether it looks like a real scam pattern. Returns the
-    response text. Raises on any failure — the caller is responsible for
-    catching and showing a friendly error, since network/API issues are
-    expected here (rate limits, missing key, no internet)."""
-    import anthropic
-
-    api_key = get_anthropic_api_key()
-    if not api_key:
-        raise RuntimeError("no_api_key")
-
-    client = anthropic.Anthropic(api_key=api_key, timeout=DEEP_ANALYSIS_TIMEOUT_SECONDS)
-    prompt = (
-        f"You are a fraud-detection assistant. Analyze the following message for signs "
-        f"of a scam. Respond in {lang_name}, in 3-5 concise sentences: name the specific "
-        f"manipulation tactics you notice (if any), say whether this matches a real-world "
-        f"scam pattern, and what the recipient should do. If it looks safe, say so plainly "
-        f"and explain why.\n\nMessage to analyze:\n\"\"\"\n{text}\n\"\"\""
-    )
-    response = client.messages.create(
-        model=DEEP_ANALYSIS_MODEL,
-        max_tokens=400,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    return response.content[0].text
+    """Second opinion from Claude for this message. Delegates to
+    deep_analysis.analyse(), which builds the injection-hardened prompt (the
+    message is data between fixed markers, never part of the instructions) and
+    raises DeepAnalysisError for the two expected failures; network/API errors
+    propagate, and the caller shows a friendly message for all of them."""
+    return deep_analysis.analyse(text, lang_name, get_anthropic_api_key())
 
 # =========================
 # LANGUAGE
@@ -4020,6 +4043,8 @@ with st.sidebar:
         )
 
     st.divider()
+    st.caption(T["model_metrics_noise"])
+
     with st.expander(f"🛠️ {T['dev_stack']}"):
         for item in [T["dev_stack_ensemble"], T["dev_stack_feature_eng"], T["badge_domain_analysis"],
                      T["badge_explainable_ai"], T["dev_stack_risk_boost"], T["dev_stack_scam_scenarios"]]:
@@ -4639,6 +4664,8 @@ if mode != "batch" and analyze:
             "Features": len(explanations),
             "Text": input_text[:70] + ("..." if len(input_text) > 70 else ""),
         })
+        # Keep the in-memory list bounded too, not just the file on disk.
+        st.session_state.history = st.session_state.history[-MAX_HISTORY_ENTRIES:]
         save_history(st.session_state.history)
 
 def _model_probs(r):
@@ -4675,7 +4702,7 @@ if mode != "batch" and "last_result" in st.session_state:
     c1.markdown(metric_card("chart", "blue", T["risk"], f'{risk_percent(r["prob"])}%'), unsafe_allow_html=True)
     c2.markdown(metric_card("alert", "amber", T["detected"], len(r["explanations"])), unsafe_allow_html=True)
     c3.markdown(metric_card("sliders", "indigo", T["threshold"], f'{r["threshold"]:.2f}'), unsafe_allow_html=True)
-    c4.markdown(metric_card("cpu", "teal", T["models_stacked"], 5), unsafe_allow_html=True)
+    c4.markdown(metric_card("cpu", "teal", T["models_stacked"], len(fm.BASE_MODELS)), unsafe_allow_html=True)
     st.caption(f"ℹ️ {T['model_help']} · model {MODEL_FINGERPRINT[:8]}")
 
     _verdict_icon = {"risk-low": "shield-check", "risk-critical": "siren"}.get(r["risk_class"], "shield-alert")
@@ -4700,6 +4727,10 @@ if mode != "batch" and "last_result" in st.session_state:
     fb_label.markdown(
         f"**{T['feedback_thanks'] if already_gave_feedback else T['feedback_prompt']}**"
     )
+    # These buttons are the one place where a message is stored server-side for
+    # other people's benefit, so say so right next to them instead of only in
+    # the README.
+    fb_label.caption(T["feedback_privacy_note"])
     if fb1.button(T["feedback_yes"], width="stretch", disabled=bool(already_gave_feedback), key="fb_yes"):
         append_feedback_entry({
             "Time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -4992,24 +5023,27 @@ SECURITY ADVICE:
         if not get_anthropic_api_key():
             st.info(T["deep_analysis_not_configured"])
         else:
-            last_click = st.session_state.get("deep_analysis_last_click")
-            cooldown_remaining = 0.0
-            if last_click is not None:
-                elapsed = (datetime.now() - last_click).total_seconds()
-                cooldown_remaining = max(0.0, DEEP_ANALYSIS_COOLDOWN_SECONDS - elapsed)
-
-            if st.button(T["deep_analysis_button"], key="deep_analysis_btn", disabled=cooldown_remaining > 0):
-                st.session_state["deep_analysis_last_click"] = datetime.now()
-                lang_name = {"🇰🇿 KZ": "Kazakh", "🇷🇺 RU": "Russian", "🇬🇧 EN": "English"}.get(lang, "English")
-                with st.spinner(T["deep_analysis_loading"]):
-                    try:
-                        st.session_state["deep_analysis_result"] = run_deep_analysis(r["input_text"], lang_name)
-                    except Exception:
-                        logger.warning("Deep analysis (Claude) call failed", exc_info=True)
-                        st.session_state["deep_analysis_result"] = None
-                        st.error(T["deep_analysis_error"])
-            elif cooldown_remaining > 0:
-                st.caption(T["deep_analysis_cooldown"].format(seconds=int(cooldown_remaining) + 1))
+            # The button is never disabled: a widget disabled by an earlier
+            # rerun is only re-evaluated on the *next* rerun, so after the
+            # cooldown expired it stayed dead until the user happened to touch
+            # something else. The cooldown is enforced here instead, where it
+            # takes effect on the click that matters.
+            remaining = deep_analysis.cooldown_remaining(st.session_state.get("deep_analysis_last_click"))
+            if st.button(T["deep_analysis_button"], key="deep_analysis_btn"):
+                if remaining > 0:
+                    st.caption(T["deep_analysis_cooldown"].format(seconds=int(remaining) + 1))
+                else:
+                    st.session_state["deep_analysis_last_click"] = datetime.now()
+                    lang_name = {"🇰🇿 KZ": "Kazakh", "🇷🇺 RU": "Russian", "🇬🇧 EN": "English"}.get(lang, "English")
+                    with st.spinner(T["deep_analysis_loading"]):
+                        try:
+                            st.session_state["deep_analysis_result"] = run_deep_analysis(r["input_text"], lang_name)
+                        except Exception:
+                            logger.warning("Deep analysis (Claude) call failed", exc_info=True)
+                            st.session_state["deep_analysis_result"] = None
+                            st.error(T["deep_analysis_error"])
+            elif remaining > 0:
+                st.caption(T["deep_analysis_cooldown"].format(seconds=int(remaining) + 1))
 
             if st.session_state.get("deep_analysis_result"):
                 st.markdown(f"**{T['deep_analysis_result_title']}**")
