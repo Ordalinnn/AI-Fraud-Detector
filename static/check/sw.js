@@ -9,7 +9,7 @@
 // sw.js, installs the new files and deletes the old ones.
 
 // BEGIN GENERATED (scripts/build_web_checker.py)
-const VERSION = "56f2a502a8ee720b";
+const VERSION = "c109faae3558a23d";
 const ASSETS = [
   "app.css",
   "app.js",

@@ -467,6 +467,26 @@ function ruleBoost(f) {
   return Math.min(boost, 0.30);
 }
 
+// Genuine bank one-time-code notifications warn the user NOT to share the
+// code; scams that imitate that shape either ask for the code or add an
+// exception ("except the employee who calls you"). Mirrors
+// fraud_logic.is_code_notification() in the web app.
+const CODE_WORD = /код|парол|құпия\s+сөз|\botp\b|one[- ]time|verification\s+code|\bpin\b/iu;
+const CODE_DIGITS = /(?:^|\D)\d{4,8}(?!\d)/u;
+const CODE_DO_NOT_SHARE = /не\s+(сообщайте|передавайте|диктуйте|называйте|отправляйте|присылайте)|никому\s+не|\b(do not|don'?t|never)\s+(share|give|tell|send|forward|reveal|disclose)\b|(бермеңіз|жіберіңіз|айтпаңыз|бөліспеңіз|хабарламаңыз)/iu;
+const CODE_REQUEST = /(сообщите|передайте|продиктуйте|назовите|отправьте|пришлите|введите|скажите)\s+(мне\s+|нам\s+)?(его\s+|этот\s+|свой\s+|ваш\s+)?(код|парол|смс|цифр|пин)|\b(send|give|tell|share|provide|read|forward)\s+(me\s+|us\s+)?(the\s+|your\s+|this\s+)?(code|password|otp|pin)\b|(айтыңыз|жіберіңіз|беріңіз)\s+.{0,25}(код|құпия|пин)|(код|құпия|пин)[\s\S]{0,80}(айтыңыз|жіберіңіз|беріңіз)/iu;
+const CODE_EXCEPTION = /кроме|\bexcept\b|басқа|за\s+исключением/iu;
+// Below the 0.5 verdict line, so a real notification is shown as safe; the
+// score and reasons stay visible instead of being suppressed.
+const CODE_NOTIFICATION_CAP = 0.35;
+
+function isCodeNotification(text) {
+  const t = normalizeForRules(String(text == null ? "" : text));
+  return CODE_WORD.test(t) && CODE_DIGITS.test(t) && CODE_DO_NOT_SHARE.test(t)
+    && !CODE_REQUEST.test(t) && !CODE_EXCEPTION.test(t);
+}
+
+
 // Reason keys, in display order. popup.js/background.js resolve each to
 // the current UI language's text via I18N.strings(lang).reasonLabels.
 // wordCount/textLength/avgWordLength are deliberately excluded (mirrors
@@ -554,6 +574,10 @@ function analyzeText(text, scorer) {
     const base = (1 - LR_BLEND_WEIGHT) * heuristicBaseScore(f) + LR_BLEND_WEIGHT * lrScore(f);
     prob = Math.min(0.99, base + ruleBoost(f));
   }
+  // A real one-time-code notification is not a scam: cap it below the verdict
+  // line. Only ever lowers the score, so nothing flagged before goes quiet.
+  const codeNotification = isCodeNotification(text);
+  if (codeNotification) prob = Math.min(prob, CODE_NOTIFICATION_CAP);
   const style = riskStyle(prob);
   const reasons = explain(f);
   // Disguised text ("к0д", Latin look-alikes, invisible characters) is a
@@ -569,7 +593,8 @@ function analyzeText(text, scorer) {
     domainInfo,
     modelWords,
     scores,
-    engine
+    engine,
+    codeNotification
   };
 }
 

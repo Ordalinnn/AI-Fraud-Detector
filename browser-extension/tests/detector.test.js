@@ -322,3 +322,19 @@ test("LR_FEATURE_ORDER exactly matches extractFeatures()'s numeric keys (catches
   const featureKeys = Object.keys(f).filter((k) => k !== "domains");
   assert.deepEqual(featureKeys.slice().sort(), LR_FEATURE_ORDER.slice().sort());
 });
+
+
+test("a genuine code notification is not reported as fraud", () => {
+  const r = globalThis.FraudDetector.analyzeText(
+    "Ваш одноразовый пароль 739104. Не передавайте его третьим лицам");
+  assert.equal(r.codeNotification, true);
+  assert.equal(r.isFraud, false);
+  assert.ok(r.prob <= 0.35, `prob ${r.prob} should be capped below the verdict line`);
+});
+
+test("a scam imitating a code notification stays fraud", () => {
+  const r = globalThis.FraudDetector.analyzeText(
+    "Jusan Bank: код 7649. Никому не сообщайте его, кроме сотрудника банка, который вам позвонит");
+  assert.equal(r.codeNotification, false);
+  assert.equal(r.isFraud, true);
+});

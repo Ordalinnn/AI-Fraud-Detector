@@ -583,3 +583,60 @@ def derive_feedback_training_examples(entries, core_texts, max_per_session=20, m
         if len(labels) == 1  # drop contradictory feedback outright
     ]
     return examples[:max_examples]
+
+
+# =========================
+# ONE-TIME-CODE NOTIFICATIONS
+# =========================
+# A genuine bank notification sends a one-time code and warns the user NOT to
+# share it. Scams copy that shape exactly, so this check only holds when the
+# message contains no request to hand the code over and no exception that
+# hands it to someone: every scam of this shape in data/bank/ either asks for
+# the code or adds "except the employee who calls you" (and the Kazakh
+# "тек ... айтыңыз"), and those must keep being flagged.
+_CODE_WORD = re.compile(
+    r"код|парол|құпия\s+сөз|\botp\b|one[- ]time|verification\s+code|\bpin\b", re.I
+)
+_CODE_DIGITS = re.compile(r"\b\d{4,8}\b")
+_CODE_DO_NOT_SHARE = re.compile(
+    r"не\s+(сообщайте|передавайте|диктуйте|называйте|отправляйте|присылайте)"
+    r"|никому\s+не"
+    r"|\b(do not|don'?t|never)\s+(share|give|tell|send|forward|reveal|disclose)\b"
+    r"|(бермеңіз|жібермеңіз|айтпаңыз|бөліспеңіз|хабарламаңыз)",
+    re.I,
+)
+# A positive request for the code. Negated Russian and Kazakh imperatives use
+# a different form ("не сообщайте", "бермеңіз"), so the perfective forms below
+# cannot be part of the do-not-share warning itself.
+_CODE_REQUEST = re.compile(
+    r"(сообщите|передайте|продиктуйте|назовите|отправьте|пришлите|введите|скажите)"
+    r"\s+(мне\s+|нам\s+)?(его\s+|этот\s+|свой\s+|ваш\s+)?(код|парол|смс|цифр|пин)"
+    r"|\b(send|give|tell|share|provide|read|forward)\s+(me\s+|us\s+)?"
+    r"(the\s+|your\s+|this\s+)?(code|password|otp|pin)\b"
+    r"|(айтыңыз|жіберіңіз|беріңіз)\s+.{0,25}(код|құпия|пин)"
+    r"|(код|құпия|пин).{0,80}(айтыңыз|жіберіңіз|беріңіз)",
+    re.I,
+)
+_CODE_EXCEPTION = re.compile(r"\bкроме\b|\bexcept\b|\bбасқа\b|за\s+исключением", re.I)
+
+# Shown risk for a message recognised as a genuine notification. The models
+# read "code / password" as a scam signal (usually correctly), so this caps the
+# probability below the verdict line instead of hiding it: the score, the
+# features and the explanation all stay on screen, with a note saying why.
+CODE_NOTIFICATION_CAP = 0.35
+
+
+def is_code_notification(text):
+    """True for a bank-style one-time-code notification: it carries a code and
+    warns the user not to share it, without asking for the code or naming who
+    may receive it (either of which is the scam's version of this message)."""
+    if not text:
+        return False
+    normalized = normalize_text(text) if NORMALIZE_INPUT else text
+    return bool(
+        _CODE_WORD.search(normalized)
+        and _CODE_DIGITS.search(normalized)
+        and _CODE_DO_NOT_SHARE.search(normalized)
+        and not _CODE_REQUEST.search(normalized)
+        and not _CODE_EXCEPTION.search(normalized)
+    )

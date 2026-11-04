@@ -338,3 +338,20 @@ def test_malformed_feedback_file_does_not_break_the_feedback_click(isolated_cwd)
     assert isinstance(entries, list)
     assert len(entries) == 1
     assert entries[0]["Text"] == "malformed feedback file check"
+
+
+def test_genuine_bank_code_notification_is_not_reported_as_fraud(isolated_cwd):
+    # The single worst error this app can make is calling a user's own bank
+    # notification a scam: it was 3 of 31 safe bank-test messages before this
+    # guard. "Code / password" is a genuine scam signal, so the exception is
+    # narrow - fraud_logic.is_code_notification() only accepts a message that
+    # carries a code, warns against sharing it, and neither asks for it nor
+    # names an exception.
+    at = AppTest.from_file(APP_PATH, default_timeout=90)
+    at.run()
+    _submit_message(at, "Ваш одноразовый пароль 739104. Не передавайте его третьим лицам")
+    assert not at.exception, at.exception
+    result = at.session_state["last_result"]
+    assert result["code_notification"] is True
+    assert result["pred"] == 0, "a real notification must not be called fraud"
+    assert result["prob"] <= 0.35

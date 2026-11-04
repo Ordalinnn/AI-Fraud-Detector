@@ -63,7 +63,7 @@ _reload_changed_local_modules()
 fm = fraud_model
 from fraud_logic import (
     domain_flags, extract_features, risk_level, risk_percent, highlight_text,
-    sanitize_for_csv,
+    sanitize_for_csv, is_code_notification, CODE_NOTIFICATION_CAP,
 )
 from translations import LANG_OPTIONS, OLD_LANG_MAP, DEFAULT_LANG, get_translations
 
@@ -2781,6 +2781,17 @@ def ensemble_predict(feats_list, texts):
     "final" (the stacker's calibrated probability)."""
     scores = fraud_model.score(list(texts), pd.DataFrame(feats_list))
     scores["raw"] = scores["average"]
+    # A genuine bank notification that carries a one-time code is capped below
+    # the verdict line instead of being called fraud: "code / password" is a
+    # strong scam signal (and every scam imitating this shape asks for the code
+    # or names an exception), so the exception is narrow on purpose. The cap
+    # only lowers the score, never raises it. See
+    # fraud_logic.is_code_notification().
+    finals = np.asarray(scores["final"], dtype=float).copy()
+    for i, text in enumerate(texts):
+        if is_code_notification(text):
+            finals[i] = min(finals[i], CODE_NOTIFICATION_CAP)
+    scores["final"] = finals
     return scores
 
 # =========================
@@ -4651,6 +4662,7 @@ if mode != "batch" and analyze:
             "risk_class": risk_class,
             "emoji": emoji,
             "explanations": explanations,
+            "code_notification": is_code_notification(input_text),
             "lang": lang,
         }
         st.session_state.pop("feedback_given", None)
@@ -4721,6 +4733,10 @@ if mode != "batch" and "last_result" in st.session_state:
         st.error(T["bad_advice"])
     else:
         st.success(T["good_advice"])
+    # The model reads "code / password" as a scam signal, so say why this
+    # message was capped instead of leaving the visitor to guess.
+    if r.get("code_notification"):
+        st.info(T["code_notification_note"])
 
     already_gave_feedback = st.session_state.get("feedback_given")
     fb_label, fb1, fb2 = st.columns([2, 1, 1])
