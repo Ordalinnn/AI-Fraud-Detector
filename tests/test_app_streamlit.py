@@ -34,7 +34,10 @@ def isolated_cwd(tmp_path, monkeypatch):
 
 def _submit_message(at, text):
     at.text_area(key="main_input_text").set_value(text)
-    submit = [b for b in at.button if "analysis_form" in b.key][0]
+    # b.key is None for buttons rendered without an explicit key (the feedback
+    # and download buttons are keyed, but not every button on a rendered result
+    # is), so filter on key presence before matching.
+    submit = [b for b in at.button if b.key and "analysis_form" in b.key][0]
     submit.click().run()
     return at
 
@@ -165,14 +168,12 @@ def test_txt_upload_over_max_chars_is_truncated_with_warning(isolated_cwd):
     assert result, "analysis should still succeed on the truncated text"
 
 
-def test_pre_existing_feedback_is_folded_into_training_data_on_next_run(isolated_cwd):
+def test_pre_existing_feedback_does_not_leak_or_break_startup(isolated_cwd):
     # Simulates a prior visitor's feedback already sitting in feedback.json
-    # (e.g. from before this server process last restarted). A fresh app
-    # run must train on it without raising - this is the main integration
-    # risk load_feedback_examples()/training_data adds (wrong field names,
-    # JSON shape mismatch, ordering bugs at module-load time, etc.) that the
-    # pure-function tests in test_fraud_logic.py can't catch on their own,
-    # since they never actually run it through train_models().
+    # (e.g. from before this server process last restarted). feedback.json is
+    # no longer folded into training (see the TRAINING DATA comment in
+    # app.py), but a fresh app run must still start on it without raising, and
+    # must never render it back into anyone's page.
     (isolated_cwd / "feedback.json").write_text(json.dumps([
         {
             "Time": "2026-01-01 00:00:00",
@@ -189,9 +190,9 @@ def test_pre_existing_feedback_is_folded_into_training_data_on_next_run(isolated
     assert not at.exception, at.exception
 
     # feedback.json is a private, shared-across-users log (see the
-    # HISTORY & FEEDBACK PERSISTENCE comment in app.py) - folding it into
-    # training data must never cause a past submission's raw text to be
-    # rendered back into anyone's page.
+    # HISTORY & FEEDBACK PERSISTENCE comment in app.py) - reading it at
+    # startup must never cause a past submission's raw text to be rendered
+    # back into anyone's page.
     rendered = "\n".join(md.value for md in at.markdown)
     assert "a brand new scam phrasing not in the core dataset" not in rendered
 
@@ -237,3 +238,103 @@ def test_wrong_verdict_offers_csv_for_the_team(isolated_cwd):
     # the model called this disguised scam fraud; "wrong" means the visitor says it is not
     assert rows[0]["label"] == (0 if at.session_state["last_result"]["pred"] == 1 else 1)
     assert rows[0]["source"].startswith("site: model said")
+
+
+def test_history_file_is_capped_at_max_history_entries(isolated_cwd):
+    # The retention fix in app.py bounds both files a visitor writes to. The
+    # cap is the whole privacy guarantee (README §Privacy promises messages
+    # are not kept indefinitely), and nothing else asserts it actually holds:
+    # a regression here silently re-creates the unbounded disk leak.
+    max_history_entries = 50  # must match MAX_HISTORY_ENTRIES in app.py
+
+    # A visitor who comes back to a session whose file already grew past the
+    # cap (written by an older build, or raced by two tabs) must have it
+    # truncated on read, and the next analysis must write back at most the cap.
+    session_id = "capped-history-session"
+    history_dir = isolated_cwd / "session_data"
+    history_dir.mkdir(parents=True, exist_ok=True)
+    entry_template = {
+        "Time": "2026-01-01 00:00:00",
+        "Risk %": 12.0,
+        "Level": "Low risk",
+        "Verdict": "✅ SAFE",
+        "Features": 2,
+    }
+    overflow = max_history_entries + 10
+    seeded = [{**entry_template, "Text": f"seeded history entry {i}"} for i in range(overflow)]
+    history_path = history_dir / f"history_{session_id}.json"
+    history_path.write_text(json.dumps(seeded), encoding="utf-8")
+
+    at = AppTest.from_file(APP_PATH, default_timeout=90)
+    at.session_state["session_id"] = session_id
+    at.run()
+    assert not at.exception, at.exception
+
+    # Read path: load_history() keeps only the newest entries.
+    assert len(at.session_state["history"]) == max_history_entries
+    loaded_texts = [e["Text"] for e in at.session_state["history"]]
+    assert "seeded history entry 0" not in loaded_texts, "oldest entries must be dropped"
+    assert f"seeded history entry {overflow - 1}" in loaded_texts, "newest entries must be kept"
+
+    # Write path: the analysis appends and saves, still capped.
+    _submit_message(at, "newest message after the cap was already exceeded")
+    assert not at.exception, at.exception
+
+    entries = json.loads(history_path.read_text(encoding="utf-8"))
+    assert len(entries) == max_history_entries
+    assert entries[-1]["Text"] == "newest message after the cap was already exceeded"
+    assert "seeded history entry 0" not in [e["Text"] for e in entries]
+
+
+def test_feedback_file_is_capped_at_max_feedback_entries(isolated_cwd):
+    # Same privacy guarantee for the shared feedback log: it is written by
+    # every visitor and used to grow forever. Oldest rows must be dropped, the
+    # newest click must survive. feedback.json is no longer read as training
+    # data, so seeding it costs no retraining.
+    max_feedback_entries = 5000  # must match MAX_FEEDBACK_ENTRIES in app.py
+
+    seeded_entry = {
+        "Time": "2026-01-01 00:00:00",
+        "Predicted": "SAFE",
+        "Risk %": 12.0,
+        "UserSaysCorrect": True,
+        "Session": "seeded-session",
+    }
+    seeded = [{**seeded_entry, "Text": f"seeded feedback row {i}"} for i in range(max_feedback_entries)]
+    (isolated_cwd / "feedback.json").write_text(json.dumps(seeded), encoding="utf-8")
+
+    at = AppTest.from_file(APP_PATH, default_timeout=90)
+    at.run()
+    _submit_message(at, "feedback cap check message")
+    assert not at.exception, at.exception
+
+    fb_yes = [b for b in at.button if b.key == "fb_yes"][0]
+    fb_yes.click().run()
+    assert not at.exception, at.exception
+
+    entries = json.loads((isolated_cwd / "feedback.json").read_text(encoding="utf-8"))
+    assert len(entries) == max_feedback_entries
+    assert entries[-1]["Text"] == "feedback cap check message"
+    assert "seeded feedback row 0" not in [e["Text"] for e in entries], "oldest rows must be dropped"
+
+
+def test_malformed_feedback_file_does_not_break_the_feedback_click(isolated_cwd):
+    # A dict (partial restore, operator edit, concurrent write by another
+    # version) used to reach current.append() and raise AttributeError as an
+    # unhandled traceback on a visitor's feedback click. Anything that is not
+    # a JSON list must be treated as empty and the click must still work.
+    (isolated_cwd / "feedback.json").write_text(json.dumps({"unexpected": "shape"}), encoding="utf-8")
+
+    at = AppTest.from_file(APP_PATH, default_timeout=90)
+    at.run()
+    _submit_message(at, "malformed feedback file check")
+    assert not at.exception, at.exception
+
+    fb_no = [b for b in at.button if b.key == "fb_no"][0]
+    fb_no.click().run()
+    assert not at.exception, at.exception
+
+    entries = json.loads((isolated_cwd / "feedback.json").read_text(encoding="utf-8"))
+    assert isinstance(entries, list)
+    assert len(entries) == 1
+    assert entries[0]["Text"] == "malformed feedback file check"
