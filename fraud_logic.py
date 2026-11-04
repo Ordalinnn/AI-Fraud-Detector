@@ -6,6 +6,7 @@ that needs a running app/session) so it can be imported directly in unit
 tests. app.py imports everything it needs from here; the UI, translations,
 and model training stay in app.py.
 """
+import html
 import re
 
 from text_normalize import normalize_text
@@ -14,7 +15,6 @@ from text_normalize import normalize_text
 # counting keywords. Switched off only by scripts/eval_obfuscation.py to
 # measure what the step is worth.
 NORMALIZE_INPUT = True
-import html
 
 # =========================
 # WORD / DOMAIN LISTS
@@ -187,15 +187,25 @@ def extract_bare_domains(text_lower, urls):
     return BARE_DOMAIN_PATTERN.findall(masked)
 
 def get_domain(url):
-    """Strips the protocol/www prefix and any path, leaving just the bare domain (e.g. "kaspi-login.xyz").
+    """Strips the protocol/www prefix, any port and any path, plus trailing
+    punctuation, leaving just the bare domain (e.g. "kaspi-login.xyz").
 
     Anchored (^) so a "www." that isn't actually the leading subdomain — e.g.
     the "www." inside "kaspi-www.secure-login.xyz" — isn't silently deleted,
     which would turn it into a different domain than what was actually
-    reported. Mirrors detector.js's getDomain(), which uses the same anchors."""
+    reported. Mirrors detector.js's getDomain(), which uses the same anchors.
+
+    The port and trailing-punctuation strip matters for detection, not just
+    display: extract_urls() matches everything up to whitespace, so the very
+    common "...visit secure-login.xyz." (link ending a sentence) or a link
+    with an explicit port used to keep the "." / ":8443" in the domain, and
+    the suspicious-TLD check (.xyz/.top/.icu, an endswith test) silently
+    stopped firing on it."""
     url = re.sub(r"^https?://", "", url)
     url = re.sub(r"^www\.", "", url)
-    return url.split("/")[0]
+    domain = url.split("/")[0]
+    domain = domain.split(":")[0]
+    return domain.rstrip(".,;:!?)\"'\u00bb\u201d")
 
 def count_matches(text, words):
     """Counts how many entries from `words` appear in `text` (case-insensitive,
@@ -325,15 +335,19 @@ def extract_features(text):
 
     words = norm_lower.split()
     avg_word_len = sum(len(w) for w in words) / len(words) if words else 0
+    # Counted once and reused for has_multiple_warnings below, so the urgency
+    # and threat lists are each scanned once per message instead of twice.
+    urgent_count = count_matches(norm_lower, urgent_words)
+    threat_count = count_matches(norm_lower, threat_words)
 
     return {
         "has_link": int(link_count > 0),
-        "urgent_count": count_matches(norm_lower, urgent_words),
+        "urgent_count": urgent_count,
         "secret_count": count_matches(norm_lower, secret_words),
         "money_count": count_matches(norm_lower, money_words),
         "loan_count": count_matches(norm_lower, loan_words),
         "vote_link_count": count_matches(norm_lower, vote_link_words),
-        "threat_count": count_matches(norm_lower, threat_words),
+        "threat_count": threat_count,
         "identity_count": count_matches(norm_lower, identity_words),
         "reward_count": count_matches(norm_lower, reward_words),
         "pressure_count": count_matches(norm_lower, pressure_phrases),
@@ -351,10 +365,7 @@ def extract_features(text):
         "word_count": len(words),
         "avg_word_length": round(avg_word_len, 2),
         "url_count": link_count,
-        "has_multiple_warnings": int(
-            count_matches(norm_lower, urgent_words) > 0
-            and count_matches(norm_lower, threat_words) > 0
-        ),
+        "has_multiple_warnings": int(urgent_count > 0 and threat_count > 0),
     }, domains
 
 # =========================

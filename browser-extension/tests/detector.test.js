@@ -149,6 +149,14 @@ test("getDomain() strips protocol and path", () => {
   assert.equal(getDomain("http://secure-login.xyz"), "secure-login.xyz");
 });
 
+test("getDomain() strips trailing punctuation and a port", () => {
+  // A link ending a sentence or carrying a port used to keep it in the
+  // "domain", which silently disabled the suspicious-TLD check.
+  const { getDomain } = require("../detector.js");
+  assert.equal(getDomain("http://secure-login.xyz."), "secure-login.xyz");
+  assert.equal(getDomain("http://secure-login.xyz:8443/login"), "secure-login.xyz");
+});
+
 test("extractUrls() finds http and www links", () => {
   const { extractUrls } = require("../detector.js");
   const urls = extractUrls("visit http://a.com or www.b.com today");

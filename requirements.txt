@@ -1,7 +1,17 @@
 streamlit~=1.56
-scikit-learn~=1.8
-pandas~=3.0
-numpy~=2.4
+
+# Pinned EXACTLY, not with a range: the exported extension model
+# (browser-extension/ensemble_model.json) and the Android char model must
+# reproduce the site's numbers to 1e-9 / 1e-6, which depends on these
+# versions' identical TF-IDF idf values, tree thresholds and scaler
+# statistics. Bump them only together with
+# `python scripts/export_extension_model.py` — otherwise
+# tests/test_extension_ensemble.py fails, because the committed model was
+# trained with exactly these versions.
+scikit-learn==1.9.1
+pandas==3.1.1
+numpy==2.5.4
+
 anthropic~=0.121.0
 faster-whisper~=1.2
 
